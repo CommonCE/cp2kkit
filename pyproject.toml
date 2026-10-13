@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cp2kkit"
 version = "0.1.0"
-description = "Read-only CP2K analysis with explicit units and provenance"
+description = "CP2K analysis and non-destructive input generation with explicit units and provenance"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []

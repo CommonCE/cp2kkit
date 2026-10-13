@@ -11,6 +11,7 @@ from .discovery import discover, resolve_output
 from .errors import KitError
 from .export import write_csv
 from .io import json_text, new_file
+from .inputgen import BASES, FUNCTIONALS, PERIODICITIES, RUN_TYPES, InputSettings, write_input
 from .models import SCHEMA_VERSION
 from .parser import parse_output
 from .plot import plot_run
@@ -19,7 +20,7 @@ from .structure import read_structure, xyz_text
 
 
 def build_parser():
-    parser = argparse.ArgumentParser(prog="cp2kkit", description="Read-only CP2K analysis with provenance")
+    parser = argparse.ArgumentParser(prog="cp2kkit", description="CP2K analysis and non-destructive input generation with provenance")
     parser.add_argument("--version", action="version", version=f"cp2kkit {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
     scan = sub.add_parser("discover", help="List projects in one directory (no recursion)")
@@ -44,6 +45,33 @@ def build_parser():
     structure.add_argument("--format", choices=["extxyz", "xyz"], default="extxyz")
     structure.add_argument("--frame", type=int, default=-1, help="XYZ frame index, default last; negative indices allowed")
     structure.add_argument("--allow-cell-loss", action="store_true", help="Explicitly allow plain XYZ to omit a known cell")
+    gen = sub.add_parser("generate-input", help="Generate a conservative GPW CP2K input and provenance JSON")
+    gen.add_argument("path", help="XYZ, extXYZ or text restart structure")
+    gen.add_argument("-o", "--output", required=True)
+    gen.add_argument("--frame", type=int, default=-1)
+    gen.add_argument("--project", default="cp2kkit")
+    gen.add_argument("--run-type", type=str.upper, choices=RUN_TYPES, default="ENERGY")
+    gen.add_argument("--functional", type=str.upper, choices=FUNCTIONALS, default="PBE")
+    gen.add_argument("--basis", choices=BASES, default="DZVP-MOLOPT-SR-GTH")
+    gen.add_argument("--dispersion", choices=["none", "d3", "d3bj"], default="none")
+    gen.add_argument("--charge", type=int, default=0)
+    gen.add_argument("--multiplicity", type=int, default=1)
+    gen.add_argument("--periodic", type=str.upper, choices=PERIODICITIES,
+                     help="Default: source PBC; plain XYZ requires explicit selection")
+    gen.add_argument("--cell", type=float, nargs=3, metavar=("A", "B", "C"), help="Override orthorhombic lengths (angstrom)")
+    gen.add_argument("--vacuum", type=float, default=5.0, help="Padding on each side for an automatically built isolated box (angstrom)")
+    gen.add_argument("--scf", choices=["ot", "diag"], default="ot")
+    gen.add_argument("--cutoff", type=float, default=350.0, help="Ry")
+    gen.add_argument("--rel-cutoff", type=float, default=50.0, help="Ry")
+    gen.add_argument("--eps-scf", type=float)
+    gen.add_argument("--max-scf", type=int, default=128)
+    gen.add_argument("--kpoints", type=int, nargs=3, default=(1, 1, 1), metavar=("NX", "NY", "NZ"))
+    gen.add_argument("--smearing", type=float, help="Fermi-Dirac electronic temperature (K); requires diag")
+    gen.add_argument("--added-mos", type=int, default=20)
+    gen.add_argument("--optimizer", type=str.upper, choices=["BFGS", "LBFGS", "CG"], default="BFGS")
+    gen.add_argument("--max-iter", type=int, default=400)
+    gen.add_argument("--pressure", type=float, default=1.01325, help="CELL_OPT external pressure (bar)")
+    gen.add_argument("--data-dir", help="Verify BASIS_MOLOPT/GTH_POTENTIALS and record hashes; also needs dftd3.dat for D3")
     return parser
 
 
@@ -56,6 +84,16 @@ def emit(data, output):
 
 
 def execute(args):
+    if args.command == "generate-input":
+        structure = read_structure(args.path, args.frame)
+        values = {name: getattr(args, name) for name in InputSettings.__dataclass_fields__}
+        values["cell"] = tuple(args.cell) if args.cell is not None else None
+        values["kpoints"] = tuple(args.kpoints)
+        output, sidecar, warnings = write_input(structure, InputSettings(**values), args.output)
+        for warning in warnings:
+            print(f"WARNING: {warning}", file=sys.stderr)
+        print(f"Wrote {output} and {sidecar}", file=sys.stderr)
+        return 0
     if args.command == "discover":
         emit({"schema_version": SCHEMA_VERSION, "projects": [p.to_dict() for p in discover(args.path)]}, args.output)
         return 0

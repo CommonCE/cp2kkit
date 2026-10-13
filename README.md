@@ -1,10 +1,10 @@
 # cp2kkit
 
-连接 CP2K 结果读取与可追溯后处理的 Python 工具。根据
+连接 CP2K 结果读取、可追溯后处理与非破坏性输入生成的 Python 工具。根据
 [`cp2kkit-mvp.md`](cp2kkit-mvp.md) 开发的 **v0.1 初步实现**，不是已完成真实版本认证的生产发布。
 
-- 默认只读，不提交或运行 CP2K，不改输入、restart 或原始输出。
-- 六项 MVP 已有实现入口；暂缓功能不纳入本次开发。
+- 分析命令保持只读；不提交或运行 CP2K，不改已有输入、restart 或原始输出。
+- 六项 MVP 已有实现入口；新增 `generate-input` 显式生成新文件，其余暂缓功能不变。
 - 核心仅使用 Python 标准库；绘图可选依赖 Matplotlib。
 - 输出带 schema、单位、文件 SHA-256、行号与原文；缺失值不等同于零。
 - 任何已有目标文件都拒绝覆盖，包括派生 CSV、JSON 和图片。
@@ -72,6 +72,28 @@ cp2kkit plot /path/to/run/water.out --kind scf -o scf.png
 | 5 | 输出已存在，拒绝覆盖 |
 | 6 | 缺少绘图可选依赖 |
 | 7 | `report --strict` 的质量检查未通过 |
+
+## CP2K 输入生成
+
+参照 Multiwfn `cp2kmate.f90` 新增 GPW 输入生成子集：
+
+```bash
+cp2kkit generate-input water.xyz -o water.inp --periodic NONE --project water
+cp2kkit generate-input water.xyz -o water-opt.inp --periodic NONE \
+  --run-type GEO_OPT --dispersion d3bj
+cp2kkit generate-input solid.extxyz -o solid.inp --run-type CELL_OPT \
+  --scf diag --kpoints 3 3 3 --smearing 300
+```
+
+支持 ENERGY / ENERGY_FORCE / GEO_OPT / CELL_OPT，PBE/BLYP、MOLOPT-GTH、
+D3/D3(BJ)、电荷/多重度、晶胞/PBC、OT/对角化与 k 点。
+输出输入文件及 `<output>.json`，两者均拒绝覆盖。
+普通 XYZ 必须明确指定周期性；仅从 restart 继承结构而非计算设置。
+可用 `--data-dir` 核对基组/赝势名字并记录数据文件哈希。
+**未运行 CP2K 验证；不等于完整移植 Multiwfn。**
+范围、默认参数与限制见 [输入生成文档](docs/input-generation.md)。
+Multiwfn 来源、自定义授权条款及必需引用见 [第三方声明](THIRD_PARTY_NOTICES.md)；
+这不代表已取得单独授权或确认再许可/收费分发边界。
 
 ## 已实现范围与限制
 

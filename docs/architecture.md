@@ -2,8 +2,8 @@
 
 ## 设计原则
 
-以 `cp2kkit-mvp.md` 为范围唯一依据：连接结果读取与可追溯后处理，
-不建设提交系统，不开展 Bader/PDOS/NEB 等暂缓模块。
+分析 MVP 以 `cp2kkit-mvp.md` 为原始范围依据；根据后续需求额外加入
+[输入生成](input-generation.md) 子集。不建设提交系统，不开展 Bader/PDOS/NEB 等暂缓模块。
 
 1. **只读源文件**：分析函数不运行外部计算、不写回源文件。
 2. **数据与判断分离**：解析事实、质量规则、显示/导出各自独立。
@@ -22,7 +22,8 @@ cli.py
  ├─ quality.py ──── models.py（解析事实 → 规则判定）
  ├─ export.py ───── models.py / quality.py（CSV）
  ├─ structure.py ── models.py / io.py（独立结构通道）
- └─ plot.py ─────── export.py / quality.py / 可选 matplotlib
+ ├─ plot.py ─────── export.py / quality.py / 可选 matplotlib
+ └─ inputgen.py ─── structure.py / models.py / io.py（纯生成 + 独占写入）
 
 models.py  数据结构与 schema 版本
 io.py      严格读取、哈希、稳定 JSON、独占输出
@@ -65,6 +66,17 @@ XYZ/extXYZ/restart → Structure（angstrom + cell + PBC + source）
 
 支持三矢量或 ABC/ALPHA_BETA_GAMMA 晶胞、UNIT、SCALED 与 KIND/ELEMENT 映射；
 不猜测种类标签，不截断损坏的最后一帧，也不展开 CP2K 预处理。
+
+## 输入生成通道
+
+```text
+XYZ/extXYZ/restart → Structure + InputSettings → 校验 → CP2K 文本 + manifest
+                                                      → 新 .inp / .inp.json
+```
+
+生成器不继承原输入计算设置；未知 PBC、电子数/多重度冲突、不支持的组合均拒绝。
+元素预设显式匹配基组与赝势价电子数，可读取本地 CP2K data 核对名字与哈希。
+不执行外部计算，不依赖 Multiwfn 程序或相邻源码路径。
 
 ## 安全与可复现性
 
