@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cp2kkit"
+version = "0.1.0"
+description = "Read-only CP2K analysis with explicit units and provenance"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+plot = ["matplotlib>=3.7"]
+
+[project.scripts]
+cp2kkit = "cp2kkit.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

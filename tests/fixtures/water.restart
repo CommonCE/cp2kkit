@@ -1,0 +1,22 @@
+&FORCE_EVAL
+  &SUBSYS
+    &CELL
+      A [angstrom] 10.0 0.0 0.0
+      B [angstrom] 1.0 11.0 0.0
+      C [angstrom] 0.0 0.0 12.0
+      PERIODIC XY
+    &END CELL
+    &COORD
+      UNIT angstrom
+      O_water 1.0 2.0 3.0
+      H 1.7 2.0 3.0
+      H 1.0 2.7 3.0
+    &END COORD
+    &KIND O_water
+      ELEMENT O
+    &END KIND
+    &KIND H
+      ELEMENT H
+    &END KIND
+  &END SUBSYS
+&END FORCE_EVAL

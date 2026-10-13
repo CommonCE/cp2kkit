@@ -1,0 +1,8 @@
+ CP2K| version string: synthetic-format
+ PROGRAM STARTED AT 2026-01-01 00:00:00
+ GLOBAL| Project name partial
+ GLOBAL| Run type GEO_OPT
+ OPTIMIZATION STEP: 1
+ SCF run converged in 5 steps
+ ENERGY| Total FORCE_EVAL ( QS ) energy [a.u.]: -10.0
+ OPTIMIZATION STEP: 2

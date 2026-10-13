@@ -1,0 +1,12 @@
+ CP2K| version string: CP2K version 2026.1 (synthetic fixture; NOT a real run)
+ PROGRAM STARTED AT 2026-01-01 00:00:00
+ GLOBAL| Project name demo
+ GLOBAL| Run type ENERGY
+ DFT| Charge  0
+ DFT| Multiplicity  1
+ QS| Basis set  DZVP-MOLOPT-SR-GTH
+ XC| Functional  PBE
+ SCF run converged in 8 steps
+ ENERGY| Total FORCE_EVAL ( QS ) energy [a.u.]: -1.23456789012345D+01
+ Total wall time [s]: 2.5
+ PROGRAM ENDED AT 2026-01-01 00:00:03

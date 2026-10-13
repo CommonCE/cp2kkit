@@ -1,0 +1,8 @@
+ CP2K| version string: synthetic-format
+ PROGRAM STARTED AT 2026-01-01 00:00:00
+ GLOBAL| Project name failed
+ GLOBAL| Run type ENERGY
+ SCF run NOT converged
+ ENERGY| Total FORCE_EVAL ( QS ) energy [a.u.]: 0.00000000000000
+ *** WARNING in qs_scf: SCF run NOT converged ***
+ PROGRAM ENDED AT 2026-01-01 00:00:03
