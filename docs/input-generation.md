@@ -55,6 +55,8 @@ sidecar 冲突时撤销本次新建输入；无 `--force`。父目录必须存�
 | 展宽 | 可选 Fermi-Dirac 温度（K）；要求对角化和正的 ADDED_MOS |
 | 优化 | BFGS（默认）、LBFGS、CG；最大 400 步 |
 | CELL_OPT | 要求 XYZ、下三角晶胞，输出解析应力；默认外压 1.01325 bar |
+| 目标版本 | `--cp2k-version` 默认 2026.2；密度输出共同语法配置提供 2024.1/2/3、2025.1/2、2026.1/2，不是运行认证 |
+| 密度 cube | 可选电子密度及适用 UKS 自旋密度；有效 STRIDE 默认 1 1 1；最终步策略见 [cube 文档](cube.md) |
 
 SR 基组/PBE 预设覆盖 71 个元素：
 
@@ -84,9 +86,21 @@ BLYP 不提供 Nb Tc Cd Sn Hf Ta Re Os Ir Pt Hg Tl Po At Rn 的预设，缺项�
 - restart **只提供结构**；原 KIND 标签按元素合并，原方法、U、约束、磁矩、
   电荷、溶剂等不继承。这是新计算模板，不是原任务的完整续算输入。
 - 未实现混合泛函/ADMM、DFT+U、MD、频率、NEB、TDDFT、溶剂、外场、
-  原子约束、密度输出等 Multiwfn 高级选项。
+  原子约束等 Multiwfn 高级选项；电子/自旋密度 cube 已加入，其他势/ELF/MO cube 等尚未实现。
 - 默认 cutoff / 基组 / 真空 / k 点不是经目标体系收敛验证的参数。
   不输出已废弃的 CELL_OPT TYPE DIRECT_CELL_OPT。
+
+## 电子/自旋密度输出
+
+```bash
+cp2kkit generate-input AB.extxyz -o AB-density.inp --project AB \
+  --cp2k-version 2026.2 --electron-density --cube-stride 1 1 1
+```
+
+不开启时不增加密度 PRINT；`--spin-density` 要求当前生成器的 UKS 条件（multiplicity > 1）。
+CP2K 在同一个 E_DENSITY_CUBE 节控制电子与自旋密度，因此 UKS 下两者都会写出。
+优化常规步频为 0，ADD_LAST NUMERIC 请求最终步；不保证异常终止产生 cube 或最后一步已收敛。
+完整频率、文件行为、GPW 价电子密度含义及老版本差异见 [cube 文档](cube.md)。
 
 ## 可复现性与验证等级
 

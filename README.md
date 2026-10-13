@@ -1,10 +1,10 @@
 # cp2kkit
 
 连接 CP2K 结果读取、可追溯后处理与非破坏性输入生成的 Python 工具。根据
-[`cp2kkit-mvp.md`](cp2kkit-mvp.md) 开发的 **v0.1 初步实现**，不是已完成真实版本认证的生产发布。
+[`cp2kkit-mvp.md`](cp2kkit-mvp.md) 开发的 **v0.1.1 初步实现**，不是已完成真实版本认证的生产发布。
 
 - 分析命令保持只读；不提交或运行 CP2K，不改已有输入、restart 或原始输出。
-- 六项 MVP 已有实现入口；新增 `generate-input` 显式生成新文件，其余暂缓功能不变。
+- 六项 MVP 已有实现入口；另有 `generate-input`、`cube-check`、`cube-diff`；不自动运行计算。
 - 核心仅使用 Python 标准库；绘图可选依赖 Matplotlib。
 - 输出带 schema、单位、文件 SHA-256、行号与原文；缺失值不等同于零。
 - 任何已有目标文件都拒绝覆盖，包括派生 CSV、JSON 和图片。
@@ -57,7 +57,7 @@ cp2kkit plot /path/to/run/water.out -o curve.png
 cp2kkit plot /path/to/run/water.out --kind scf -o scf.png
 ```
 
-未提供 `--output` 时，discover / parse / report 向 stdout 写机器可读数据，
+未提供 `--output` 时，discover / parse / report / cube-check 向 stdout 写机器可读数据，
 诊断向 stderr 输出。目标父目录需事先存在，不会自动创建大量目录。
 结构导出额外生成 `<完整输出文件名>.json`，其中保留原晶胞、坐标、来源和告警。
 
@@ -95,6 +95,29 @@ D3/D3(BJ)、电荷/多重度、晶胞/PBC、OT/对角化与 k 点。
 Multiwfn 来源、自定义授权条款及必需引用见 [第三方声明](THIRD_PARTY_NOTICES.md)；
 这不代表已取得单独授权或确认再许可/收费分发边界。
 
+## 密度 cube 输出与差分
+
+```bash
+# 在仓库根目录，无需安装即可调用
+export PYTHONPATH="$PWD/src"
+python -m cp2kkit generate-input AB.extxyz -o AB-density.inp --project AB \
+  --cp2k-version 2026.2 --electron-density --cube-stride 1 1 1
+python -m cp2kkit cube-check AB.cube -o AB-cube-check.json
+python -m cp2kkit cube-diff AB.cube A.cube B.cube -o delta-density.cube
+python -m cp2kkit cube-check delta-density.cube
+```
+
+输入生成增加 `--electron-density`、`--spin-density`、`--cube-stride`。
+GPW/GTH 输出是赝势显式价电子密度；UKS 同时附带 alpha-minus-beta 自旋密度。
+目标版本默认 2026.2，密度输出共同语法兼顾 2024.1–2026.2 的显式版本配置；
+这不是实际程序认证。优化关闭常规步 cube 输出，请求最终步；用于相减优先最终固定构型单点。
+
+cube 逐行读取，报告网格、哈希、单位依据和积分；未知标量只报告原始数值积分。
+差分为 `rho[0] - sum(rho[1:])`，允许多个片段及不同原子数，严格比较规范化单位后的网格，
+不插值/配准。输出 cube + JSON 先临时写入，再独占发布，已有目标拒绝覆盖。
+**密度差正负部分积分不是片段净电荷转移；网格相同也不能证明计算参考态一致。**
+格式、单位策略、物理条件、完整 AB/A/B 示例及验证边界见 [cube 文档](docs/cube.md)。
+
 ## 已实现范围与限制
 
 | MVP 功能 | 初步实现 |
@@ -126,7 +149,8 @@ Multiwfn 来源、自定义授权条款及必需引用见 [第三方声明](THIR
 - XYZ 中没有晶胞时明确告警；默认不会把它当成非周期结构。
 - restart 仅支持一个 SUBSYS，显式 CELL/COORD 与 KIND/ELEMENT；
   不展开预处理指令、外部坐标文件或 CELL/COORD 子节。未知相关语法拒绝解析。
-- 输入按 UTF-8 严格读取；当前读取全文件，超大输出的流式解析为后续优化项。
+- 输入按 UTF-8 严格读取；现有输出/restart 解析读取全文件，超大输出的流式解析为后续优化项。
+  新 cube 通道使用逐行限长迭代，不保留完整标量数组；当前仅支持单标量子集。
 
 ## 测试
 

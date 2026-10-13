@@ -7,11 +7,12 @@ from contextlib import ExitStack
 from pathlib import Path
 
 from . import __version__
+from .cube import DIALECTS, SCALAR_TYPES, SCALAR_UNITS, CubeOptions, check_cube, diff_cubes
 from .discovery import discover, resolve_output
 from .errors import KitError
 from .export import write_csv
 from .io import json_text, new_file
-from .inputgen import BASES, FUNCTIONALS, PERIODICITIES, RUN_TYPES, InputSettings, write_input
+from .inputgen import BASES, CP2K_VERSIONS, FUNCTIONALS, PERIODICITIES, RUN_TYPES, InputSettings, write_input
 from .models import SCHEMA_VERSION
 from .parser import parse_output
 from .plot import plot_run
@@ -72,6 +73,24 @@ def build_parser():
     gen.add_argument("--max-iter", type=int, default=400)
     gen.add_argument("--pressure", type=float, default=1.01325, help="CELL_OPT external pressure (bar)")
     gen.add_argument("--data-dir", help="Verify BASIS_MOLOPT/GTH_POTENTIALS and record hashes; also needs dftd3.dat for D3")
+    gen.add_argument("--cp2k-version", choices=CP2K_VERSIONS, default="2026.2", help="Target syntax profile; not runtime certification")
+    gen.add_argument("--electron-density", action="store_true", help="Print GPW valence density cube (UKS also prints spin density)")
+    gen.add_argument("--spin-density", action="store_true", help="Require UKS and enable density cubes, including alpha-minus-beta spin density")
+    gen.add_argument("--cube-stride", type=int, nargs=3, metavar=("NX", "NY", "NZ"), help="Positive grid increments, effective default 1 1 1 when density enabled; not a convergence guarantee")
+    for name in ("cube-check", "cube-diff"):
+        cmd = sub.add_parser(name, help="Validate scalar CUBE and report grid/integrals" if name == "cube-check" else "Subtract aligned fragment densities from the first CUBE; no registration/interpolation")
+        cmd.add_argument("paths" if name == "cube-diff" else "path", nargs="+" if name == "cube-diff" else None)
+        cmd.add_argument("-o", "--output", required=name == "cube-diff")
+        cmd.add_argument("--dialect", choices=DIALECTS, default="auto", help="auto recognizes Quickstep; signed explicitly uses negative counts as angstrom")
+        cmd.add_argument("--length-unit", choices=["bohr", "angstrom"], help="Explicit spatial unit assertion, not a conversion request")
+        cmd.add_argument("--scalar-type", choices=SCALAR_TYPES, default="auto", help="Meaning assertion for otherwise unknown fields")
+        cmd.add_argument("--scalar-unit", choices=SCALAR_UNITS, default="auto", help="Density unit assertion; never inferred from atom charges or magnitudes")
+        if name == "cube-diff":
+            cmd.add_argument("--input-length-units", nargs="+", choices=["bohr", "angstrom"], help="Per-file spatial assertions, in input order")
+            cmd.add_argument("--input-scalar-units", nargs="+", choices=SCALAR_UNITS, help="Per-file scalar assertions, in input order")
+            cmd.add_argument("--grid-atol", type=float, default=1e-6, help="Componentwise absolute grid tolerance (bohr)")
+            cmd.add_argument("--grid-rtol", type=float, default=0.0, help="Dimensionless relative grid tolerance")
+            cmd.add_argument("--integral-atol", type=float, default=1e-3, help="Nonzero integral warning threshold (electrons); no correction")
     return parser
 
 
@@ -84,11 +103,29 @@ def emit(data, output):
 
 
 def execute(args):
+    if args.command in {"cube-check", "cube-diff"}:
+        options = CubeOptions(args.dialect, args.length_unit, args.scalar_type, args.scalar_unit)
+        if args.command == "cube-check":
+            report = check_cube(args.path, options)
+            emit(report, args.output)
+        else:
+            count = len(args.paths)
+            lengths = args.input_length_units or [args.length_unit]*count
+            units = args.input_scalar_units or [args.scalar_unit]*count
+            if len(lengths) != count or len(units) != count:
+                raise KitError("Per-file unit options must match the number of CUBE inputs")
+            options = [CubeOptions(args.dialect, length, args.scalar_type, unit) for length, unit in zip(lengths, units)]
+            report = diff_cubes(args.paths, args.output, options, args.grid_atol, args.grid_rtol, args.integral_atol)
+            print(f"Wrote {args.output} and {args.output}.json", file=sys.stderr)
+        for warning in report["warnings"]:
+            print(f"WARNING: {warning}", file=sys.stderr)
+        return 0
     if args.command == "generate-input":
         structure = read_structure(args.path, args.frame)
         values = {name: getattr(args, name) for name in InputSettings.__dataclass_fields__}
         values["cell"] = tuple(args.cell) if args.cell is not None else None
         values["kpoints"] = tuple(args.kpoints)
+        values["cube_stride"] = tuple(args.cube_stride) if args.cube_stride is not None else None
         output, sidecar, warnings = write_input(structure, InputSettings(**values), args.output)
         for warning in warnings:
             print(f"WARNING: {warning}", file=sys.stderr)

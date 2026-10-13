@@ -23,7 +23,8 @@ cli.py
  ├─ export.py ───── models.py / quality.py（CSV）
  ├─ structure.py ── models.py / io.py（独立结构通道）
  ├─ plot.py ─────── export.py / quality.py / 可选 matplotlib
- └─ inputgen.py ─── structure.py / models.py / io.py（纯生成 + 独占写入）
+ ├─ inputgen.py ─── structure.py / models.py / io.py（纯生成 + 独占写入）
+ └─ cube.py ─────── models.py / io.py / structure.py（单位常数；流式标量检查/相减）
 
 models.py  数据结构与 schema 版本
 io.py      严格读取、哈希、稳定 JSON、独占输出
@@ -77,6 +78,19 @@ XYZ/extXYZ/restart → Structure + InputSettings → 校验 → CP2K 文本 + ma
 生成器不继承原输入计算设置；未知 PBC、电子数/多重度冲突、不支持的组合均拒绝。
 元素预设显式匹配基组与赝势价电子数，可读取本地 CP2K data 核对名字与哈希。
 不执行外部计算，不依赖 Multiwfn 程序或相邻源码路径。
+
+## cube 通道
+
+```text
+CUBE → CubeReader（头部、逐行标量、字节哈希）→ Statistics → 检查 JSON
+多个已对齐密度流 → 逐点相减/统计 → 临时 cube + JSON → 独占发布
+```
+
+CubeOptions 显式定义生产者、空间/标量解释，未知语义不当成电子数。
+规范化 bohr 网格用于容差比较，密度单位转换不改变采样位置；不配准或插值。
+不同原子数合法，输出沿用 AB 的原子字段。网格步进矢量行列式给出体积元。
+`io.staged_files` 预检目标、同目录临时写入、硬链接独占发布；异常仅回滚本次仍拥有的输出 inode。
+详细格式/物理与验证范围见 [cube 文档](cube.md)。
 
 ## 安全与可复现性
 

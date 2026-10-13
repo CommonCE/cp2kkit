@@ -10,7 +10,7 @@ from pathlib import Path
 
 from cp2kkit.cli import main
 from cp2kkit.errors import KitError, OutputExists
-from cp2kkit.inputgen import BASES, MULTIWFN_CITATIONS, VALENCE, InputSettings, generate_input, write_input
+from cp2kkit.inputgen import BASES, CP2K_VERSIONS, MULTIWFN_CITATIONS, VALENCE, InputSettings, generate_input, write_input
 from cp2kkit.structure import Structure, read_restart, read_xyz
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -211,6 +211,80 @@ class InputGenerationTests(unittest.TestCase):
             unknown = Path(tmp) / "unknown.inp"
             self.assertEqual(main(["generate-input", str(FIXTURES / "trajectory.xyz"), "-o", str(unknown)]), 2)
             self.assertFalse(unknown.exists())
+
+    def test_density_print_placement_and_frequency(self):
+        for task in ("ENERGY", "ENERGY_FORCE", "GEO_OPT", "CELL_OPT"):
+            settings = replace(self.settings, run_type=task, periodic="XYZ", cell=(10.,10.,10.),
+                               electron_density=True, cube_stride=(1,2,3))
+            text, manifest = generate_input(self.water, settings)
+            stack = []
+            parents = []
+            for line in text.splitlines():
+                fields = line.strip().split()
+                if not fields or fields[0].startswith('#'):
+                    continue
+                if fields[0] == '&END':
+                    self.assertEqual(stack.pop(), fields[1])
+                elif fields[0].startswith('&'):
+                    if fields[0] == '&E_DENSITY_CUBE':
+                        parents = stack.copy()
+                        self.assertEqual(fields[1], 'ON')
+                    stack.append(fields[0][1:])
+            self.assertEqual(parents, ['FORCE_EVAL','DFT','PRINT'])
+            self.assertEqual(stack, [])
+            for line in ('STRIDE 1 2 3','APPEND F','ADD_LAST NUMERIC','QS_SCF 0','JUST_ENERGY 1','GEO_OPT 0','CELL_OPT 0'):
+                self.assertIn(line, text)
+            self.assertEqual(manifest['density_output']['stride'], [1,2,3])
+            self.assertEqual(manifest['density_output']['each']['GEO_OPT'], 0)
+            self.assertEqual(manifest['density_output']['scalar_unit'], 'e/bohr^3')
+            self.assertFalse(manifest['density_output']['runtime_validated'])
+        text, m = generate_input(self.water, self.settings)
+        self.assertNotIn('&E_DENSITY_CUBE', text)
+        self.assertFalse(m['density_output']['enabled'])
+        self.assertIsNone(m['density_output']['stride'])
+
+    def test_density_spin_condition_stride_and_version(self):
+        with self.assertRaises(KitError):
+            generate_input(self.water, replace(self.settings, spin_density=True))
+        for stride in ((0,1,1), (-1,1,1), (1,1), (1.5,1,1), (True,1,1)):
+            with self.subTest(stride=stride), self.assertRaises(KitError):
+                generate_input(self.water, replace(self.settings, electron_density=True, cube_stride=stride))
+        with self.assertRaises(KitError):
+            generate_input(self.water, replace(self.settings, cube_stride=(1,1,1)))
+        for spin_requested in (True, False):
+            text, m = generate_input(self.water, replace(self.settings, charge=1, multiplicity=2,
+                                                        electron_density=not spin_requested, spin_density=spin_requested))
+            self.assertIn('UKS T', text)
+            self.assertIn('STRIDE 1 1 1', text)
+            self.assertNotIn('&SPIN_DENSITY_CUBE', text)
+            self.assertTrue(m['density_output']['electron_density'])
+            self.assertTrue(m['density_output']['spin_density'])
+        for version in CP2K_VERSIONS:
+            _, m = generate_input(self.water, replace(self.settings, electron_density=True, cp2k_version=version))
+            self.assertEqual(m['target_version'], version)
+            self.assertEqual(m['density_output']['reference_version'], 'CP2K '+version)
+            self.assertIn('/v'+version+'/', m['density_output']['source'])
+            self.assertEqual(len(m['density_output']['definition_sha256']), 64)
+            if version == '2024.3':
+                self.assertIsNone(m['density_output']['manual_source'])
+            else:
+                self.assertIn(version.replace('.', '_'), m['density_output']['manual_source'])
+        with self.assertRaises(KitError):
+            generate_input(self.water, replace(self.settings, cp2k_version='2027.1'))
+
+    def test_density_cli(self):
+        with tempfile.TemporaryDirectory() as tmp, redirect_stderr(io.StringIO()):
+            out = Path(tmp)/'h2.inp'
+            args = ['generate-input', str(FIXTURES/'trajectory.xyz'), '--periodic','none','-o',str(out),
+                    '--electron-density','--cube-stride','1','2','3','--cp2k-version','2024.1']
+            self.assertEqual(main(args),0)
+            manifest = json.loads(Path(str(out)+'.json').read_text())
+            self.assertEqual(manifest['density_output']['stride'],[1,2,3])
+            self.assertEqual(manifest['target_version'],'2024.1')
+            bad = Path(tmp)/'bad.inp'
+            self.assertEqual(main(['generate-input', str(FIXTURES/'trajectory.xyz'), '--periodic','none',
+                                   '-o',str(bad),'--spin-density']),2)
+            self.assertFalse(bad.exists())
 
     def test_plain_xyz_explicit_periodicity(self):
         h2 = read_xyz(FIXTURES / "trajectory.xyz", 0)

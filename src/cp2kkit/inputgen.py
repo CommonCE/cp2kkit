@@ -26,6 +26,17 @@ MULTIWFN_CITATIONS = (
     "Tian Lu, Feiwu Chen, J. Comput. Chem. 33, 580-592 (2012). DOI: 10.1002/jcc.22885",
     "Tian Lu, J. Chem. Phys. 161, 082503 (2024). DOI: 10.1063/5.0216272",
 )
+CP2K_VERSIONS = ("2024.1", "2024.2", "2024.3", "2025.1", "2025.2", "2026.1", "2026.2")
+# Exact source bytes inspected for the common density-output keyword contract.
+DENSITY_DEFINITION_HASHES = {
+    "2024.1": "2d2156115ed139b1f59e2b9e9db4c5c27909603093aa8ebfd153f89020023887",
+    "2024.2": "6a1bdf398bd1f56321ec6eca18be7e1661651b8848f7723367e6e636e9551b22",
+    "2024.3": "6a1bdf398bd1f56321ec6eca18be7e1661651b8848f7723367e6e636e9551b22",
+    "2025.1": "d85973f39a0a326adb25e75779dd09cccdfc23ab1f469e73ee6d2d3d9180995e",
+    "2025.2": "0156c7c6d0afbd5dcd14d2b9d513b249cbd274e3300be16369a521e15d439650",
+    "2026.1": "e41fc1ae1c574eddf0faed59cede0e29208f460867bcc6bc89457f54d3c9fd7a",
+    "2026.2": "2cef0bc8e85f0ec6c291a5c5101da55fea0658440c15647d42220f530c0aa2bc",
+}
 RUN_TYPES = ("ENERGY", "ENERGY_FORCE", "GEO_OPT", "CELL_OPT")
 FUNCTIONALS = ("PBE", "BLYP")
 BASES = ("SZV-MOLOPT-SR-GTH", "DZVP-MOLOPT-SR-GTH", "DZVP-MOLOPT-GTH",
@@ -69,6 +80,10 @@ class InputSettings:
     max_iter: int = 400
     pressure: float = 1.01325  # bar
     data_dir: str | None = None
+    cp2k_version: str = "2026.2"
+    electron_density: bool = False
+    spin_density: bool = False
+    cube_stride: tuple[int, int, int] | None = None
 
 
 def positive(value, name):
@@ -84,6 +99,8 @@ def data_header_exists(text, element, name):
 def generate_input(structure: Structure, settings: InputSettings):
     """Return (complete input text, deterministic provenance/settings manifest)."""
     s = settings
+    if s.cp2k_version not in CP2K_VERSIONS:
+        raise KitError("CP2K target version must be one of the checked 2024.1–2026.2 profiles")
     if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*", s.project):
         raise KitError("Project must be a safe name (letters, digits, _, ., -); no paths or directives")
     for value, choices, name in ((s.run_type, RUN_TYPES, "run type"), (s.functional, FUNCTIONALS, "functional"),
@@ -102,6 +119,16 @@ def generate_input(structure: Structure, settings: InputSettings):
         raise KitError("Pressure must be finite (bar)")
     eps = s.eps_scf if s.eps_scf is not None else (5e-6 if s.run_type == "ENERGY" else 1e-6)
     positive(eps, "eps_scf")
+    density_enabled = s.electron_density or s.spin_density
+    if s.spin_density and s.multiplicity == 1:
+        raise KitError("Spin density requires UKS; current generator enables UKS only for multiplicity > 1")
+    if s.cube_stride is not None:
+        if len(s.cube_stride) != 3 or any(type(v) is not int or v < 1 for v in s.cube_stride):
+            raise KitError("cube_stride requires three positive integers")
+        if not density_enabled:
+            raise KitError("cube_stride requires --electron-density or --spin-density")
+    stride = s.cube_stride if s.cube_stride is not None else (1, 1, 1)
+    density_each = {"QS_SCF": 0, "JUST_ENERGY": 1, "GEO_OPT": 0, "CELL_OPT": 0}
     if len(s.kpoints) != 3 or any(type(v) is not int or v < 1 for v in s.kpoints):
         raise KitError("kpoints requires three positive integers")
     if not structure.symbols or len(structure.symbols) != len(structure.positions):
@@ -167,6 +194,12 @@ def generate_input(structure: Structure, settings: InputSettings):
         warnings.append("Low-dimensional ANALYTIC Poisson solver converges slowly; check vacuum and electrostatic convergence.")
     if s.scf == "ot":
         warnings.append("OT without smearing is intended for gapped systems, not metals.")
+    if density_enabled:
+        warnings.append("GPW/GTH cube contains pseudopotential valence electron density, not all-electron/core density; stride and grid need convergence checks.")
+        if s.multiplicity > 1:
+            warnings.append("CP2K E_DENSITY_CUBE prints both electron and alpha-minus-beta spin densities for UKS; these cannot be independently suppressed here.")
+        if s.run_type in {"GEO_OPT", "CELL_OPT"}:
+            warnings.append("ADD_LAST prints the last identified optimization step, not proof of convergence; verify output and use a final fixed-geometry ENERGY calculation for comparable fragment grids.")
     kinds = {el: {"basis": f"{s.basis}-q{VALENCE[el]}",
                   "potential": f"GTH-{s.functional}-q{VALENCE[el]}", "valence_electrons": VALENCE[el]} for el in elements}
     data_sources = {}
@@ -217,6 +250,12 @@ def generate_input(structure: Structure, settings: InputSettings):
     lines += ["    &END XC"]
     if s.kpoints != (1, 1, 1):
         lines += ["    &KPOINTS", "      SCHEME MONKHORST-PACK " + " ".join(map(str, s.kpoints)), "    &END KPOINTS"]
+    if density_enabled:
+        lines += ["    &PRINT", "      &E_DENSITY_CUBE ON",
+                  "        STRIDE " + " ".join(map(str, stride)),
+                  "        APPEND F", "        ADD_LAST NUMERIC", "        &EACH"]
+        lines += [f"          {key} {value}" for key, value in density_each.items()]
+        lines += ["        &END EACH", "      &END E_DENSITY_CUBE", "    &END PRINT"]
     lines += ["  &END DFT", "  &SUBSYS", "    &CELL"]
     lines += [f"      {axis} [angstrom] " + " ".join(map(num, row)) for axis, row in zip("ABC", cell)]
     lines += [f"      PERIODIC {periodic}", "    &END CELL", "    &COORD", "      UNIT angstrom"]
@@ -238,11 +277,29 @@ def generate_input(structure: Structure, settings: InputSettings):
     effective = Structure(structure.symbols.copy(), positions, [row.copy() for row in cell],
                           [axis in periodic for axis in "XYZ"], structure.source, structure.frame)
     manifest = {"schema_version": SCHEMA_VERSION, "generator": {"name": "cp2kkit", "version": __version__},
-                "target_software": "CP2K", "runtime_version": None, "runtime_validated": False,
+                "target_software": "CP2K", "target_version": s.cp2k_version,
+                "runtime_version": None, "runtime_validated": False,
                 "references": {"Multiwfn": list(MULTIWFN_CITATIONS),
                                "terms_url": "http://sobereva.com/multiwfn/download.html",
                                "notice": "THIRD_PARTY_NOTICES.md"},
                 "settings": asdict(s), "effective_eps_scf": eps, "poisson_solver": solver,
+                "density_output": {"enabled": bool(density_enabled),
+                                   "electron_density": bool(density_enabled),
+                                   "spin_density": bool(density_enabled and s.multiplicity > 1),
+                                   "stride": list(stride) if density_enabled else None,
+                                   "each": density_each if density_enabled else None,
+                                   "add_last": "NUMERIC" if density_enabled else None,
+                                   "append": False, "filename_override": None,
+                                   "density_meaning": "GPW pseudopotential valence electron density",
+                                   "spin_convention": "alpha minus beta", "spatial_unit": "bohr",
+                                   "scalar_unit": "e/bohr^3", "stride_unit": "grid index increment",
+                                   "reference_version": "CP2K " + s.cp2k_version, "syntax_reference_checked": True,
+                                   "runtime_validated": False,
+                                   "source": f"https://raw.githubusercontent.com/cp2k/cp2k/v{s.cp2k_version}/src/" +
+                                             ("input_cp2k_dft.F" if s.cp2k_version == "2024.1" else "input_cp2k_print_dft.F"),
+                                   "definition_sha256": DENSITY_DEFINITION_HASHES[s.cp2k_version],
+                                   "manual_source": None if s.cp2k_version == "2024.3" else
+                                       f"https://manual.cp2k.org/cp2k-{s.cp2k_version.replace('.', '_')}-branch/CP2K_INPUT/FORCE_EVAL/DFT/PRINT/E_DENSITY_CUBE.html"},
                 "units": {"coordinates": "angstrom", "cell": "angstrom", "vacuum": "angstrom",
                           "cutoff": "Ry", "rel_cutoff": "Ry", "smearing": "K", "pressure": "bar",
                           "max_dr": "bohr", "rms_dr": "bohr", "max_force": "hartree/bohr", "rms_force": "hartree/bohr"},
