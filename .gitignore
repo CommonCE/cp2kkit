@@ -5,6 +5,8 @@ __pycache__/
 build/
 dist/
 .coverage
+# Local scratch space for manual tests; regression tests/ remains tracked.
+/test-workspace/
 # Expensive simulation outputs must not be committed.
 *.wfn
 *.cube
