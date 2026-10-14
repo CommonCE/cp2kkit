@@ -88,6 +88,8 @@ diag+展宽默认空轨道 `max(30, NINT(原子数/2))`，否则 0。
 `settings.max_outer_scf` 是 OT 外层上限（默认 20），diag 不使用。
 CIF 对称展开、GJF 原电荷/多重度、POSCAR selective dynamics 等格式信息存于
 `source_structure.source`，不代表继承为 CP2K 计算设置或约束。
+自软件 0.2.1 起，CELL/COORD 文本固定 8 位小数，`generated_structure` 对应实际舍入后的
+angstrom 数值；`source_structure` 仍保留原结构精度。字段/单位不变，schema 保持 0.1.0。
 
 - `target_version` / `settings.cp2k_version`：明确请求的 CP2K 语法目标，默认 2026.2。
   `runtime_version=null` / `runtime_validated=false`：未实际运行，不将目标版本当执行版本。

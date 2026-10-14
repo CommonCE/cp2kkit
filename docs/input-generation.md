@@ -1,6 +1,6 @@
 # CP2K 输入生成
 
-本文描述 cp2kkit **0.2.0** 的当前行为；旧版本默认值及迁移提示见
+本文描述 cp2kkit **0.2.1** 的当前行为；旧版本默认值及迁移提示见
 [变更记录](../CHANGELOG.md)。
 
 `generate-input` 是在原只读 MVP 外新增的显式写入入口，不运行或提交计算。
@@ -192,6 +192,21 @@ cp2kkit generate-input AB.extxyz -o AB-density.inp --project AB \
 CP2K 在同一个 E_DENSITY_CUBE 节控制电子与自旋密度，因此 UKS 下两者都会写出。
 优化常规步频为 0，ADD_LAST NUMERIC 请求最终步；不保证异常终止产生 cube 或最后一步已收敛。
 完整频率、文件行为、GPW 价电子密度含义及老版本差异见 [cube 文档](cube.md)。
+
+## 生成文本格式
+
+- `EPS_DEFAULT`、内/外层 `EPS_SCF` 使用大写科学计数法，例如 `1.0E-12`、`1.0E-06`。
+  默认数值不变：ENERGY 的 EPS_DEFAULT/EPS_SCF 仍是 1e-11/5e-6，其他任务为 1e-12/1e-6。
+  用户自定义 EPS 保留 float 的有效数字，不统一截成一位小数。
+- CELL 的 A/B/C 矢量和 COORD 的 Cartesian 坐标按列对齐，固定小数点后 8 位；
+  消除舍入后的 `-0.00000000`，大数超过列宽时仍保留分隔空格。
+- 按示例省略 `[angstrom]` 和 `UNIT angstrom`，使用 CP2K 的默认 angstrom 单位；
+  文件头和 JSON 仍明确注明单位。已核对 CP2K 2026.2 官方
+  [CELL](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/SUBSYS/CELL.html) 与
+  [COORD](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/SUBSYS/COORD.html) 文档。
+- 文本 8 位小数会舍入几何数值：JSON `source_structure` 保留原结构，
+  `generated_structure` 记录舍入后的实际写入值；舍入后奇异的晶胞拒绝生成。
+  不改源文件，也不改变独立 `export-structure` 的高精度输出。
 
 ## 可复现性与验证等级
 

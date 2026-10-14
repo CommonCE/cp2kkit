@@ -39,6 +39,74 @@ class InputGenerationTests(unittest.TestCase):
         self.assertEqual(self.water.positions[0], [0., 0., 0.])
         self.assertEqual((text, manifest), generate_input(self.water, self.settings))
 
+    def test_readable_eps_formatting_and_custom_precision(self):
+        for task, default, eps in (("ENERGY", "1.0E-11", "5.0E-06"),
+                                   ("GEO_OPT", "1.0E-12", "1.0E-06")):
+            text, _ = generate_input(self.water, replace(self.settings, run_type=task))
+            self.assertIn(f"EPS_DEFAULT {default}\n", text)
+            self.assertEqual(text.count(f"EPS_SCF {eps}\n"), 2)  # OT inner + outer
+        for eps in (1.2345678901234567e-7, 0.125, 1e-100, 5e-324):
+            text, m = generate_input(self.water, replace(self.settings, eps_scf=eps))
+            tokens = [line.split()[1] for line in text.splitlines() if line.strip().startswith('EPS_SCF ')]
+            self.assertEqual(len(tokens), 2)
+            for token in tokens:
+                self.assertRegex(token, r'^\d+\.\d+E[+-]\d{2,}$')
+                self.assertEqual(float(token), eps)
+            self.assertEqual(m['effective_eps_scf'], eps)
+        text, _ = generate_input(self.water, replace(self.settings, scf='diag', eps_scf=1e-6))
+        self.assertEqual(text.count('EPS_SCF 1.0E-06\n'), 1)
+
+    def test_cell_coord_fixed_width_user_example(self):
+        zinc = replace(self.water, symbols=['Zn'], positions=[[1.41636598, 4.48472671, 2.14717961]],
+                       cell=[[16.1868, 0., 0.], [0., 28.0363, 0.], [0., 0., 40.4441]], pbc=[True]*3)
+        text, m = generate_input(zinc, InputSettings())
+        expected = ('    &CELL\n'
+                    '      A    16.18680000     0.00000000     0.00000000\n'
+                    '      B     0.00000000    28.03630000     0.00000000\n'
+                    '      C     0.00000000     0.00000000    40.44410000\n'
+                    '      PERIODIC XYZ #Direction(s) of applied PBC (geometry aspect)\n'
+                    '    &END CELL\n'
+                    '    &COORD\n'
+                    '      Zn          1.41636598    4.48472671    2.14717961\n'
+                    '    &END COORD')
+        self.assertIn(expected, text)
+        self.assertNotIn('UNIT angstrom', text)
+        self.assertEqual(m['units']['coordinates'], 'angstrom')
+        self.assertEqual(m['units']['cell'], 'angstrom')
+
+    def test_geometry_rounding_manifest_and_negative_zero(self):
+        source = replace(self.water, positions=[[1.123456789123, -0.000000001, -12.123456789123],
+                                               self.water.positions[1], self.water.positions[2]],
+                         cell=[[10.123456789, 0., 0.], [1.234567891, 11., 0.], [0., 0., 12.]], pbc=[True]*3)
+        text, m = generate_input(source, InputSettings())
+        self.assertNotIn('-0.00000000', text)
+        self.assertEqual(m['source_structure']['positions'], source.positions)
+        self.assertEqual(m['source_structure']['cell'], source.cell)
+        self.assertEqual(source.positions[0][0], 1.123456789123)
+        self.assertEqual(m['generated_structure']['positions'][0], [1.12345679, 0., -12.12345679])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'rounded.restart'
+            path.write_text(text)
+            got = read_restart(path)
+        self.assertEqual(got.positions, m['generated_structure']['positions'])
+        self.assertEqual(got.cell, m['generated_structure']['cell'])
+        self.assertEqual(m['input_sha256'], hashlib.sha256(text.encode()).hexdigest())
+
+    def test_geometry_large_fields_and_rounding_singular_cell(self):
+        source = replace(self.water, positions=[[123456789.12345679, -123456789.12345679, 0.],
+                                               self.water.positions[1], self.water.positions[2]],
+                         cell=[[123456789.12345679, 0., 0.], [0., 11., 0.], [0., 0., 12.]], pbc=[True]*3)
+        text, m = generate_input(source, InputSettings())
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'large.restart'
+            path.write_text(text)
+            got = read_restart(path)
+        self.assertEqual(got.positions, m['generated_structure']['positions'])
+        self.assertEqual(got.cell, m['generated_structure']['cell'])
+        tiny = replace(source, cell=[[1e-9, 0., 0.], [0., 11., 0.], [0., 0., 12.]])
+        with self.assertRaisesRegex(KitError, 'Singular'):
+            generate_input(tiny, InputSettings())
+
     def test_reference_notices_and_catalog(self):
         text, manifest = generate_input(self.water, self.settings)
         for citation in MULTIWFN_CITATIONS:
