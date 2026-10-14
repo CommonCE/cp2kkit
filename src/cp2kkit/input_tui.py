@@ -14,8 +14,11 @@ from pathlib import Path
 
 from .errors import KitError
 from .inputgen import (BASES, CP2K_VERSIONS, FUNCTIONALS, PERIODICITIES, RUN_TYPES,
-                       InputSettings, generate_input, write_input)
+                       InputSettings, generate_input)
 from .structure import read_structure
+from .presentation import Presenter
+from .spin_settings import (parse_dft_plus_u, parse_magnetism,
+                            format_dft_plus_u, format_magnetism)
 
 
 @dataclass(frozen=True)
@@ -29,7 +32,8 @@ class Field:
     positive: bool = False
 
 
-# Every InputSettings field is editable; menu numbering is local, not upstream's.
+# Shared field schema for CLI seeds, source-header controls and generation edits.
+# input_editor selects the numbered subset and records its upstream/local IDs.
 GROUPS = (
     ("Files, project and version", (
         Field("path", "Structure path (XYZ/extXYZ/restart/GJF/CIF/POSCAR; no quotes needed for spaces)"),
@@ -68,6 +72,9 @@ GROUPS = (
     ("Integration grid", (
         Field("cutoff", "CUTOFF [Ry]", "float", positive=True),
         Field("rel_cutoff", "REL_CUTOFF [Ry]", "float", positive=True))),
+    ("Hubbard U and magnetism", (
+        Field('dft_plus_u', 'DFT+U: Element:L:Ueff_eV; separate entries with semicolons; off disables (e.g. Fe:2:4.0)', 'hubbard'),
+        Field('magnetism', 'Magnetism: uks or Element=moment; @atom=moment (1-based); e.g. Fe=4; @2=-4; auto restores multiplicity-based spin. Moments are initial alpha-beta electron numbers.', 'magnetic'))),
     ("Electron/spin density cubes", (
         Field("electron_density", "Electron density (GPW pseudopotential valence density)", "bool"),
         Field("spin_density", "Spin density (alpha-minus-beta; requires UKS)", "bool"),
@@ -94,8 +101,19 @@ def visible_fields(fields, values):
 
 def field_display(field, values):
     value = values[field.name]
+    if field.kind == 'hubbard':
+        return format_dft_plus_u(value)
+    if field.kind == 'magnetic':
+        return format_magnetism(value)
     if value is None and field.name == 'project' and values.get('path'):
         return Path(values['path']).stem + ' (auto)'
+    if value is None and field.name == 'periodic' and values.get('path'):
+        try:
+            structure = read_structure(values['path'], values['frame'])
+            pbc = structure.pbc
+            return ('Unknown' if pbc is None else ''.join(a for a, flag in zip('XYZ', pbc) if flag) or 'NONE') + ' (source/auto)'
+        except (KitError, OSError):
+            return 'Unknown (source unavailable)'
     if value is None and field.name == 'max_scf':
         return ('25' if values['scf'] == 'ot' else '128') + ' (auto)'
     if value is None and field.name == 'added_mos':
@@ -121,6 +139,10 @@ def display(value):
 
 def parse_value(field, raw):
     """Local lexical/range validation only; cross-field chemistry stays in inputgen."""
+    if field.kind == 'hubbard':
+        return parse_dft_plus_u(raw)
+    if field.kind == 'magnetic':
+        return parse_magnetism(raw)
     if field.optional and raw.lower() == "auto":
         return None
     if field.choices:
@@ -139,7 +161,7 @@ def parse_value(field, raw):
     if field.kind == "text":
         if any(ord(c) < 32 or ord(c) == 127 for c in raw):
             raise ValueError("Text or paths must not contain control characters")
-        return raw
+        return str(Path(raw).expanduser()) if field.name in {'path', 'output', 'data_dir'} else raw
     converter = int if field.kind.startswith("int") else float
     if field.kind.endswith("3"):
         parts = raw.split()
@@ -166,7 +188,13 @@ def command_arguments(path, frame, output, settings):
             f"--frame={frame}", f"--output={output}"]
     for name, value in asdict(settings).items():
         flag = "--" + name.replace("_", "-")
-        if type(value) is bool:
+        if name == 'dft_plus_u':
+            if value:
+                args.append(flag+'='+format_dft_plus_u(value))
+        elif name == 'magnetism':
+            if value is not None:
+                args.append(flag+'='+format_magnetism(value))
+        elif type(value) is bool:
             if value:
                 args.append(flag)
         elif value is not None:
@@ -178,24 +206,34 @@ def command_arguments(path, frame, output, settings):
 
 
 class Cancelled(Exception):
-    """Explicit user cancellation: no output, successful return."""
+    """Cancel an operation; rollback unfinished writes, retain completed files."""
+
+
+class SessionExit(Exception):
+    """Quit/EOF exits the entire interactive session, including nested operations."""
 
 
 class Menu:
-    def __init__(self, stdin, stdout):
+    def __init__(self, stdin, stdout, plain=False, width=None):
         self.stdin, self.stdout = stdin, stdout
+        self.presenter = Presenter(stdout, plain, width)
 
     def show(self, text=""):
-        print(text, file=self.stdout)
+        self.presenter.show(text)
+
+    def heading(self, text):
+        self.presenter.heading(text)
 
     def ask(self, prompt):
         self.stdout.write(prompt)
         self.stdout.flush()
         line = self.stdin.readline()
         if not line:
-            raise EOFError
+            raise SessionExit
         raw = line.strip()
         if raw.lower() in ("q", "quit"):
+            raise SessionExit
+        if raw.lower() == 'cancel':
             raise Cancelled
         return raw
 
@@ -204,97 +242,87 @@ class Menu:
         for i, choice in enumerate(field.choices, 1):
             self.show(f"  {i}. {choice}")
         extra = "; auto restores automatic/disabled optional values" if field.optional else ""
+        current_text = (format_dft_plus_u(current) if field.kind == 'hubbard' else
+                        format_magnetism(current) if field.kind == 'magnetic' else display(current))
         while True:
-            raw = self.ask(f"Current [{display(current)}]; Enter to keep{extra}; q to cancel: ")
-            if not raw:
+            raw = self.ask(f"Current [{current_text}]; Enter keeps{extra}; back returns; cancel cancels; q exits: ")
+            if not raw or raw.lower() == 'back':
                 return current
             try:
                 return parse_value(field, raw)
             except ValueError as exc:
                 self.show(f"Invalid input: {exc}")
 
-    def group(self, title, fields, values):
+    def group(self, title, fields, values, on_change=None):
         all_fields = fields
         while True:
             fields = visible_fields(all_fields, values)
-            self.show(f"\n--- {title} ---")
+            self.heading(f"\n--- {title} ---")
             for i, field in enumerate(fields, 1):
                 self.show(f"  {i}. {field.label}: {field_display(field, values)}")
-            raw = self.ask("Select an item number; 0 returns to the main menu; q cancels: ")
-            if raw == "0":
+            raw = self.ask(f"Select [0-{len(fields)}]; 0/back returns; cancel cancels; q exits: ")
+            if raw.lower() in {"0", "back"}:
                 return
             if raw not in tuple(str(i) for i in range(1, len(fields)+1)):
                 self.show("Invalid menu number")
                 continue
             field = fields[int(raw)-1]
-            values[field.name] = self.edit(field, values[field.name])
+            old = values[field.name]
+            values[field.name] = self.edit(field, old)
+            if values[field.name] != old:
+                values.get('_edited', set()).add(field.name)
+                if on_change is not None:
+                    on_change()
 
     def review(self, values, full=False):
         """Read and validate without writing; caller can fix an invalid draft."""
         settings = InputSettings(**{name: values[name] for name in InputSettings.__dataclass_fields__})
         structure = read_structure(values["path"], values["frame"])
         text, manifest = generate_input(structure, settings)
-        self.show("\n--- Validated generation settings (not runtime/convergence certification) ---")
+        self.heading("\n--- Review & write (not runtime/convergence certification) ---")
+        self.show(f"Source: {Path(values['path']).resolve()}; frame={values['frame']}")
+        self.show(f"Charge [e]: {settings.charge}; Spin multiplicity: {settings.multiplicity}")
+        if settings.dft_plus_u or settings.magnetism is not None:
+            self.show(f"DFT+U [eV]: {format_dft_plus_u(settings.dft_plus_u)}"
+                      + ('; projectors: MULLIKEN' if settings.dft_plus_u else ''))
+            self.show(f"UKS: {manifest['electronic_extensions']['uks']}; initial magnetism: {format_magnetism(settings.magnetism)}")
+        self.show(f"Periodicity: {''.join(a for a, flag in zip('XYZ', manifest['generated_structure']['pbc']) if flag) or 'NONE'}; Dispersion: {settings.dispersion}")
+        self.show(f"Project: {field_display(Field('project', ''), values)}")
+        self.show(f"Grid: CUTOFF={settings.cutoff} Ry; REL_CUTOFF={settings.rel_cutoff} Ry")
+        self.show(f"k-points: {display(settings.kpoints)}")
+        self.show(f"SCF limits: inner/diag={field_display(Field('max_scf', ''), values)}"
+                  + (f"; outer={settings.max_outer_scf}" if settings.scf == 'ot' else ''))
+        if settings.scf == 'diag':
+            self.show(f"Smearing: {str(settings.smearing)+' K' if settings.smearing is not None else 'off'}; "
+                      f"ADDED_MOS={field_display(Field('added_mos', ''), values)}")
+        if settings.run_type in {'GEO_OPT', 'CELL_OPT'}:
+            self.show(f"Optimization: {settings.optimizer}; max_iter={settings.max_iter}")
+        if settings.run_type == 'CELL_OPT':
+            self.show(f"External pressure: {settings.pressure} bar")
         self.show(f"Atoms: {len(structure.symbols)}; Explicit valence electrons: {manifest['valence_electron_count']}")
         self.show(f"Target version: {settings.cp2k_version}; Run type: {settings.run_type}; Method: GPW/{settings.functional}")
         self.show(f"SCF: {settings.scf}; Effective EPS_SCF: {manifest['effective_eps_scf']}; Poisson: {manifest['poisson_solver']}")
         self.show(f"Generated cell [angstrom]: {manifest['generated_structure']['cell']}")
-        self.show(f"Coordinates translated: {manifest['coordinates_translated']}; Basis/potentials: {manifest['kinds']}")
+        self.show(f"Coordinates translated: {manifest['coordinates_translated']}")
+        for element, kind in manifest['kinds'].items():
+            self.show(f"{element}: basis={kind['basis']}; pseudopotential={kind['potential']}")
+            if kind.get('initial_magnetization') is not None:
+                self.show(f"  Initial MAGNETIZATION: {kind['initial_magnetization']}; element: {kind['element']}")
         self.show(f"Effective density output: electron={manifest['density_output']['electron_density']}, "
                   f"spin={manifest['density_output']['spin_density']}, stride={manifest['density_output']['stride']}")
         for warning in manifest["warnings"]:
-            self.show(f"WARNING: {warning}")
-        self.show(f"Will create: {values['output']} and {values['output']}.json")
-        self.show("Reproducible command (current working directory; not executed automatically):")
-        self.show(shlex.join(command_arguments(values["path"], values["frame"], values["output"], settings)))
+            self.show(f"Warning: {warning}")
+        self.show(f"Input path: {Path(values['output']).resolve()}")
+        self.show(f"Sidecar path: {Path(str(values['output'])+'.json').resolve()}")
         if full:
+            self.show("Reproducible command (current working directory; not executed automatically):")
+            self.show(shlex.join(command_arguments(values["path"], values["frame"], values["output"], settings)))
             self.show("\n--- Input preview (not written) ---\n" + text)
         return structure, settings
 
 
-def run_interactive(path, frame, output, settings, stdin=None, stdout=None):
-    """Edit CLI-seeded settings; only an explicit final yes writes new files."""
-    stdin = sys.stdin if stdin is None else stdin
-    stdout = sys.stdout if stdout is None else stdout
-    if not stdin.isatty():
-        raise KitError("Interactive generation requires a terminal (TTY); use generate-input PATH -o OUTPUT for scripts")
-    menu = Menu(stdin, stdout)
-    values = {**asdict(settings), "path": path, "frame": frame, "output": output}
-    try:
-        menu.show("CP2K input generation - Multiwfn-style numbered menu (current GPW subset)")
-        menu.show("Creates new files only; no calculations. Charge/spin/method are not inherited from restart; q cancels at any time.")
-        for field in (GROUPS[0][1][0], GROUPS[0][1][2]):
-            while not values[field.name]:
-                values[field.name] = menu.edit(field, values[field.name])
-        while True:
-            menu.show("\n=== Main menu: current settings ===")
-            for i, (title, fields) in enumerate(GROUPS, 1):
-                summary = "; ".join(f"{f.name}={field_display(f, values)}" for f in visible_fields(fields, values))
-                menu.show(f"  {i}. {title}: {summary}")
-            raw = menu.ask("9 previews the input and command; 0 validates and confirms generation; q cancels; or select a group number: ")
-            if raw in ("0", "9"):
-                try:
-                    structure, updated = menu.review(values, full=raw == "9")
-                except (KitError, OSError) as exc:
-                    menu.show(f"Validation failed (no files written): {exc}\nReturn to the menu to edit the relevant settings.")
-                    continue
-                if raw == "9":
-                    continue
-                answer = menu.ask("Write the two new files listed above? [y/N] (q to cancel): ").lower()
-                if answer not in ("y", "yes"):
-                    menu.show("Not confirmed; returning to the menu. No files written.")
-                    continue
-                # Existing writer retains exit codes, collision protection and rollback.
-                result = write_input(structure, updated, values["output"])
-                menu.show(f"Generated {result[0]} and {result[1]}")
-                return 0
-            if raw in tuple(str(i) for i in range(1, len(GROUPS)+1)):
-                title, fields = GROUPS[int(raw)-1]
-                menu.group(title, fields, values)
-            else:
-                menu.show("Invalid menu number")
-    except Cancelled:
-        menu.show("Cancelled; no files generated.")
-        return 0
-    except (EOFError, KeyboardInterrupt) as exc:
-        raise KitError("Interactive session interrupted; completed files, if any, are retained") from exc
+def run_interactive(path, frame, output, settings, stdin=None, stdout=None, plain=False,
+                    parent_session=False):
+    """CLI-seeded single menu using the same generator and exclusive writer as batch."""
+    from .input_editor import run_editor
+    return run_editor(path, frame, output, settings, stdin, stdout, plain, parent_session)

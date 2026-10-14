@@ -2,27 +2,26 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.2.3 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.2.4 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 - Analysis remains read-only: no submission/execution or modification of existing
   inputs, restart files, or raw output.
 - The six MVP features have entry points, with additional `generate-input`,
   `cube-check`, and `cube-diff` commands; calculations are never run automatically.
-- The core uses Python's standard library; Matplotlib is optional.
+- The core uses Python's standard library; Rich styling and Matplotlib are optional.
 - Outputs include schema, units, SHA-256, line numbers, and original text.
   Missing values are not zero.
 - All existing targets, including derived CSV/JSON/images, are protected from overwrite.
 - Energies can be extracted from failed jobs without becoming valid scientific results.
 
-## Current version: 0.2.3
+## Current version: 0.2.4
 
-All maintained documentation, headings, development prompts, and project text are
-in English. Development templates now require English by default while preserving
-original third-party quotations/citations and user data. The version is 0.2.3 as
-explicitly requested. CLI behavior, scientific defaults, and schema 0.1.0 are unchanged.
-The English menus from 0.2.2 and EPS/geometry formatting fixes from 0.2.1 remain.
-See [the changelog](CHANGELOG.md) for changes and migration notes.
+The interactive interface now uses grouped, scrolling numbered menus and a
+single-menu input editor, with optional Rich styling, plain mode, real structure
+summaries, and explicit result statuses. Scientific defaults, batch formats/exit codes,
+and schema 0.1.0 are unchanged. Menu numbers/navigation have changed; see
+[the changelog](CHANGELOG.md) and the navigation below.
 A version number is not CP2K runtime certification.
 
 ## Quick start
@@ -41,6 +40,8 @@ Install into the existing Python environment:
 
 ```bash
 uv pip install -e .
+# Optional scrolling-menu styling (plain mode works without Rich).
+uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -e '.[ui]'
 # Install the optional dependency only when plotting is needed.
 uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -e '.[plot]'
 cp2kkit --help
@@ -57,10 +58,45 @@ cp2kkit water.gjf
 cp2kkit POSCAR
 ```
 
-The menu provides loading/changing structures, input generation, extXYZ export,
-and output quality reports. Generation or cancellation returns to the application
-menu; a failed load does not replace the current structure. Interactive entry points
-require a TTY; scripts retain the batch subcommands below.
+The menu groups implemented actions into **Structure**, **Calculation**, and
+**Analysis**, with continuous numbers and `0. Exit`. The header shows the source
+basename, formula, atom count, cell lengths (angstrom), angles (degrees), and
+periodicity. Unknown PBC stays Unknown, not NONE; full paths appear in details.
+Output quality and CUBE analysis do not require a loaded structure. A marked
+structure-dependent action can load a file and then resume automatically.
+Failed replacement loads preserve the previous structure.
+
+```bash
+cp2kkit --plain
+cp2kkit --plain crystal.cif
+NO_COLOR=1 cp2kkit crystal.cif
+```
+
+Navigation:
+- Application main menu: `0` or `q` exits; ordinary submenus use `0`/`back` to return.
+- Input generation uses inspected Multiwfn main-menu IDs for corresponding options;
+  `100+` are explicitly local extensions. All applicable fields share one list.
+  **Here `0` reviews/generates after confirmation; `-10`/`back`/`cancel` returns.**
+  `q` exits the entire session. Hidden fields leave gaps without renumbering.
+- Structure path/frame appear in the header; `s` changes the source and `f` changes
+  the XYZ frame. Output path, project and target version are not settings-menu rows.
+- Parameter prompts: Enter keeps the value, `back` abandons that edit; literal
+  `0` is a value, not navigation. Optional `auto` restores source/default behavior.
+- Use `r` to review, `p` to preview the full input/replay command, or `0`/`w` to
+  review and write with explicit y/yes confirmation. Output defaults to the source
+  stem plus `.inp` in the current directory; CLI overrides remain supported.
+  Existing targets are refused; a recovery prompt accepts a new path, never overwrites.
+- Ctrl+C cancels an operation back to main; at main it exits. EOF exits cleanly.
+  Completed files are retained; unfinished writes use the existing rollback.
+- Result summaries show Success/Warning/Error and full generated paths.
+  Parsing success is distinct from calculation quality. Enter returns to main;
+  `d` optionally shows complete analysis details.
+
+These are ordinary line-oriented menus: no clearing, alternate screen, continuous
+redraw, curses, or Textual. Narrow terminals fold text rather than truncate paths.
+Rich is optional via `.[ui]`; `--plain` or any `NO_COLOR` disables styling entirely.
+Interactive entry points require **both stdin and stdout TTY**. Redirected/pipe use
+never waits for menu input; use explicit batch subcommands below instead.
 
 ## CLI subcommands
 
@@ -125,14 +161,43 @@ cp2kkit generate-input water.xyz -o water.inp --periodic NONE --tui
 cp2kkit generate-input
 ```
 
-The editor supports grouped settings, full previews, replayable commands, and
-explicit confirmation before writing. `q` cancels without generation.
-It is a standard-library line-oriented numbered TUI, not a full-screen arrow-key UI;
-curses and Multiwfn are not runtime dependencies. Non-terminal batch use remains CLI-only.
+All implemented input options appear together, Multiwfn-style, in one scrolling
+numbered menu: task/optimization, method/basis/dispersion,
+charge/spin, cell/PBC, SCF/occupations/k-points, grids, and density outputs.
+There is no Step 1/6 workflow, hidden advanced page, or group-selection submenu.
+Conditional fields are hidden when inapplicable: pressure outside CELL_OPT,
+isolated padding unless effective PBC is NONE, smearing/empty orbitals for OT,
+and outer SCF limits for diag. Unknown PBC is not treated as NONE. Remaining
+numbers do not change. Hidden values are retained, never silently reset; switch
+to the applicable mode to edit conflicting overrides. Selecting a field shows its full prompt
+and choices, then returns to the same settings menu with edits retained.
+Use `r` for review, `p` for full preview/replay, and `0`/`w` for review plus explicit
+y/yes writing. `-10`/`back`/`cancel` returns; `q` exits the session. Matching IDs include
+`-7` PBC, `-3` density cube, `-1` task, `1–4` method/basis/dispersion/SCF, `6` smearing,
+`8` k-points, `10` optimizer, and `12` pressure. Unsupported upstream options are
+omitted. Other implemented fields use `100+` extension IDs, not a hidden submenu.
+Source/frame controls are in the header. Project and target-version overrides are
+CLI-only (`--project`, `--cp2k-version`); `-o` remains available to seed an output path.
+Slots **124 / 125** now configure **DFT+U / magnetic initialization**, respectively.
+Cell overrides and data directories remain available through `--cell` / `--data-dir`.
+Complete CLI calls remain noninteractive, and machine-readable JSON/CSV is never
+rendered through Rich. Add `--plain` for unstyled interaction.
+Neither curses nor Multiwfn is a runtime dependency. Version stays 0.2.4 as requested.
 See [input generation](docs/input-generation.md).
 
 Supported: ENERGY/ENERGY_FORCE/GEO_OPT/CELL_OPT, PBE/BLYP, MOLOPT-GTH,
 D3/D3(BJ), charge/multiplicity, cell/PBC, OT/diagonalization, and k-points.
+For target CP2K **2026.2**, explicit Hubbard Ueff/L and collinear magnetic initial
+states are also supported, including same-element opposite-spin KIND splitting.
+`124`: enter `Element:L:Ueff_eV` entries separated by semicolons; `off` disables.
+`125`: enter `uks`, or `Element=moment; @atom=moment`; `auto` restores the original
+multiplicity-based spin behavior. Atom selectors are 1-based loaded/expanded order.
+Element seeds apply first; atom seeds override them. Initial moments are alpha-minus-
+beta electron numbers, not fixed moment constraints. No U, charge or multiplicity
+is inferred/adjusted. For example, `Fe:2:4.0` and `Fe=4; @2=-4` illustrate syntax,
+**not recommended parameters or a validated magnetic ground state**.
+The matching CLI flags are `--dft-plus-u` and `--magnetism` (quote semicolon lists).
+Without these explicit requests, generated CP2K input text/default physics stays unchanged.
 Input and `<output>.json` are both overwrite-protected.
 Structures include XYZ/extXYZ, restart, Cartesian GJF/COM, CIF, and VASP5 POSCAR/CONTCAR.
 PROJECT defaults to the source filename without suffix; grid defaults to 400/55 Ry;

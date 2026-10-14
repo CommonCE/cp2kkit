@@ -112,6 +112,35 @@ Fields/units/schema 0.1.0 are unchanged.
 - syntax_reference_checked/runtime_validated describe density-print validation,
   not certification of the entire generator.
 
+## Generated input JSON: optional electronic extensions
+
+Schema remains 0.1.0; the following fields are additive. Older inputs without new
+requests retain the same generated input text. Existing input-settings metadata now
+also records `dft_plus_u` (empty array by default) and `magnetism` (null by default).
+
+- `settings.dft_plus_u`: array of [element, L, Ueff_eV] entries. One present element
+  per entry, L=0/1/2/3, finite nonnegative Ueff=U-J in eV.
+- `settings.magnetism`: null means automatic UKS from multiplicity; [] explicitly
+  requests UKS without local seeds; [selector, moment] entries request UKS plus
+  initial moments. Selectors are element symbols or @1-based atom indices.
+  Element defaults are overridden by atom selectors. Zero and negative moments
+  are actual values. Moments are initial alpha-minus-beta electron numbers.
+- When +U or explicit magnetism is requested, `electronic_extensions` records
+  effective UKS, atom_kinds (ordered labels matching generated COORD), atom_index_base=1,
+  initial-spin convention, U units, projector method, keyword-reference version/URLs,
+  and runtime_validated=false. Current reference/target restriction is CP2K 2026.2.
+- `kinds` is keyed by generated KIND label (not necessarily an element symbol).
+  For extensions it adds actual element, nullable initial_magnetization and optional
+  dft_plus_u {L, U_minus_J, unit, method}. Split same-element kinds retain their basis/
+  potential and all receive the element's requested Hubbard correction.
+- Source/generated structure symbols remain chemical elements; generated COORD
+  KIND labels are recorded separately in electronic_extensions.atom_kinds.
+  Positions/cell/order remain governed by the existing eight-decimal geometry contract.
+  Parsed restart KIND labels/moments are not implicitly inherited.
+- Total charge/multiplicity are never derived from initial local moments. An explicit
+  UKS singlet is distinct from default RKS; density_output.spin_density and the
+  generated two-spin ADDED_MOS follow effective UKS rather than multiplicity alone.
+
 ## Cube check JSON
 
 - schema_version/source: absolute path, raw-byte sha256, size_bytes.

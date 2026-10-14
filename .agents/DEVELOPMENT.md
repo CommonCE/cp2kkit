@@ -28,7 +28,7 @@ port or evidence of validation with the actual software.
 ## 2. Code and interfaces
 
 - Python >= 3.10, conventional `src/` layout. The core uses the standard library;
-  plotting dependencies are optional.
+  plotting and Rich presentation dependencies are optional.
 - Prefer small targeted changes; do not refactor unrelated code, add unnecessary
   dependencies, or create duplicate parsers.
 - Reuse `Structure`, `InputSettings`, existing readers/writers, and domain exceptions.

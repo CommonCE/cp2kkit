@@ -18,11 +18,13 @@ from .parser import parse_output
 from .plot import plot_run
 from .quality import quality_report
 from .structure import read_structure, xyz_text
+from .spin_settings import parse_dft_plus_u, parse_magnetism
 
 
 def build_parser():
     parser = argparse.ArgumentParser(prog="cp2kkit", description="CP2K toolkit: cp2kkit [STRUCTURE] opens the terminal main menu; subcommands support batch use")
     parser.add_argument("--version", action="version", version=f"cp2kkit {__version__}")
+    parser.add_argument("--plain", action="store_true", help="Disable interactive styling (also honors NO_COLOR)")
     sub = parser.add_subparsers(dest="command", required=True)
     scan = sub.add_parser("discover", help="List projects in one directory (no recursion)")
     scan.add_argument("path", nargs="?", default=".")
@@ -49,7 +51,8 @@ def build_parser():
     gen = sub.add_parser("generate-input", help="Generate a conservative GPW CP2K input and provenance JSON")
     gen.add_argument("path", nargs="?", help="XYZ/extXYZ/restart/GJF/CIF/POSCAR structure; prompted in TUI mode")
     gen.add_argument("-o", "--output", help="New input path; required unless using TUI")
-    gen.add_argument("--interactive", "--tui", action="store_true", help="Edit CLI-seeded settings in a Multiwfn-style numbered terminal menu")
+    gen.add_argument("--interactive", "--tui", action="store_true", help="Edit all CLI-seeded settings in one scrolling numbered menu")
+    gen.add_argument("--plain", action="store_true", default=argparse.SUPPRESS, help="Disable interactive styling")
     gen.add_argument("--frame", type=int, default=-1)
     gen.add_argument("--project", help="Default: structure filename without its suffix")
     gen.add_argument("--run-type", type=str.upper, choices=RUN_TYPES, default="ENERGY")
@@ -74,6 +77,10 @@ def build_parser():
     gen.add_argument("--optimizer", type=str.upper, choices=["BFGS", "LBFGS", "CG"], default="BFGS")
     gen.add_argument("--max-iter", type=int, default=400)
     gen.add_argument("--pressure", type=float, default=1.01325, help="CELL_OPT external pressure (bar)")
+    gen.add_argument('--dft-plus-u', type=parse_dft_plus_u, default=(),
+                     help='CP2K 2026.2: Element:L:Ueff_eV entries separated by semicolons; off disables')
+    gen.add_argument('--magnetism', type=parse_magnetism,
+                     help='CP2K 2026.2: uks or Element=moment; @atom=moment (1-based), e.g. Fe=4; @2=-4; auto restores multiplicity-based UKS')
     gen.add_argument("--data-dir", help="Verify BASIS_MOLOPT/GTH_POTENTIALS and record hashes; also needs dftd3.dat for D3")
     gen.add_argument("--cp2k-version", choices=CP2K_VERSIONS, default="2026.2", help="Target syntax profile; not runtime certification")
     gen.add_argument("--electron-density", action="store_true", help="Print GPW valence density cube (UKS also prints spin density)")
@@ -129,7 +136,7 @@ def execute(args):
         values["cube_stride"] = tuple(args.cube_stride) if args.cube_stride is not None else None
         if args.interactive:
             from .input_tui import run_interactive
-            return run_interactive(args.path, args.frame, args.output, InputSettings(**values))
+            return run_interactive(args.path, args.frame, args.output, InputSettings(**values), plain=args.plain)
         if args.path is None or args.output is None:
             raise KitError("generate-input requires PATH and --output; use --tui for a terminal menu")
         structure = read_structure(args.path, args.frame)
@@ -185,10 +192,11 @@ def main(argv=None):
     parser = build_parser()
     argv = list(sys.argv[1:] if argv is None else argv)
     commands = {"discover", "parse", "report", "plot", "export-structure", "generate-input", "cube-check", "cube-diff"}
-    if not argv or (len(argv) == 1 and argv[0] not in commands and not argv[0].startswith("-")):
+    menu_argv = [arg for arg in argv if arg != "--plain"]
+    if not menu_argv or (len(menu_argv) == 1 and menu_argv[0] not in commands and not menu_argv[0].startswith("-")):
         try:
             from .main_tui import run_main_menu
-            return run_main_menu(argv[0] if argv else None)
+            return run_main_menu(menu_argv[0] if menu_argv else None, plain="--plain" in argv)
         except KitError as exc:
             print(f"cp2kkit: {exc}", file=sys.stderr)
             return exc.code
@@ -197,7 +205,7 @@ def main(argv=None):
             return 2
     args = parser.parse_args(argv)
     if args.command == "generate-input":
-        if args.path is None and args.output is None and sys.stdin.isatty():
+        if args.path is None and args.output is None and sys.stdin.isatty() and sys.stdout.isatty():
             args.interactive = True
         if not args.interactive and (args.path is None or args.output is None):
             parser.error("generate-input requires PATH and --output; use --tui for a terminal menu")

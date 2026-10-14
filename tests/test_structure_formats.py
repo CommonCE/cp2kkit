@@ -2,6 +2,7 @@
 import hashlib
 import io
 import json
+import os
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -182,10 +183,10 @@ class FormatTests(FormatCase):
     def test_tui_smearing_auto_updates_with_structure_size(self):
         self.read('helium.xyz', '65\nsynthetic\n'+'He 0 0 0\n'*65)
         output = self.dir/'helium.inp'
-        log = io.StringIO()
+        log = TTY()
         run_interactive(str(self.dir/'helium.xyz'), -1, str(output), InputSettings(periodic='NONE'),
-                        stdin=TTY('6\n1\ndiag\n5\n300\n0\n0\ny\n'), stdout=log)
-        self.assertIn('added_mos=33 (auto)', log.getvalue())
+                        stdin=TTY('4\ndiag\n6\n300\n0\ny\n\n'), stdout=log, plain=True)
+        self.assertIn('33 (auto)', log.getvalue())
         self.assertIn('ADDED_MOS 33', output.read_text())
 
     def test_dynamic_visibility_and_actual_auto_values(self):
@@ -200,52 +201,60 @@ class FormatTests(FormatCase):
         self.assertNotIn('max_outer_scf', names())
         values['periodic'] = 'NONE'
         self.assertIn('vacuum', names())
-        log = io.StringIO()
-        run_interactive(str(self.dir/'crystal.cif'), -1, str(self.dir/'new.inp'), InputSettings(), stdin=TTY('q\n'), stdout=log)
-        self.assertNotIn('pressure=', log.getvalue())
-        self.assertNotIn('smearing=', log.getvalue())
-        self.assertIn('project=crystal (auto)', log.getvalue())
+        log = TTY()
+        run_interactive(str(self.dir/'crystal.cif'), -1, str(self.dir/'new.inp'), InputSettings(),
+                        stdin=TTY('q\n'), stdout=log, plain=True)
+        self.assertNotIn('CELL_OPT pressure', log.getvalue())
+        self.assertNotIn('Isolated box padding', log.getvalue())
+        self.assertNotIn('Smearing [K]', log.getvalue())
+        self.assertNotIn('ADDED_MOS:', log.getvalue())
+        self.assertIn('Structure:', log.getvalue())
+        self.assertNotIn('Project name:', log.getvalue())
 
 
 class MainMenuTests(FormatCase):
     def test_default_entry_load_generate_and_return(self):
         self.read('crystal.cif', CIF)
-        output = self.dir/'generated.inp'
-        log, err = io.StringIO(), io.StringIO()
-        # Enter input editor, change output path, generate, return to app menu.
-        with patch('sys.stdin', TTY(f'2\n1\n3\n{output}\n0\n0\ny\n0\n')), redirect_stdout(log), redirect_stderr(err):
-            self.assertEqual(main([str(self.dir/'crystal.cif')]), 0)
+        output = self.dir/'crystal.inp'
+        log, err = TTY(), io.StringIO()
+        lines = '0\ny\n\n0\n'
+        previous = Path.cwd()
+        try:
+            os.chdir(self.dir)
+            with patch('sys.stdin', TTY('4\n'+lines)), redirect_stdout(log), redirect_stderr(err):
+                self.assertEqual(main(['--plain', str(self.dir/'crystal.cif')]), 0)
+        finally:
+            os.chdir(previous)
         self.assertTrue(output.exists())
         self.assertEqual(json.loads(Path(str(output)+'.json').read_text())['settings']['project'], 'crystal')
         self.assertGreaterEqual(log.getvalue().count('cp2kkit Main menu'), 2)
 
     def test_no_path_load_choice_and_invalid_file_keep_loaded(self):
         self.read('POSCAR', POSCAR)
-        log = io.StringIO()
+        log = TTY()
         with patch('pathlib.Path.cwd', return_value=self.dir):
-            self.assertEqual(run_main_menu(stdin=TTY('1\n1\n1\nmissing.cif\n0\n'), stdout=log), 0)
+            self.assertEqual(run_main_menu(stdin=TTY('1\n1\n1\nmissing.cif\nback\n0\n'), stdout=log, plain=True), 0)
         self.assertIn('No structure loaded', log.getvalue())
         self.assertIn('Atoms: 3', log.getvalue())
-        self.assertIn('Operation failed', log.getvalue())
-        self.assertIn('Loaded:', log.getvalue().split('Operation failed')[-1])
+        self.assertIn('Previous structure retained', log.getvalue())
 
     def test_application_menu_and_prompts_are_english(self):
         self.read('POSCAR', POSCAR)
-        log = io.StringIO()
-        run_main_menu(str(self.dir/'POSCAR'), stdin=TTY('1\n\n2\nq\n4\nmissing.out\n3\n\n0\n'), stdout=log)
+        log = TTY()
+        run_main_menu(str(self.dir/'POSCAR'), stdin=TTY('1\n\n4\ncancel\n5\nmissing.out\n\n3\n\n0\n'),
+                      stdout=log, plain=True)
         self.assertTrue(log.getvalue().isascii(), log.getvalue())
-        self.assertIn('cp2kkit Main menu', log.getvalue())
         self.assertIn('Select a structure file', log.getvalue())
-        self.assertIn('Generate CP2K input', log.getvalue())
         self.assertIn('New extXYZ output path', log.getvalue())
-        self.assertIn('Operation failed', log.getvalue())
+        self.assertIn('Error:', log.getvalue())
 
     def test_cli_bare_cancel_non_tty_and_invalid_initial_path(self):
-        with patch('sys.stdin', TTY('0\n')), redirect_stdout(io.StringIO()):
+        with patch('sys.stdin', TTY('0\n')), redirect_stdout(TTY()):
             self.assertEqual(main([]), 0)
         with patch('sys.stdin', io.StringIO()), redirect_stderr(io.StringIO()):
             self.assertEqual(main([]), 2)
-        with patch('sys.stdin', TTY('')), redirect_stderr(io.StringIO()):
-            self.assertEqual(main(['missing.cif']), 2)
-        with self.assertRaises(KitError):
-            run_main_menu(stdin=TTY(''), stdout=io.StringIO())
+        log = TTY()
+        with patch('sys.stdin', TTY('0\n')), redirect_stdout(log):
+            self.assertEqual(main(['missing.cif']), 0)
+        self.assertIn('Error: Cannot load initial structure', log.getvalue())
+        self.assertEqual(run_main_menu(stdin=TTY(''), stdout=TTY(), plain=True), 0)

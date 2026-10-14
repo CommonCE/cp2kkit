@@ -22,6 +22,7 @@ from .errors import KitError
 from .io import json_text, new_file, read_text
 from .models import SCHEMA_VERSION
 from .structure import Structure, check_cell
+from .spin_settings import atomic_kinds, validate_requests
 
 MULTIWFN_CITATIONS = (
     "Tian Lu, Feiwu Chen, J. Comput. Chem. 33, 580-592 (2012). DOI: 10.1002/jcc.22885",
@@ -86,6 +87,8 @@ class InputSettings:
     electron_density: bool = False
     spin_density: bool = False
     cube_stride: tuple[int, int, int] | None = None
+    dft_plus_u: tuple[tuple[str, int, float], ...] = ()  # element, L, Ueff [eV]
+    magnetism: tuple[tuple[str, float], ...] | None = None  # None: auto; (): UKS; element/@atom seeds
 
 
 def positive(value, name):
@@ -147,9 +150,10 @@ def generate_input(structure: Structure, settings: InputSettings):
         raise KitError("Pressure must be finite (bar)")
     eps = s.eps_scf if s.eps_scf is not None else (5e-6 if s.run_type == "ENERGY" else 1e-6)
     positive(eps, "eps_scf")
+    uks = s.multiplicity > 1 or s.magnetism is not None
     density_enabled = s.electron_density or s.spin_density
-    if s.spin_density and s.multiplicity == 1:
-        raise KitError("Spin density requires UKS; current generator enables UKS only for multiplicity > 1")
+    if s.spin_density and not uks:
+        raise KitError("Spin density requires UKS; select multiplicity > 1 or explicit magnetism/UKS")
     if s.cube_stride is not None:
         if len(s.cube_stride) != 3 or any(type(v) is not int or v < 1 for v in s.cube_stride):
             raise KitError("cube_stride requires three positive integers")
@@ -171,6 +175,11 @@ def generate_input(structure: Structure, settings: InputSettings):
         raise KitError("Non-SR MOLOPT preset only supports H C N O F Si P S Cl; use an SR basis")
     if s.functional == "BLYP" and set(elements) & PBE_ONLY_ELEMENTS:
         raise KitError("No verified GTH-BLYP preset for: " + ", ".join(sorted(set(elements) & PBE_ONLY_ELEMENTS)))
+    hubbard, magnetism = validate_requests(s.dft_plus_u, s.magnetism, structure.symbols, VALENCE)
+    s = replace(s, dft_plus_u=hubbard, magnetism=magnetism)
+    if (hubbard or magnetism is not None) and s.cp2k_version != '2026.2':
+        raise KitError('DFT+U and explicit magnetic settings are currently keyword-checked only for CP2K 2026.2')
+    atom_labels, kind_specs = atomic_kinds(structure.symbols, magnetism)
     electrons = sum(VALENCE[symbol] for symbol in structure.symbols) - s.charge
     unpaired = s.multiplicity - 1
     if electrons <= 0 or unpaired > electrons or (electrons - unpaired) % 2:
@@ -235,12 +244,29 @@ def generate_input(structure: Structure, settings: InputSettings):
         warnings.append("POSCAR selective-dynamics constraints are recorded in source metadata but NOT inherited in this new CP2K input.")
     if density_enabled:
         warnings.append("GPW/GTH cube contains pseudopotential valence electron density, not all-electron/core density; stride and grid need convergence checks.")
-        if s.multiplicity > 1:
+        if uks:
             warnings.append("CP2K E_DENSITY_CUBE prints both electron and alpha-minus-beta spin densities for UKS; these cannot be independently suppressed here.")
         if s.run_type in {"GEO_OPT", "CELL_OPT"}:
             warnings.append("ADD_LAST prints the last identified optimization step, not proof of convergence; verify output and use a final fixed-geometry ENERGY calculation for comparable fragment grids.")
-    kinds = {el: {"basis": f"{s.basis}-q{VALENCE[el]}",
-                  "potential": f"GTH-{s.functional}-q{VALENCE[el]}", "valence_electrons": VALENCE[el]} for el in elements}
+    if hubbard:
+        warnings.append('DFT+U uses explicit Ueff=U-J [eV] with MULLIKEN projectors; justify U, orbital L and basis for the target property. No U values are inferred.')
+    if magnetism is not None:
+        warnings.append('Explicit magnetism enables collinear UKS without changing total charge/multiplicity. MAGNETIZATION is only an atomic initial guess, not a fixed local moment or guaranteed magnetic state.')
+        initial_sum = sum(kind_specs[label][1] or 0. for label in atom_labels)
+        if magnetism and not math.isclose(initial_sum, s.multiplicity-1, abs_tol=1e-10):
+            warnings.append(f'Requested initial atomic moments sum to {initial_sum:g}, while MULTIPLICITY-1 is {s.multiplicity-1}; check the intended magnetic state. Neither value is adjusted automatically.')
+    kinds = {}
+    u_by_element = {el: (angular, energy) for el, angular, energy in hubbard}
+    for label, (el, moment) in sorted(kind_specs.items()):
+        kind = {"basis": f"{s.basis}-q{VALENCE[el]}",
+                "potential": f"GTH-{s.functional}-q{VALENCE[el]}", "valence_electrons": VALENCE[el]}
+        if hubbard or magnetism is not None:
+            kind['element'] = el
+            kind['initial_magnetization'] = moment
+            if el in u_by_element:
+                angular, energy = u_by_element[el]
+                kind['dft_plus_u'] = {'L': angular, 'U_minus_J': energy, 'unit': 'eV', 'method': 'MULLIKEN'}
+        kinds[label] = kind
     data_sources = {}
     files = {"basis": "BASIS_MOLOPT", "potential": "GTH_POTENTIALS", "dispersion": "dftd3.dat"}
     if s.data_dir is not None:
@@ -248,7 +274,8 @@ def generate_input(structure: Structure, settings: InputSettings):
             text, source = read_text(Path(s.data_dir) / files[key])
             data_sources[key] = source
             if key != "dispersion":
-                for el, kind in kinds.items():
+                for label, kind in kinds.items():
+                    el = kind.get('element', label)
                     if not data_header_exists(text, el, kind[key]):
                         raise KitError(f"{files[key]} has no {el} {kind[key]}")
             files[key] = str((Path(s.data_dir) / files[key]).resolve())
@@ -267,17 +294,20 @@ def generate_input(structure: Structure, settings: InputSettings):
         lines.append("  STRESS_TENSOR ANALYTICAL")
     lines += ["  &DFT", f'    BASIS_SET_FILE_NAME "{files["basis"]}"',
               f'    POTENTIAL_FILE_NAME "{files["potential"]}"', f"    CHARGE {s.charge}",
-              f"    MULTIPLICITY {s.multiplicity}", f"    UKS {'T' if s.multiplicity > 1 else 'F'}",
+              f"    MULTIPLICITY {s.multiplicity}", f"    UKS {'T' if uks else 'F'}",
               "    &QS", "      METHOD GPW", f"      EPS_DEFAULT {scientific_number(1e-11 if s.run_type == 'ENERGY' else 1e-12)}", "    &END QS",
               "    &MGRID", f"      CUTOFF [Ry] {num(s.cutoff)}", f"      REL_CUTOFF [Ry] {num(s.rel_cutoff)}",
               f"      NGRIDS {5 if '-SR-' not in s.basis else 4}", "    &END MGRID",
               "    &POISSON", f"      PERIODIC {periodic}", f"      POISSON_SOLVER {solver}", "    &END POISSON",
               "    &SCF", "      SCF_GUESS ATOMIC", f"      EPS_SCF {scientific_number(eps)}", f"      MAX_SCF {s.max_scf}"]
+    if hubbard:
+        # PLUS_U_METHOD belongs in DFT, not SCF; insert before &QS.
+        lines.insert(lines.index('    &QS'), '    PLUS_U_METHOD MULLIKEN')
     if s.scf == "ot":
         lines += ["      &OT", "        PRECONDITIONER FULL_ALL", "        MINIMIZER DIIS", "      &END OT",
                   "      &OUTER_SCF", f"        EPS_SCF {scientific_number(eps)}", f"        MAX_SCF {s.max_outer_scf}", "      &END OUTER_SCF"]
     else:
-        added_mos = ' '.join([str(s.added_mos)] * (2 if s.multiplicity > 1 else 1))
+        added_mos = ' '.join([str(s.added_mos)] * (2 if uks else 1))
         lines += [f"      ADDED_MOS {added_mos}", "      &DIAGONALIZATION", "        ALGORITHM STANDARD", "      &END DIAGONALIZATION",
                   "      &MIXING", "        METHOD BROYDEN_MIXING", "        ALPHA 0.4", "        NBROYDEN 8", "      &END MIXING"]
         if s.smearing is not None:
@@ -302,11 +332,19 @@ def generate_input(structure: Structure, settings: InputSettings):
     lines += [f"      PERIODIC {periodic} #Direction(s) of applied PBC (geometry aspect)",
               "    &END CELL", "    &COORD"]
     lines += [f"      {el:<8}" + "".join(f" {v:13.8f}" for v in row)
-              for el, row in zip(structure.symbols, positions)]
+              for el, row in zip(atom_labels, positions)]
     lines += ["    &END COORD"]
-    for el, kind in kinds.items():
-        lines += [f"    &KIND {el}", f"      ELEMENT {el}", f"      BASIS_SET {kind['basis']}",
-                  f"      POTENTIAL {kind['potential']}", "    &END KIND"]
+    for label, kind in kinds.items():
+        el = kind.get('element', label)
+        lines += [f"    &KIND {label}", f"      ELEMENT {el}", f"      BASIS_SET {kind['basis']}",
+                  f"      POTENTIAL {kind['potential']}"]
+        if kind.get('initial_magnetization') is not None:
+            lines.append(f"      MAGNETIZATION {num(kind['initial_magnetization'])}")
+        if el in u_by_element:
+            angular, energy = u_by_element[el]
+            lines += ['      &DFT_PLUS_U ON', f'        L {angular}',
+                      f'        U_MINUS_J [eV] {num(energy)}', '      &END DFT_PLUS_U']
+        lines.append('    &END KIND')
     lines += ["  &END SUBSYS", "&END FORCE_EVAL"]
     if s.run_type in {"GEO_OPT", "CELL_OPT"}:
         lines += ["&MOTION", f"  &{s.run_type}", f"    OPTIMIZER {s.optimizer}", f"    MAX_ITER {s.max_iter}",
@@ -328,7 +366,7 @@ def generate_input(structure: Structure, settings: InputSettings):
                 "settings": asdict(s), "effective_eps_scf": eps, "poisson_solver": solver,
                 "density_output": {"enabled": bool(density_enabled),
                                    "electron_density": bool(density_enabled),
-                                   "spin_density": bool(density_enabled and s.multiplicity > 1),
+                                   "spin_density": bool(density_enabled and uks),
                                    "stride": list(stride) if density_enabled else None,
                                    "each": density_each if density_enabled else None,
                                    "add_last": "NUMERIC" if density_enabled else None,
@@ -350,6 +388,16 @@ def generate_input(structure: Structure, settings: InputSettings):
                 "source_structure": structure.to_dict(), "generated_structure": effective.to_dict(),
                 "coordinates_translated": translated, "warnings": warnings,
                 "input_text": text, "input_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
+    if hubbard or magnetism is not None:
+        manifest['electronic_extensions'] = {
+            'uks': uks, 'atom_kinds': atom_labels, 'atom_index_base': 1,
+            'initial_magnetization_convention': 'alpha minus beta electron number; initial guess only',
+            'dft_plus_u_unit': 'eV', 'plus_u_method': 'MULLIKEN' if hubbard else None,
+            'keyword_reference_version': '2026.2', 'runtime_validated': False,
+            'references': [
+                'https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/SUBSYS/KIND/DFT_PLUS_U.html',
+                'https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/SUBSYS/KIND.html',
+                'https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT.html']}
     return text, manifest
 
 

@@ -12,7 +12,7 @@ No submission system or deferred Bader/PDOS/NEB post-processing is introduced.
 4. **Conservative assessment:** null is unknown; unknown/failed/truncated cannot pass.
 5. **No implicit selection/restart merging:** sort candidates by name, not time/size guesses.
 6. **Non-destructive outputs:** exclusive creation; rollback newly created files on multi-file failure.
-7. **Minimal dependencies:** standard-library core, isolated optional plotting, no ASE requirement.
+7. **Minimal dependencies:** standard-library core, isolated optional plotting/Rich presentation, no ASE requirement.
 
 ## Modules and dependency direction
 
@@ -26,8 +26,11 @@ cli.py
  |-- plot.py ------- export.py / quality.py / optional matplotlib
  |-- main_tui.py --- input_tui.py / structure.py (application menu/load/dispatch)
  |-- structure_formats.py (strict GJF/CIF/POSCAR; lazy dispatch from structure.py)
- |-- input_tui.py -- inputgen.py / structure.py (TTY editor seeded by CLI)
- |-- inputgen.py --- structure.py / models.py / io.py (pure generation/exclusive writes)
+ |-- input_tui.py -- input_editor.py / inputgen.py / structure.py (TTY navigation/fields)
+ |-- input_editor.py (single numbered settings menu, drafts, review; same generator/writer)
+ |-- presentation.py (scrolling text, optional Rich; no batch rendering)
+ |-- inputgen.py --- structure.py / spin_settings.py / models.py / io.py (pure generation/exclusive writes)
+ |-- spin_settings.py (explicit Ueff/L parsing, collinear atom seeds, stable KIND splitting)
  `-- cube.py ------- models.py / io.py / structure.py (units; streaming checks/differences)
 
 models.py: data model/schema version
@@ -83,13 +86,28 @@ and unsupported combinations are rejected. Element presets explicitly match
 basis/potential valence counts; optional local data checks verify names/hashes.
 No calculation or Multiwfn/adjacent-source dependency.
 
-The standard-library editor maintains drafts, performs local type/range checks,
-then delegates chemistry/cross-field validation to the shared generator.
-Previews do not write; explicit confirmation uses the exclusive writer.
-Complete batch subcommands stay noninteractive; terminal generate-input without
-structure/output can open the editor. Bare cp2kkit/cp2kkit STRUCTURE opens the
-application menu for generation/export etc. Dynamic hiding never silently repairs
-conflicting physical settings. All maintained UI/documentation/development text is English.
+The line-oriented input editor maintains drafts, performs local type/range checks,
+and rechecks changes through the shared generator without repairing physical conflicts.
+Applicable fields are directly selectable in one list. FIELD_IDS records inspected
+Multiwfn main-menu IDs and explicit 100+ local extensions; unsupported IDs are not
+repurposed. Source/frame controls are in the header, while output/project/version
+are no longer numbered fields. Automatic output follows the source stem; CLI seeds
+remain honored. The shared visible_fields rules filter both
+rendering and selection. Numbers stay fixed, leaving gaps for hidden fields when
+task/SCF/PBC changes; hidden values remain in the validated draft. Presenter handles folding
+and optional Rich styling; Menu handles input/navigation; editor/application dispatch
+existing business APIs. Review/previews do not write; 0/w plus explicit y/yes uses the
+exclusive writer; -10/back/cancel returns from the generator. Collisions have a
+new-target recovery prompt, not a permanent path setting.
+Complete batch calls stay noninteractive; stdin/stdout TTY are required for menus.
+Bare cp2kkit/cp2kkit STRUCTURE opens the grouped application menu. --plain/NO_COLOR
+disable styling. EOF/q exits the session; Ctrl+C cancels an operation (exits at main).
+Default input text and protected writers are unchanged. Slots 124/125 now request
+explicit Ueff/L and collinear magnetic initialization; --cell/--data-dir remain
+CLI-only. spin_settings validates and maps element/atom selectors without changing
+charge/multiplicity or source geometry. Split KIND labels retain ELEMENT-specific
+basis/potential/U. Only target 2026.2 is checked for these opt-in features. Schema
+0.1.0 gains additive raw settings, generated KIND mapping and reference metadata.
 
 ## Cube pipeline
 

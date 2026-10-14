@@ -79,7 +79,8 @@ included. Reading cube format itself does not require a version number.
 - No request means no density PRINT section; other input defaults are unaffected.
 - Under UKS, E_DENSITY_CUBE prints both electron/spin density. This feature has no
   separate SPIN_DENSITY_CUBE switch. Spin requests require current UKS eligibility
-  (multiplicity > 1); invalid requests error without silently changing magnetism.
+  (multiplicity > 1, or explicit magnetic initialization/UKS for target 2026.2);
+  invalid requests error without silently changing total charge/multiplicity.
 - Under UKS, either request produces both cubes. JSON `settings` records requested
   values; `density_output` records effective behavior.
 - ENERGY/ENERGY_FORCE use JUST_ENERGY 1. GEO_OPT/CELL_OPT routine frequency is 0;

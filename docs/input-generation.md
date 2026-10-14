@@ -1,6 +1,6 @@
 # CP2K input generation
 
-This guide describes cp2kkit **0.2.3**. Older defaults and migration notes are in
+This guide describes cp2kkit **0.2.4**. Older defaults and migration notes are in
 [the changelog](../CHANGELOG.md).
 
 `generate-input` is an explicit write entry point added beyond the read-only MVP;
@@ -54,72 +54,88 @@ Outputs are `<output>` and `<output>.json`. If either exists, refuse overwrite
 (exit 5); a sidecar collision rolls back the newly created input. There is no
 `--force`. Parent directories must already exist.
 
-## Multiwfn-style numbered TUI
+## Single numbered input-generation menu
 
 ```bash
-# Interactive entry: prompt for structure and new output paths.
 cp2kkit generate-input --tui
 cp2kkit generate-input --interactive     # Equivalent option.
-
-# CLI arguments seed the editor; no separate physical defaults.
 cp2kkit generate-input water.xyz -o water-opt.inp --periodic NONE \
-  --run-type GEO_OPT --dispersion d3bj --electron-density --tui
-
-# A terminal invocation without structure/output automatically opens the editor.
-cp2kkit generate-input
+  --run-type GEO_OPT --dispersion d3bj --electron-density --tui --plain
+cp2kkit generate-input                  # Opens menu only when both streams are TTY.
 ```
 
-Application title: `cp2kkit Main menu`; editor title: `Main menu: current settings`.
-All submenus, labels, prompts, validation, previews, confirmations, and documentation
-are in English. Menu numbers, auto/q/quit/y/n operations, and parameter semantics
-are unchanged; legacy Boolean input aliases remain accepted.
+All applicable settings appear together in one scrolling numbered menu, using
+Multiwfn-style direct selection. There are no sequential steps, hidden advanced
+pages, or group-selection submenus. Corresponding main-menu IDs follow the inspected
+Multiwfn 2026.10.1 source; unsupported entries are omitted, not reassigned.
+This changes presentation only; the same `InputSettings`, generator and protected
+writer remain in use. Version remains **0.2.4**, as explicitly requested.
 
-This is a revisitable settings editor, not a mandatory sequential wizard. It uses
-standard-library line-oriented interaction for terminals/SSH without curses or extra
-UI packages. Neither the Multiwfn executable nor adjacent development source is required.
+| ID | Setting/action | Numbering origin |
+|---|---|---|
+| -10 | Return/cancel generation | Multiwfn main menu |
+| -7 | Periodicity | Multiwfn main menu |
+| -3 | Electron-density cube | Multiwfn cube entry; supported density subset only |
+| -1 | Task | Multiwfn main menu |
+| 0 | Review and generate, with explicit y/yes confirmation | Multiwfn generate ID; extra safety confirmation |
+| 1 / 2 / 3 / 4 | Functional / basis / dispersion / OT-diag | Multiwfn main menu |
+| 6 / 8 | Smearing temperature / k-points | Multiwfn main menu; local parameter prompts |
+| 10 / 12 | Optimizer / CELL_OPT pressure | Multiwfn main menu |
+| 101 / 102 | Charge / multiplicity | Local extensions (upstream Other settings 1/2) |
+| 105 / 106 | CUTOFF / REL_CUTOFF | Local extensions (upstream Other settings 5 combines both) |
+| 107 / 112 | Isolated padding / ADDED_MOS | Local extensions (upstream Other settings 7/12) |
+| 120 / 121 / 122 | EPS_SCF / inner-diag limit / outer limit | Local extensions |
+| 123 / 124 / 125 | Optimization steps / DFT+U / magnetic initialization | Local extensions |
+| 126 / 127 | Spin density / cube stride | Local extensions |
 
-| Editor action | Content |
-|---:|---|
-| 1 | Files, project and version: structure, XYZ frame, new output, project, target CP2K |
-| 2 | Task and optimization: run type, optimizer, steps, pressure |
-| 3 | Method, basis and dispersion: GPW functional, MOLOPT-GTH, dispersion, data directory |
-| 4 | Charge and spin |
-| 5 | Periodicity and cell: PBC, orthorhombic override, isolated padding (angstrom) |
-| 6 | SCF, k-points and occupations: OT/diag, EPS_SCF, limits, k-points, smearing (K), empty orbitals |
-| 7 | Integration grid: CUTOFF/REL_CUTOFF (Ry) |
-| 8 | Electron/spin density cubes: switches and STRIDE |
-| 9 | Validate/preview complete input, provenance warnings, and replayable CLI; no writing |
-| 0 | Validate/show effective settings; write only after explicit y/yes |
-| q / quit | Cancel the session without generation |
+Only corresponding implemented main-menu IDs are reused; this is not full upstream
+menu/choice/default equivalence. In particular, OT outer-limit editing is not the
+upstream outer-SCF enable/disable toggle. No unimplemented placeholders are shown.
 
-- Select a field inside a group; `0` returns to the editor menu. Enter keeps the value.
-- Pressure appears only for CELL_OPT; padding only for effective NONE.
-  OT hides smearing/empty orbitals and shows outer limits; diag does the reverse.
-  Field numbers vary with available options. Switching algorithms does not silently
-  clear explicit conflicts; edit them manually.
-- PROJECT/MAX_SCF/ADDED_MOS accept `auto`. Project follows the current source;
-  OT inner default is 25, diag 128. Automatic empty orbitals depend on atom count/smearing.
-- Enumerations accept displayed numbers/names; Boolean values accept y/n;
-  triples are space-separated.
-- Optional `auto` restores defaults/removes overrides. PBC auto inherits source
-  PBC, **not NONE**; smearing auto disables it; cell auto preserves the source;
-  cube_stride auto restores the effective default.
-- Paths may contain spaces: enter literal paths without shell quotes. `q`/`quit`
-  cancel; use `./q`/`./quit` for literal filenames. Output parent directories must exist.
-- Type/range errors retry locally. Cross-field/structure errors appear on preview/generation
-  and return to editing. Spin density without UKS, OT+non-Gamma, and unknown PBC
-  are not fixed by silently changing other settings.
-- Confirmation defaults to no; Enter returns to editing. Existing targets still exit 5,
-  with no overwrite button. EOF/Ctrl-C exits 2; unfinished writes roll back through
-  the writer, while completed files are retained.
-- TUI requires stdin TTY; pipes cannot impersonate interactive confirmation. Use CLI
-  for scripts. stdout may be redirected to save menus/previews. Complete regular
-  CLI calls do not enter TUI even from a terminal.
+- Structure path and frame appear above the list, without setting numbers or seed
+  annotations. `s` loads/replaces the structure; `f` selects the XYZ frame.
+  An invalid source/frame preserves the previous selection.
+- Output path, project and target-version rows are removed. Without `-o`, the
+  output is `<source-stem>.inp` in the current directory; a source change updates
+  an automatic target. Explicit CLI `-o`, `--project`, and `--cp2k-version` seeds
+  remain honored. PROJECT still defaults to the source stem; target CP2K stays 2026.2.
+  These values and absolute output paths remain in review/manifest for traceability.
+- Select any displayed number directly; a prompt shows its choices. Numbers remain
+  fixed across task/SCF/PBC changes. Hidden fields cannot be selected.
+  Pressure appears only for CELL_OPT; optimizer/step limits only for optimization.
+  Isolated padding requires effective NONE, not Unknown. OT hides smearing/ADDED_MOS;
+  diag hides outer SCF limits. All values are retained when fields disappear.
+- Parameter Enter keeps; `back` abandons that edit. **Literal zero remains a value**,
+  including charge, ADDED_MOS and Boolean off. Optional `auto` restores defaults.
+  Enumerations accept names/numbers; triples are space-separated.
+- **Input-generation navigation changed:** `0` now reviews/generates, matching
+  Multiwfn. Use `-10`/`back`/`cancel` to return without generation.
+  The application main menu still uses `0` to exit; ordinary submenus retain their
+  own `0`-back behavior. `q` exits the session; Ctrl+C cancels; EOF exits cleanly.
+- `r` reviews effective settings/warnings and full paths; `p` adds full input and
+  the replay command. Neither writes. Enter returns to the same settings list.
+- `0` or its alias `w` reviews and asks for explicit `y`/`yes` before writing.
+  Enter defaults to no. Collision/I/O errors offer a new-path retry prompt
+  (Enter/back returns to settings), without adding a persistent output-path option.
+  No overwrite button exists. The protected writer revalidates and rolls back.
+- Bare interactive generation opens the same menu; use `s` to load a source.
+  A missing source gives a recoverable validation message.
 
-Both modes share `InputSettings`, `generate_input`, and `write_input`. Identical
-structure/settings yield identical text/JSON; there are no TUI-only physical defaults
-or schema changes. Replay commands are shell-quoted for display only, never executed.
-The menu covers the current GPW subset, not all Multiwfn tasks/methods.
+- Type/range errors retry locally. Changed fields are rechecked by the existing
+  generator. Incompatible drafts retain their values with explicit warnings.
+  No charge/spin/SCF/PBC/k-point combination is automatically repaired.
+  Hidden overrides are retained and still validated. For example, switch to diag,
+  remove explicit smearing/nonzero ADDED_MOS, then switch back to OT. No implicit
+  reset is performed when fields disappear.
+- Enter paths literally without shell quotes. Use `./q`, `./cancel`, `./back`,
+  or `./0` for filenames that collide with navigation words.
+
+Optional Rich (`.[ui]`) has a standard-library fallback; `--plain` and the presence
+of `NO_COLOR` disable styling. Text folds on narrow terminals without clearing,
+alternate screen, or continuous redraw. Both stdin and stdout must be TTY.
+Redirected/piped sessions fail promptly with batch alternatives rather than waiting.
+Complete batch calls, schema 0.1.0, scientific defaults, and protected writing are
+unchanged; identical structure/settings produce identical text/manifest.
 
 ## Scope and defaults
 
@@ -131,7 +147,7 @@ The menu covers the current GPW subset, not all Multiwfn tasks/methods.
 | Basis | DZVP-MOLOPT-SR-GTH (default); SZV-MOLOPT-SR-GTH, DZVP/TZVP/TZV2P-MOLOPT-GTH |
 | Potential | GTH-PBE/GTH-BLYP; basis and potential explicitly matched with `-qN` |
 | Dispersion | none (default), D3, D3(BJ); dftd3.dat and REFERENCE_FUNCTIONAL |
-| Charge/spin | 0/1; explicit valence-electron parity check; UKS for multiplicity > 1 |
+| Charge/spin | 0/1; explicit valence-electron parity check; UKS for multiplicity > 1 or explicit magnetic request |
 | SCF | OT+FULL_ALL/DIIS+outer SCF (default), or diagonalization+Broyden mixing |
 | EPS_SCF | ENERGY 5e-6, other tasks 1e-6; override allowed |
 | SCF limits | OT inner/outer 25/20; diag 128; `--max-scf`/`--max-outer-scf` overrides |
@@ -142,6 +158,7 @@ The menu covers the current GPW subset, not all Multiwfn tasks/methods.
 | CELL_OPT | Requires XYZ/lower-triangular cell; analytical stress; default pressure 1.01325 bar |
 | Target version | 2026.2 default; common density syntax profiles 2024.1/2/3, 2025.1/2, 2026.1/2; not runtime certification |
 | Density cubes | Optional electron/applicable UKS spin density; stride default 1 1 1; final-step policy in [cube guide](cube.md) |
+| DFT+U / magnetic seeds | Explicit opt-in, target 2026.2 only; Ueff/L per element, MULLIKEN projectors; collinear UKS/atom seeds with split KIND labels |
 
 SR/PBE presets cover 71 elements:
 
@@ -196,15 +213,70 @@ Standard-library readers preserve original hashes and do not run Gaussian/VASP/M
   electron/basis-based sufficiency guarantee. Check high-temperature/metals/orbital
   analysis and override as needed. Positive half-integer rounding matches Fortran NINT.
 - Charge/multiplicity checks ensure explicit-electron consistency, not the correct
-  magnetic state. No antiferromagnetism, broken-symmetry singlets, or per-KIND MAGNETIZATION.
+  magnetic state. Explicit collinear magnetic guesses (including opposite-spin
+  atoms of one element and UKS singlets) are supported as described below, not
+  certified converged states. No noncollinear spin, SOC, local-spin constraints,
+  occupation matrices, or automatic magnetic-order search.
 - Restart provides **geometry only**: original KIND labels merge by element;
   method/U/constraints/moments/charge/solvent are not inherited. This is a new template,
   not a complete restart of the original job.
-- Hybrid/ADMM, DFT+U, MD, frequencies, NEB, TDDFT, solvents, external fields, atomic
+- Hybrid/ADMM, MD, frequencies, NEB, TDDFT, solvents, external fields, atomic
   constraints, and other advanced Multiwfn branches are not implemented.
   Electron/spin cubes are supported; potential/ELF/MO cubes are not.
 - Default cutoff/basis/vacuum/k-points are not converged for the target system.
   Deprecated CELL_OPT TYPE DIRECT_CELL_OPT is not emitted.
+
+## DFT+U and magnetic initialization (124 / 125)
+
+These are real generator features, not renamed placeholders. They are opt-in and
+currently keyword-checked only against CP2K **2026.2**; explicit requests with other
+target profiles are rejected rather than presented as verified. Software version
+stays 0.2.4 as requested. Schema 0.1.0 gains additive settings/extension metadata.
+
+- **124 — DFT+U:** enter `Element:L:Ueff_eV`, separated by semicolons.
+  `L=0/1/2/3` means s/p/d/f; Ueff is finite, nonnegative, in eV, and equals U-J.
+  `off`/`auto` clears the correction. One entry per present element is supported.
+  No element-specific U values or orbital channels are guessed.
+  The generator writes `DFT/PLUS_U_METHOD MULLIKEN` and active
+  `SUBSYS/KIND/DFT_PLUS_U` sections with `L` and `U_MINUS_J [eV]`.
+  User-selected U/L must be justified for the functional, basis and projector
+  definition; no native runtime/shell-suitability validation has been performed.
+- **125 — magnetic initialization:** `uks` explicitly enables UKS without local seeds;
+  `Element=moment; @index=moment` enables UKS and supplies atomic initial guesses.
+  `auto` (also `off`/`none`) clears explicit magnetic requests and restores the
+  original multiplicity-based UKS rule; it does not force RKS when multiplicity > 1.
+  The edit prompt shows loaded atoms with **1-based indices and angstrom coordinates**.
+  These indices follow expanded structure/selected-frame order, not CIF site labels.
+- Element requests apply first; explicit `@index` overrides apply second. Signed
+  values and zero are retained; selectors must be unique, present and finite.
+  Moments are initial alpha-minus-beta electron numbers, with magnitude no greater
+  than the preset explicit valence count, not fixed local moments.
+- Different initial moments on one element produce separate generated KIND labels
+  (`Fe_m1`, `Fe_m2`, etc.) and matching COORD labels. No atom reordering occurs.
+  Basis/potentials retain the actual ELEMENT; element-specific +U is copied to
+  all split kinds of that element. Unassigned atoms retain default initial guesses.
+  Source KIND labels/moments are not inherited.
+- Explicit magnetic requests may enable a UKS singlet, but **never change total
+  charge or multiplicity**. The existing electron/parity check still applies.
+  A requested-moment sum different from MULTIPLICITY-1 is warned about, not repaired.
+  Local moments may change during SCF; initial seeds do not certify FM/AFM stability.
+  UKS spin-density output and two-spin ADDED_MOS also apply to explicit UKS singlets.
+- Old menu cell/data-directory entries are removed; `--cell` and `--data-dir`
+  remain CLI/API controls. The new flags are `--dft-plus-u` / `--magnetism`:
+
+```bash
+# Syntax example ONLY; these U/moment values are not recommendations.
+cp2kkit generate-input Fe2O2.extxyz -o Fe2O2-afm.inp \
+  --dft-plus-u 'Fe:2:4.0' --magnetism 'Fe=4; @2=-4' --multiplicity 1
+```
+
+No U ramping, independent U/J, LOWDIN selection, constrained occupations, or
+noncollinear magnetism is implemented in these controls. Without explicit requests,
+the previous input-text defaults remain unchanged; provenance records raw requests.
+Reviewed keyword sources:
+[DFT_PLUS_U](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/SUBSYS/KIND/DFT_PLUS_U.html),
+[KIND/MAGNETIZATION](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/SUBSYS/KIND.html),
+[DFT/UKS and PLUS_U_METHOD](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT.html).
 
 ## Electron/spin density output
 
@@ -214,7 +286,7 @@ cp2kkit generate-input AB.extxyz -o AB-density.inp --project AB \
 ```
 
 Without a request, no density PRINT is added. `--spin-density` requires current
-UKS eligibility (multiplicity > 1). CP2K's E_DENSITY_CUBE controls both fields,
+UKS eligibility (multiplicity > 1 or an explicit magnetic request). CP2K's E_DENSITY_CUBE controls both fields,
 so both are written under UKS. Routine optimization frequency is 0; ADD_LAST
 NUMERIC requests the final recognized step, not proof of convergence or a guarantee
 of output after abnormal termination. Frequencies/files/GPW valence meaning and

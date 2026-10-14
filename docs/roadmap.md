@@ -1,19 +1,40 @@
 # Development status and next steps
 
-Current software: **0.2.3**, explicitly requested; schema: **0.1.0**.
-See [the changelog](../CHANGELOG.md). This round standardizes maintained documentation,
-prompts, and project text in English without changing scientific defaults or CLI behavior.
-Original third-party quotations/citations, hashes, user data, and historical records are preserved.
-The original standalone MVP document has been consolidated into the planning section below.
+Current software: **0.2.4**, explicitly requested; schema: **0.1.0**.
+See [the changelog](../CHANGELOG.md). This round adds a scrolling grouped application
+menu and a single numbered input editor, optional Rich styling/plain fallback,
+structure summaries, result summaries, and consistent navigation. No alternate
+screen, screen clearing, continuous redraw, or full-screen framework is used.
+Applicable generation fields are visible together, with stable numbers instead
+of sequential steps/advanced pages. Pressure is CELL_OPT-only, padding requires
+effective NONE, OT hides smearing/empty orbitals, and diag hides outer SCF limits.
+Hidden fields leave number gaps and retain their values without implicit resets. The user
+requested these layout corrections without another version bump; 0.2.4 is retained.
+Source/frame moved to the header (s/f controls); output/project/version rows are
+removed. Corresponding main-menu IDs now follow the inspected Multiwfn source;
+100+ are explicit local extensions. In generation, 0 reviews/generates with
+confirmation and -10 returns. Other application menus keep their own navigation.
+Default input text, batch exit codes and protected writers remain unchanged.
+Slots 124/125 now implement explicit DFT+U and collinear magnetic guesses for target
+2026.2, including same-element opposite-spin KIND splitting. CLI cell/data controls
+remain available. Raw settings and optional electronic-extension metadata are
+additive under schema 0.1.0; U values and charge/multiplicity are never inferred.
 
-Current validation: **138 tests passed, none skipped**; compileall and diff checks passed.
-CLI reports `cp2kkit 0.2.3`. New tests check maintained-language consistency, local
-Markdown links, English development instructions, and legacy Boolean compatibility.
-Official Multiwfn quotations and recorded source hashes were verified unchanged.
-No CP2K calculations or new dependencies were introduced.
+Current validation: **176 tests passed, none skipped**; compileall, diff, CLI version,
+and local Markdown-link checks passed. Regression includes a real POSIX PTY menu,
+default/edited generation equivalence, conflicts/manual fixes, back/cancel/q/EOF/
+Ctrl+C, failed replacement, exclusive output/sidecar collisions, export/CUBE actions,
+plain/NO_COLOR/optional-dependency fallback, and narrow-terminal rendering.
+Optional Rich **15.0.0** was installed and import/render verified in the existing
+Python environment; the ui extra declares rich>=13.7. No CP2K/Multiwfn calculations,
+submission, package publication, commit, or push was performed. Runtime/scientific
+certification and real-file version coverage remain unverified.
 
 ## Recent historical validation
 
+- **0.2.3:** 138 tests passed, none skipped. Standardized maintained documentation,
+  prompts and project text in English; preserved original quotations/hashes and
+  consolidated the standalone MVP into this roadmap. No scientific/default changes.
 - **0.2.2:** 134 tests passed, none skipped. Application/editor/submenu text became
   English; numbering/defaults and 0.2.1 formatting stayed intact. Compileall/diff
   checks passed; CLI reported 0.2.2. CP2K was not run.
@@ -75,8 +96,10 @@ old default, or emitting target-version-unsupported keywords without checking.
 
 1. **Defaults/behavior:** verify differences, solvers, WAVELET box shapes, low-dimensional
    vacuum, centering, cell repetition, external structures, configuration.
-2. **KIND/spin/constraints:** independent KIND, per-KIND bases/potentials/moments,
-   DFT+U/CDFT, atom freezing, cell constraints, anisotropic pressure.
+2. **KIND/spin/constraints:** explicit element/atom magnetic guesses and Ueff/L
+   are implemented for target 2026.2. Remaining: arbitrary independent KIND/basis/
+   potential controls, richer +U projectors/occupations, CDFT, atom freezing,
+   cell constraints, anisotropic pressure, and actual magnetic-state validation.
 3. **Methods/bases:** GGA/meta-GGA, hybrids, ADMM/RI-HFX, GPW/GAPW, auxiliary/all-electron
    bases, correlated wavefunctions, semiempirical/force fields, dispersion/SCF options.
 4. **Tasks:** frequencies/vibrations/Raman, MD, dimer TS, BAND/NEB, NMR, polarizability,

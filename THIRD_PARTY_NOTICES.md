@@ -23,8 +23,13 @@ workflows, parameter tables, defaults, or rewritten code. Record actual use hone
 - [Provenance](third_party/multiwfn/PROVENANCE.md): local modules, upstream version/
   file/subroutine/hash, use, differences, permission, and a future-entry template.
 
-Registered modules include `src/cp2kkit/inputgen.py` (generation) and
-`src/cp2kkit/input_tui.py` (numbered interaction, not a Fortran UI port).
+Registered modules include `src/cp2kkit/inputgen.py` (generation),
+`src/cp2kkit/spin_settings.py` (explicit Ueff/L and initial-spin KIND organization),
+and `src/cp2kkit/input_tui.py` / `src/cp2kkit/input_editor.py` (numbered interaction
+and selected inspected upstream main-menu IDs, not a full Fortran UI port).
+The local 124/125 U/magnetism extensions are not upstream main-menu IDs;
+they require explicit parameters and do not reproduce upstream's automatic
+multiplicity-from-local-moments change.
 Not distributing original Fortran or requiring the Multiwfn binary does not
 establish strict clean-room implementation or exemption from upstream conditions.
 

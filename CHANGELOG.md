@@ -8,6 +8,59 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.2.4
+
+### Scrolling interactive workflow
+
+- Group application actions into Structure/Calculation/Analysis, using continuous
+  display numbers and separate stable IDs. Add real formula/atom/cell/angle/PBC
+  summaries and full-path details. Unknown periodicity remains Unknown.
+- Add independent quality/CUBE check/difference actions. Structure-dependent actions
+  can load a file and resume; unsuccessful replacement preserves the prior structure.
+- Keep all implemented input options together in one scrolling numbered menu,
+  with fixed field numbers, current values, direct edits, compatibility feedback,
+  preview/review, and explicit protected writing. Hide pressure outside CELL_OPT,
+  padding unless effective PBC is NONE, smearing/empty orbitals for OT, and outer
+  SCF for diag. Hidden fields cannot be selected; values are retained and validated.
+  Remaining numbers stay fixed. OT review also omits inapplicable occupation fields.
+  Remove the intermediate step-based workflow at the user's request; retain 0.2.4
+  without an additional version bump.
+- Move structure/frame to the header with s/f controls; remove output/project/target
+  version from numbered settings. Default output is source-stem.inp; CLI overrides
+  remain honored. Align corresponding main-menu IDs to inspected Multiwfn 2026.10.1:
+  -7 PBC, -3 density cube, -1 task, 1–4 method/basis/dispersion/SCF, 6 smearing,
+  8 k-points, 10 optimizer and 12 pressure. Unsupported upstream entries are omitted;
+  remaining local controls use explicit 100+ extension IDs. Generator 0 reviews/
+  generates with confirmation; -10 returns. Keep 0.2.4 without a further bump.
+- Review includes physical/numerical/output settings, effective basis/potentials,
+  source and absolute target paths, warnings, optional full input/replay details.
+  Recover from collisions through a new-path prompt without overwriting.
+- Add optional Rich ui extra, plain fallback, --plain and NO_COLOR; scrolling folded
+  text only, no alternate screen/redraw/clearing. Add textual result statuses and
+  distinguish successful parsing from calculation quality.
+- Navigation migration: application main 0/q exits; ordinary submenu 0/back returns;
+  generator 0 generates with confirmation and -10/back returns; q exits the whole
+  session; cancel/Ctrl+C cancels operations; EOF exits cleanly. Parameter zero stays
+  valid. Both stdin and stdout must be TTY; redirected menus fail without waiting.
+  Use batch subcommands for machine-readable/redirected output.
+- Explicit requested version 0.2.4; scientific defaults, batch contracts/exit codes,
+  output protection and schema 0.1.0 unchanged. No calculation, publication, or
+  CP2K runtime/scientific certification is implied.
+- Replace menu 124/125 cell/data controls with actual DFT+U/magnetic initialization.
+  Keep --cell/--data-dir CLI/API controls. New opt-in --dft-plus-u/--magnetism flags
+  and menu prompts require explicit Ueff/L or UKS/element/atom spin seeds; opposite
+  initial moments split same-element KIND labels without reordering geometry.
+  Total charge/multiplicity stay unchanged; initial moments are not constraints.
+  Ueff uses eV and MULLIKEN projectors, with no guessed U values. New requests are
+  restricted to keyword-checked target 2026.2, not runtime-certified. UKS singlets
+  also follow spin-density/two-spin empty-orbital rules. Default input text remains
+  unchanged; schema 0.1.0 receives additive settings/KIND/reference metadata.
+  Keep software 0.2.4 at the user's explicit request.
+- Validation: 176 tests passed, none skipped, including a real POSIX PTY menu,
+  navigation/state, generation equivalence, conflicts, collisions/rollback,
+  independent export/CUBE/quality actions, plain/NO_COLOR/fallback, batch regression,
+  and narrow layouts. Compileall, diff, version and local-link checks passed.
+
 ## 0.2.3
 
 ### English project content
