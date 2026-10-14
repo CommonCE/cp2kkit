@@ -1,6 +1,6 @@
 # CP2K 输入生成
 
-本文描述 cp2kkit **0.2.1** 的当前行为；旧版本默认值及迁移提示见
+本文描述 cp2kkit **0.2.2** 的当前行为；旧版本默认值及迁移提示见
 [变更记录](../CHANGELOG.md)。
 
 `generate-input` 是在原只读 MVP 外新增的显式写入入口，不运行或提交计算。
@@ -65,6 +65,10 @@ cp2kkit generate-input water.xyz -o water-opt.inp --periodic NONE \
 # 在终端中，未提供结构和输出时自动进入菜单
 cp2kkit generate-input
 ```
+
+应用菜单标题为 `cp2kkit Main menu`，输入编辑菜单标题为 `Main menu: current settings`。
+所有子菜单、字段标签、选择/校验提示、预览和生成确认统一为英文；文档说明仍使用中文。
+菜单编号、auto/q/quit/y/n 操作及参数语义不变，原中文布尔输入别名仍可接受。
 
 数字菜单逐项修改，每次显示当前值；不是必须从头走完的向导。
 使用标准库行式交互，支持常规终端/SSH，不安装 curses 或额外 UI 依赖。

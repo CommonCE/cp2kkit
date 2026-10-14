@@ -14,10 +14,10 @@ def choose_structure(menu):
     candidates = sorted((p for p in Path.cwd().iterdir() if p.is_file() and
                          (p.suffix.lower() in STRUCTURE_SUFFIXES or p.name.upper() in {'POSCAR', 'CONTCAR'})),
                         key=lambda p: p.name)
-    menu.show('\n--- 选择结构文件（当前目录）---')
+    menu.show('\n--- Select a structure file (current directory)---')
     for i, path in enumerate(candidates, 1):
         menu.show(f'  {i}. {path.name}')
-    raw = menu.ask('输入文件编号或完整/相对路径；回车返回；q 退出: ')
+    raw = menu.ask('Enter a file number or absolute/relative path; Enter to return; q to quit: ')
     if not raw:
         return None
     if raw in {str(i) for i in range(1, len(candidates)+1)}:
@@ -35,15 +35,15 @@ def run_main_menu(path=None, stdin=None, stdout=None):
     loaded_path = str(path) if path is not None else None
     try:
         while True:
-            menu.show('\n=== cp2kkit 主菜单 ===')
+            menu.show('\n=== cp2kkit Main menu ===')
             if loaded is None:
-                menu.show('当前未加载结构；请选择文件。')
+                menu.show('No structure loaded; please select a file.')
             else:
-                menu.show(f'已加载: {loaded_path}；原子数: {len(loaded.symbols)}；'
-                          f'晶胞: {"有" if loaded.cell else "未知"}；PBC: {loaded.pbc}')
-            menu.show('  1. 加载/更换结构文件\n  2. 生成 CP2K 输入文件\n'
-                      '  3. 导出结构（extXYZ）\n  4. CP2K 输出质量报告\n  0. 退出')
-            raw = menu.ask('选择功能编号；q 退出: ')
+                menu.show(f'Loaded: {loaded_path}; Atoms: {len(loaded.symbols)}; '
+                          f'Cell: {"available" if loaded.cell else "unknown"}; PBC: {loaded.pbc}')
+            menu.show('  1. Load/change structure file\n  2. Generate CP2K input\n'
+                      '  3. Export structure (extXYZ)\n  4. CP2K output quality report\n  0. Exit')
+            raw = menu.ask('Select a function number; q to quit: ')
             if raw == '0':
                 return 0
             try:
@@ -64,7 +64,7 @@ def run_main_menu(path=None, stdin=None, stdout=None):
                                         stdin=stdin, stdout=stdout)
                     else:
                         from .cli import build_parser, execute
-                        output = menu.ask('新 extXYZ 输出路径（回车返回）: ')
+                        output = menu.ask('New extXYZ output path (Enter to return): ')
                         if output:
                             execute(build_parser().parse_args(['export-structure', loaded_path, '-o', output]))
                 elif raw == '4':
@@ -72,15 +72,15 @@ def run_main_menu(path=None, stdin=None, stdout=None):
                     from .discovery import resolve_output
                     from .quality import quality_report
                     from .io import json_text
-                    output_path = menu.ask('CP2K 输出文件/目录路径（回车返回）: ')
+                    output_path = menu.ask('CP2K output file/directory path (Enter to return): ')
                     if output_path:
                         menu.show(json_text(quality_report(parse_output(resolve_output(output_path)))))
                 else:
-                    menu.show('无效菜单编号')
+                    menu.show('Invalid menu number')
             except (KitError, OSError) as exc:
-                menu.show(f'操作失败: {exc}；已有文件保持不变。')
+                menu.show(f'Operation failed: {exc}; existing files are unchanged.')
     except Cancelled:
-        menu.show('已退出主菜单。')
+        menu.show('Exited the main menu.')
         return 0
     except (EOFError, KeyboardInterrupt) as exc:
         raise KitError('Main menu interrupted; completed files, if any, are retained') from exc

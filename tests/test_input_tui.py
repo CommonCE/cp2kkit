@@ -42,6 +42,23 @@ class MenuTests(unittest.TestCase):
                                stdin=TTY(lines), stdout=log, **kwargs)
         return code, log.getvalue()
 
+    def test_all_menu_text_is_english(self):
+        for title, fields in GROUPS:
+            self.assertTrue(title.isascii(), title)
+            for field in fields:
+                self.assertTrue(field.label.isascii(), field.label)
+        lines = ''.join(f'{i}\n0\n' for i in range(1, 9))+'9\n0\n\nq\n'
+        for settings in (self.settings, replace(self.settings, run_type='CELL_OPT', periodic='XYZ',
+                                               cell=(20.,20.,20.), scf='diag', smearing=300)):
+            self.settings = settings
+            code, log = self.session(lines)
+            self.assertEqual(code, 0)
+            self.assertTrue(log.isascii(), log)
+            self.assertIn('Main menu: current settings', log)
+            self.assertIn('Input preview (not written)', log)
+            self.assertIn('Cancelled; no files generated.', log)
+            self.assertFalse(self.output.exists())
+
     def test_all_input_fields_editable_and_ranges(self):
         fields = [f for _, group in GROUPS for f in group]
         names = [f.name for f in fields]
@@ -69,8 +86,8 @@ class MenuTests(unittest.TestCase):
         text, expected = generate_input(read_structure(self.path), self.settings)
         self.assertEqual(self.output.read_text(), text)
         self.assertEqual(json.loads(Path(str(self.output)+".json").read_text()), json.loads(json.dumps(expected)))
-        self.assertIn("可复现命令", log)
-        self.assertIn("显式价电子数", log)
+        self.assertIn("Reproducible command", log)
+        self.assertIn("Explicit valence electrons", log)
 
     def test_edit_task_functional_charge_and_density(self):
         # Choose GEO_OPT/BLYP; charge +1/multiplicity 2; enable spin with stride 2 3 4.
@@ -100,13 +117,13 @@ class MenuTests(unittest.TestCase):
             write.assert_not_called()
         self.assertEqual(code, 0)
         self.assertIn("&FORCE_EVAL", log)
-        self.assertIn("未确认", log)
+        self.assertIn("Not confirmed", log)
         self.assertEqual(list(self.dir.iterdir()), [self.path])
 
     def test_bad_local_values_and_menu_choices_retry(self):
         code, log = self.session("²\n99\n7\n999\n1\nnan\n-5\n450\n0\nq\n")
         self.assertEqual(code, 0)
-        self.assertGreaterEqual(log.count("无效"), 4)
+        self.assertGreaterEqual(log.count("Invalid"), 4)
         self.assertIn("cutoff=450.0", log)
         self.assertFalse(self.output.exists())
 
@@ -239,7 +256,7 @@ class CLIInteractiveTests(unittest.TestCase):
                         proc.communicate()
                         raise
                     self.assertEqual(proc.returncode, 0, error+log)
-                    self.assertIn("输入预览", log)
+                    self.assertIn("Input preview", log)
                     text, _ = generate_input(read_structure(FIXTURES/"trajectory.xyz"), InputSettings(periodic="NONE"))
                     self.assertEqual(out.read_text(), text)
             finally:

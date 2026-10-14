@@ -31,47 +31,47 @@ class Field:
 
 # Every InputSettings field is editable; menu numbering is local, not upstream's.
 GROUPS = (
-    ("文件、项目与版本", (
-        Field("path", "结构路径（XYZ/extXYZ/restart/GJF/CIF/POSCAR；路径含空格时无需引号）"),
-        Field("frame", "XYZ 帧索引（默认 -1；其他格式必须为 -1）", "int"),
-        Field("output", "新输入文件路径（同时生成 .json）"),
-        Field("project", "项目名（auto 使用结构文件名去后缀）", optional=True),
-        Field("cp2k_version", "目标 CP2K 版本（非运行认证）", choices=CP2K_VERSIONS))),
-    ("任务与优化", (
-        Field("run_type", "任务", choices=RUN_TYPES),
-        Field("optimizer", "优化器（仅优化任务有效）", choices=("BFGS", "LBFGS", "CG")),
-        Field("max_iter", "最大优化步数", "int", minimum=1),
-        Field("pressure", "CELL_OPT 外压 [bar]", "float"))),
-    ("方法、基组与色散", (
-        Field("functional", "泛函（GPW/GTH）", choices=FUNCTIONALS),
-        Field("basis", "基组（赝势随泛函/元素预设匹配）", choices=BASES),
-        Field("dispersion", "色散", choices=("none", "d3", "d3bj")),
-        Field("data_dir", "CP2K data 目录（核对名字与哈希）", optional=True))),
-    ("电荷与自旋", (
-        Field("charge", "总电荷 [e]（不从 restart 继承）", "int"),
-        Field("multiplicity", "自旋多重度（>1 启用 UKS；不继承磁态）", "int", minimum=1))),
-    ("周期性与晶胞", (
-        Field("periodic", "周期性（auto 继承源 PBC；XYZ 未知时必须明确选择）",
+    ("Files, project and version", (
+        Field("path", "Structure path (XYZ/extXYZ/restart/GJF/CIF/POSCAR; no quotes needed for spaces)"),
+        Field("frame", "XYZ frame index (default -1; other formats require -1)", "int"),
+        Field("output", "New input file path (also writes .json)"),
+        Field("project", "Project name (auto: structure filename without suffix)", optional=True),
+        Field("cp2k_version", "Target CP2K version (not runtime certification)", choices=CP2K_VERSIONS))),
+    ("Task and optimization", (
+        Field("run_type", "Run type", choices=RUN_TYPES),
+        Field("optimizer", "Optimizer (optimization tasks only)", choices=("BFGS", "LBFGS", "CG")),
+        Field("max_iter", "Maximum optimization steps", "int", minimum=1),
+        Field("pressure", "CELL_OPT external pressure [bar]", "float"))),
+    ("Method, basis and dispersion", (
+        Field("functional", "Functional (GPW/GTH)", choices=FUNCTIONALS),
+        Field("basis", "Basis set (potential matched to functional/element preset)", choices=BASES),
+        Field("dispersion", "Dispersion", choices=("none", "d3", "d3bj")),
+        Field("data_dir", "CP2K data directory (verify names and hashes)", optional=True))),
+    ("Charge and spin", (
+        Field("charge", "Total charge [e] (not inherited from restart)", "int"),
+        Field("multiplicity", "Spin multiplicity (>1 enables UKS; magnetic state not inherited)", "int", minimum=1))),
+    ("Periodicity and cell", (
+        Field("periodic", "Periodicity (auto: source PBC; explicitly select if XYZ PBC is unknown)",
               choices=PERIODICITIES, optional=True),
-        Field("cell", "正交晶胞覆盖 A B C [angstrom]（auto 保留源晶胞）",
+        Field("cell", "Orthorhombic cell override A B C [angstrom] (auto: preserve source cell)",
               "float3", optional=True, positive=True),
-        Field("vacuum", "自动孤立盒子每侧 padding [angstrom]", "float", positive=True))),
-    ("SCF、k 点与占据", (
-        Field("scf", "SCF（OT 适用于有隙体系，金属应核对 diag/展宽）", choices=("ot", "diag")),
-        Field("eps_scf", "EPS_SCF（auto 为任务默认值）", "float", optional=True, positive=True),
-        Field("max_scf", "内层/对角化最大 SCF 步数（auto: OT 25 / diag 128）", "int", optional=True, minimum=1),
-        Field("kpoints", "MONKHORST-PACK NX NY NZ（非 Gamma 要求 XYZ + diag）", "int3", minimum=1),
-        Field("smearing", "Fermi-Dirac 温度 [K]（auto 关闭；要求 diag）",
+        Field("vacuum", "Automatic isolated box padding on each side [angstrom]", "float", positive=True))),
+    ("SCF, k-points and occupations", (
+        Field("scf", "SCF (OT for gapped systems; check diag/smearing for metals)", choices=("ot", "diag")),
+        Field("eps_scf", "EPS_SCF (auto: task default)", "float", optional=True, positive=True),
+        Field("max_scf", "Maximum inner/diagonalization SCF steps (auto: OT 25 / diag 128)", "int", optional=True, minimum=1),
+        Field("kpoints", "MONKHORST-PACK NX NY NZ (non-Gamma requires XYZ + diag)", "int3", minimum=1),
+        Field("smearing", "Fermi-Dirac temperature [K] (auto: off; requires diag)",
               "float", optional=True, positive=True),
-        Field("added_mos", "ADDED_MOS（auto: 展宽 max(30, NINT(原子数/2))，否则 0）", "int", optional=True, minimum=0),
-        Field("max_outer_scf", "外层 SCF 最大步数（OT 默认开启）", "int", minimum=1))),
-    ("积分网格", (
+        Field("added_mos", "ADDED_MOS (auto: max(30, NINT(atom_count/2)) with smearing, otherwise 0)", "int", optional=True, minimum=0),
+        Field("max_outer_scf", "Maximum outer SCF steps (enabled by default for OT)", "int", minimum=1))),
+    ("Integration grid", (
         Field("cutoff", "CUTOFF [Ry]", "float", positive=True),
         Field("rel_cutoff", "REL_CUTOFF [Ry]", "float", positive=True))),
-    ("电子/自旋密度 cube", (
-        Field("electron_density", "电子密度（GPW 赝势显式价电子密度）", "bool"),
-        Field("spin_density", "自旋密度（alpha-minus-beta；要求 UKS）", "bool"),
-        Field("cube_stride", "STRIDE NX NY NZ（auto 为 1 1 1；需先开启密度）",
+    ("Electron/spin density cubes", (
+        Field("electron_density", "Electron density (GPW pseudopotential valence density)", "bool"),
+        Field("spin_density", "Spin density (alpha-minus-beta; requires UKS)", "bool"),
+        Field("cube_stride", "STRIDE NX NY NZ (auto: 1 1 1; enable density first)",
               "int3", optional=True, minimum=1))),
 )
 
@@ -111,9 +111,9 @@ def field_display(field, values):
 
 def display(value):
     if value is None:
-        return "auto / 未设置"
+        return "auto / not set"
     if type(value) is bool:
-        return "开启" if value else "关闭"
+        return "on" if value else "off"
     if isinstance(value, tuple):
         return " ".join(map(str, value))
     return str(value)
@@ -129,22 +129,22 @@ def parse_value(field, raw):
         for choice in field.choices:
             if raw.casefold() == choice.casefold():
                 return choice
-        raise ValueError("请选择列出的编号或名称")
+        raise ValueError("Select a listed number or name")
     if field.kind == "bool":
         if raw.lower() in ("y", "yes", "1", "true", "on", "开启"):
             return True
         if raw.lower() in ("n", "no", "0", "false", "off", "关闭"):
             return False
-        raise ValueError("请输入 y/n（开启/关闭）")
+        raise ValueError("Enter y/n (on/off)")
     if field.kind == "text":
         if any(ord(c) < 32 or ord(c) == 127 for c in raw):
-            raise ValueError("文本或路径不能包含控制字符")
+            raise ValueError("Text or paths must not contain control characters")
         return raw
     converter = int if field.kind.startswith("int") else float
     if field.kind.endswith("3"):
         parts = raw.split()
         if len(parts) != 3:
-            raise ValueError("需要三个以空格分隔的数")
+            raise ValueError("Enter three space-separated numbers")
         value = tuple(converter(p) for p in parts)
         numbers = value
     else:
@@ -152,11 +152,11 @@ def parse_value(field, raw):
         numbers = (value,)
     for number in numbers:
         if isinstance(number, float) and not math.isfinite(number):
-            raise ValueError("数值必须有限，不能为 NaN/Inf")
+            raise ValueError("Values must be finite, not NaN/Inf")
         if field.positive and number <= 0:
-            raise ValueError("数值必须为正")
+            raise ValueError("Values must be positive")
         if field.minimum is not None and number < field.minimum:
-            raise ValueError(f"数值必须 >= {field.minimum:g}")
+            raise ValueError(f"Values must be >= {field.minimum:g}")
     return value
 
 
@@ -203,15 +203,15 @@ class Menu:
         self.show(field.label)
         for i, choice in enumerate(field.choices, 1):
             self.show(f"  {i}. {choice}")
-        extra = "; auto 恢复自动/关闭可选值" if field.optional else ""
+        extra = "; auto restores automatic/disabled optional values" if field.optional else ""
         while True:
-            raw = self.ask(f"当前 [{display(current)}]；回车保持{extra}；q 取消: ")
+            raw = self.ask(f"Current [{display(current)}]; Enter to keep{extra}; q to cancel: ")
             if not raw:
                 return current
             try:
                 return parse_value(field, raw)
             except ValueError as exc:
-                self.show(f"无效输入: {exc}")
+                self.show(f"Invalid input: {exc}")
 
     def group(self, title, fields, values):
         all_fields = fields
@@ -220,11 +220,11 @@ class Menu:
             self.show(f"\n--- {title} ---")
             for i, field in enumerate(fields, 1):
                 self.show(f"  {i}. {field.label}: {field_display(field, values)}")
-            raw = self.ask("选择项目编号；0 返回主菜单；q 取消: ")
+            raw = self.ask("Select an item number; 0 returns to the main menu; q cancels: ")
             if raw == "0":
                 return
             if raw not in tuple(str(i) for i in range(1, len(fields)+1)):
-                self.show("无效菜单编号")
+                self.show("Invalid menu number")
                 continue
             field = fields[int(raw)-1]
             values[field.name] = self.edit(field, values[field.name])
@@ -234,21 +234,21 @@ class Menu:
         settings = InputSettings(**{name: values[name] for name in InputSettings.__dataclass_fields__})
         structure = read_structure(values["path"], values["frame"])
         text, manifest = generate_input(structure, settings)
-        self.show("\n--- 已校验生成参数（不是运行/收敛认证）---")
-        self.show(f"原子数: {len(structure.symbols)}；显式价电子数: {manifest['valence_electron_count']}")
-        self.show(f"目标版本: {settings.cp2k_version}；任务: {settings.run_type}；方法: GPW/{settings.functional}")
-        self.show(f"SCF: {settings.scf}；有效 EPS_SCF: {manifest['effective_eps_scf']}；Poisson: {manifest['poisson_solver']}")
-        self.show(f"实际晶胞 [angstrom]: {manifest['generated_structure']['cell']}")
-        self.show(f"原子坐标已平移: {manifest['coordinates_translated']}；基组/赝势: {manifest['kinds']}")
-        self.show(f"有效密度输出: electron={manifest['density_output']['electron_density']}, "
+        self.show("\n--- Validated generation settings (not runtime/convergence certification) ---")
+        self.show(f"Atoms: {len(structure.symbols)}; Explicit valence electrons: {manifest['valence_electron_count']}")
+        self.show(f"Target version: {settings.cp2k_version}; Run type: {settings.run_type}; Method: GPW/{settings.functional}")
+        self.show(f"SCF: {settings.scf}; Effective EPS_SCF: {manifest['effective_eps_scf']}; Poisson: {manifest['poisson_solver']}")
+        self.show(f"Generated cell [angstrom]: {manifest['generated_structure']['cell']}")
+        self.show(f"Coordinates translated: {manifest['coordinates_translated']}; Basis/potentials: {manifest['kinds']}")
+        self.show(f"Effective density output: electron={manifest['density_output']['electron_density']}, "
                   f"spin={manifest['density_output']['spin_density']}, stride={manifest['density_output']['stride']}")
         for warning in manifest["warnings"]:
             self.show(f"WARNING: {warning}")
-        self.show(f"将新建: {values['output']} 和 {values['output']}.json")
-        self.show("可复现命令（当前工作目录；不会自动执行）:")
+        self.show(f"Will create: {values['output']} and {values['output']}.json")
+        self.show("Reproducible command (current working directory; not executed automatically):")
         self.show(shlex.join(command_arguments(values["path"], values["frame"], values["output"], settings)))
         if full:
-            self.show("\n--- 输入预览（未写入）---\n" + text)
+            self.show("\n--- Input preview (not written) ---\n" + text)
         return structure, settings
 
 
@@ -261,40 +261,40 @@ def run_interactive(path, frame, output, settings, stdin=None, stdout=None):
     menu = Menu(stdin, stdout)
     values = {**asdict(settings), "path": path, "frame": frame, "output": output}
     try:
-        menu.show("CP2K 输入生成 — Multiwfn 风格数字菜单（当前 GPW 子集）")
-        menu.show("只生成新文件，不运行计算；不从 restart 继承电荷/自旋/方法；q 随时取消。")
+        menu.show("CP2K input generation - Multiwfn-style numbered menu (current GPW subset)")
+        menu.show("Creates new files only; no calculations. Charge/spin/method are not inherited from restart; q cancels at any time.")
         for field in (GROUPS[0][1][0], GROUPS[0][1][2]):
             while not values[field.name]:
                 values[field.name] = menu.edit(field, values[field.name])
         while True:
-            menu.show("\n=== 主菜单：当前设置 ===")
+            menu.show("\n=== Main menu: current settings ===")
             for i, (title, fields) in enumerate(GROUPS, 1):
                 summary = "; ".join(f"{f.name}={field_display(f, values)}" for f in visible_fields(fields, values))
                 menu.show(f"  {i}. {title}: {summary}")
-            raw = menu.ask("9 预览完整输入与命令；0 校验并确认生成；q 取消；或选择组编号: ")
+            raw = menu.ask("9 previews the input and command; 0 validates and confirms generation; q cancels; or select a group number: ")
             if raw in ("0", "9"):
                 try:
                     structure, updated = menu.review(values, full=raw == "9")
                 except (KitError, OSError) as exc:
-                    menu.show(f"校验失败（未写文件）: {exc}\n请返回菜单修改相关参数。")
+                    menu.show(f"Validation failed (no files written): {exc}\nReturn to the menu to edit the relevant settings.")
                     continue
                 if raw == "9":
                     continue
-                answer = menu.ask("确认写入上述两个新文件？[y/N]（q 取消）: ").lower()
+                answer = menu.ask("Write the two new files listed above? [y/N] (q to cancel): ").lower()
                 if answer not in ("y", "yes"):
-                    menu.show("未确认，返回菜单；未写文件。")
+                    menu.show("Not confirmed; returning to the menu. No files written.")
                     continue
                 # Existing writer retains exit codes, collision protection and rollback.
                 result = write_input(structure, updated, values["output"])
-                menu.show(f"已生成 {result[0]} 和 {result[1]}")
+                menu.show(f"Generated {result[0]} and {result[1]}")
                 return 0
             if raw in tuple(str(i) for i in range(1, len(GROUPS)+1)):
                 title, fields = GROUPS[int(raw)-1]
                 menu.group(title, fields, values)
             else:
-                menu.show("无效菜单编号")
+                menu.show("Invalid menu number")
     except Cancelled:
-        menu.show("已取消；未生成文件。")
+        menu.show("Cancelled; no files generated.")
         return 0
     except (EOFError, KeyboardInterrupt) as exc:
         raise KitError("Interactive session interrupted; completed files, if any, are retained") from exc

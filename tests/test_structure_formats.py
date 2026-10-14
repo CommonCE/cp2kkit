@@ -217,17 +217,28 @@ class MainMenuTests(FormatCase):
             self.assertEqual(main([str(self.dir/'crystal.cif')]), 0)
         self.assertTrue(output.exists())
         self.assertEqual(json.loads(Path(str(output)+'.json').read_text())['settings']['project'], 'crystal')
-        self.assertGreaterEqual(log.getvalue().count('cp2kkit 主菜单'), 2)
+        self.assertGreaterEqual(log.getvalue().count('cp2kkit Main menu'), 2)
 
     def test_no_path_load_choice_and_invalid_file_keep_loaded(self):
         self.read('POSCAR', POSCAR)
         log = io.StringIO()
         with patch('pathlib.Path.cwd', return_value=self.dir):
             self.assertEqual(run_main_menu(stdin=TTY('1\n1\n1\nmissing.cif\n0\n'), stdout=log), 0)
-        self.assertIn('当前未加载', log.getvalue())
-        self.assertIn('原子数: 3', log.getvalue())
-        self.assertIn('操作失败', log.getvalue())
-        self.assertIn('已加载:', log.getvalue().split('操作失败')[-1])
+        self.assertIn('No structure loaded', log.getvalue())
+        self.assertIn('Atoms: 3', log.getvalue())
+        self.assertIn('Operation failed', log.getvalue())
+        self.assertIn('Loaded:', log.getvalue().split('Operation failed')[-1])
+
+    def test_application_menu_and_prompts_are_english(self):
+        self.read('POSCAR', POSCAR)
+        log = io.StringIO()
+        run_main_menu(str(self.dir/'POSCAR'), stdin=TTY('1\n\n2\nq\n4\nmissing.out\n3\n\n0\n'), stdout=log)
+        self.assertTrue(log.getvalue().isascii(), log.getvalue())
+        self.assertIn('cp2kkit Main menu', log.getvalue())
+        self.assertIn('Select a structure file', log.getvalue())
+        self.assertIn('Generate CP2K input', log.getvalue())
+        self.assertIn('New extXYZ output path', log.getvalue())
+        self.assertIn('Operation failed', log.getvalue())
 
     def test_cli_bare_cancel_non_tty_and_invalid_initial_path(self):
         with patch('sys.stdin', TTY('0\n')), redirect_stdout(io.StringIO()):
