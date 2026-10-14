@@ -131,9 +131,9 @@ def parse_value(field, raw):
                 return choice
         raise ValueError("Select a listed number or name")
     if field.kind == "bool":
-        if raw.lower() in ("y", "yes", "1", "true", "on", "开启"):
+        if raw.lower() in ("y", "yes", "1", "true", "on", "\u5f00\u542f"):
             return True
-        if raw.lower() in ("n", "no", "0", "false", "off", "关闭"):
+        if raw.lower() in ("n", "no", "0", "false", "off", "\u5173\u95ed"):
             return False
         raise ValueError("Enter y/n (on/off)")
     if field.kind == "text":

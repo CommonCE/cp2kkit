@@ -1,2 +1,2 @@
 """Read-only, evidence-first CP2K post-processing."""
-__version__ = "0.2.2"
+__version__ = "0.2.3"

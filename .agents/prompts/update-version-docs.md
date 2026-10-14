@@ -1,42 +1,52 @@
-# 提示词：功能完成后更新版本号与文档
+# Prompt: update the version and documentation after feature work
 
-复制以下提示词，替换占位符后使用；功能实现模板也应执行本流程。
-
----
-
-请先阅读 `.agents/DEVELOPMENT.md`，检查当前源码、版本声明、文档与 Git 状态。
-
-本次完成的功能：<实际实现范围，不填写尚未完成的计划>
-兼容性变化：<新增接口、默认值变化、格式限制或破坏性变化>
-用户指定版本（如有）：<版本；未指定时按下面规则判断>
-
-要求：
-
-1. 每轮新增功能完成后，必须更新软件版本号与相应文档；同一轮多个功能统一更新一次，
-   不按修改文件数重复升版。仅文档/提示词调整不单独强制升版。
-2. 严格采用用户约定的 `A.B.C`：
-   - A 是大版本号，仅由用户人工决定；助手不得自动递增，即使有破坏性变更也先询问用户。
-   - B 是小版本号，有新增功能或功能更新时递增，C 归零。
-   - C 在修复功能、修复 bug 时递增，A/B 不变。
-   - 同一轮兼有功能更新和修复时统一递增 B、C 归零；同一轮只升版一次。
-   - 用户明确指定版本优先；目标不高于当前版本或要求冲突时先确认，不擅自降版。
-   默认值/接口变化要说明迁移影响，但不能据此擅自更新 A。
-3. 同步 `pyproject.toml` 的项目版本、`src/cp2kkit/__init__.py` 的 `__version__`、
-   README 当前版本及 CLI `--version`。不要手改忽略的 egg-info、构建产物或旧结果中的版本。
-   软件版本、数据 schema、目标 CP2K 版本是不同概念，禁止全仓库盲目替换版本数字；
-   schema 只有交换契约需要变化时才独立评估更新。
-4. 更新 `CHANGELOG.md`：实际新增/变化、默认值和迁移提示、重要限制与验证边界。
-   不编造历史版本内容、发布日期或已发布状态；保留已有历史记录。
-5. 按实际影响同步 README、`docs/roadmap.md`、功能文档；接口/结构变化还需核对
-   `docs/architecture.md` / `docs/schema.md`。第三方参考变化同步来源登记与适用条款。
-   历史阶段的版本与测试记录保留，不把所有旧记录改成当前值。
-6. 检查版本一致性，运行最小相关测试、完整回归、compileall 和 `git diff --check`；
-   验证 `python -m cp2kkit --version`。测试数量必须来自本次执行，未运行检查明确说明。
-7. 用中文报告旧版本 → 新版本、更新的文档路径、实际验证和兼容性限制。
-   修改版本不等于发布成功或真实 CP2K 认证；不自动安装、构建、提交或推送。
-   不覆盖计算结果，也不改动用户无关文件。
+Copy this prompt and replace the placeholders; feature templates must follow this workflow too.
 
 ---
 
-相关说明：[通用约束](../DEVELOPMENT.md)、[实现功能](implement-feature.md)、
-[项目 README](../../README.md)、[变更记录](../../CHANGELOG.md)。
+Read `.agents/DEVELOPMENT.md`; inspect actual source, versions, documentation, and Git status.
+Use English for development text, documentation headings/prose, prompts, comments,
+messages, commit messages, and reports unless the user explicitly requests another
+communication language. Preserve original quotations, citations, paths, and user data.
+
+Completed features: <actual implementation, not unfinished plans>
+Compatibility changes: <interfaces, defaults, format restrictions, breaking changes>
+User-specified version, if any: <version; otherwise apply the rules below>
+
+Requirements:
+
+1. Update software version and relevant documentation after each feature round.
+   Bump once for a round containing multiple features, not once per file.
+   Documentation/prompt-only edits do not independently require a bump.
+2. Follow the user's A.B.C convention:
+   - A is the major version, decided manually by the user. Never increment A
+     automatically, even for breaking changes; ask first.
+   - B is the minor version; increment it for new/updated features and reset C.
+   - C increments for functionality/bug fixes; leave A/B unchanged.
+   - A mixed feature/fix round increments B and resets C; bump once per round.
+   - Explicit user versions take priority. Ask if the target is not higher than
+     the current version or requirements conflict; do not downgrade.
+   Explain default/interface migration impacts without using them to change A.
+3. Synchronize `pyproject.toml`, `src/cp2kkit/__init__.py`'s `__version__`,
+   README, and CLI `--version`. Do not hand-edit ignored egg-info, build outputs,
+   or versions in old results. Software, schema, and target CP2K versions differ:
+   do not blindly replace all version numbers. Assess schema changes independently.
+4. Update `CHANGELOG.md` with actual additions/changes, defaults/migration,
+   limitations, and validation boundaries. Do not invent history, release dates,
+   or publication status. Preserve existing history.
+5. Update README, `docs/roadmap.md`, and affected feature documents.
+   Recheck architecture/schema for interface/data changes; update third-party
+   provenance/terms when references change. Preserve historical versions/test counts.
+   Check English-language consistency and local links.
+6. Check version consistency; run focused tests, full regression, compileall,
+   `git diff --check`, and `python -m cp2kkit --version`. Use counts from the
+   actual run; state checks not run.
+7. Report old -> new version, changed documentation paths, actual validation,
+   and compatibility limitations in English unless another language is requested.
+   A version bump is not publication or CP2K certification. Do not install, build,
+   commit, or push automatically; preserve results and unrelated user files.
+
+---
+
+Related: [development rules](../DEVELOPMENT.md), [feature template](implement-feature.md),
+[README](../../README.md), [changelog](../../CHANGELOG.md).

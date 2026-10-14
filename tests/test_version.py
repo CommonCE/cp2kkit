@@ -21,7 +21,7 @@ class VersionTests(unittest.TestCase):
         declared = re.search(r'^version\s*=\s*"([^"]+)"\s*$', metadata, re.M)
         self.assertIsNotNone(declared)
         self.assertEqual(declared[1], __version__)
-        self.assertIn(f'**v{__version__} 初步实现**', (ROOT/'README.md').read_text())
+        self.assertIn(f'**v{__version__} preliminary implementation**', (ROOT/'README.md').read_text())
         changelog = (ROOT/'CHANGELOG.md').read_text()
         first_version = re.search(r'^## (\d+\.\d+\.\d+)\s*$', changelog, re.M)
         self.assertIsNotNone(first_version)

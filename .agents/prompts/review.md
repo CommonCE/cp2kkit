@@ -1,31 +1,36 @@
-# 提示词：代码与科学设置审查
+# Prompt: review code and scientific settings
 
-复制以下提示词，替换占位符后使用。
-
----
-
-请阅读 `.agents/DEVELOPMENT.md`，只读审查以下内容：
-
-审查范围：<文件、功能、当前 diff 或 commit>
-重点：<正确性、兼容性、科学设置、覆盖保护、来源或测试>
-
-要求：
-
-1. 检查实际代码、相关调用方、测试、文档和适用第三方记录，不只根据描述推断。
-2. 优先找可导致错误结果、静默丢失科学设置、覆盖数据、错误 passed 判定、
-   非确定性选文件、单位混淆、输入注入或 CLI/API 回归的问题。
-3. 输入生成重点核对目标软件/版本、方法/基组/赝势、色散、电荷/多重度/KIND、
-   PBC/Poisson、晶胞、SCF/k 点/展宽、约束及来源继承语义。
-4. 审查 Multiwfn 参考部分的版本/文件/哈希、具体使用内容和已有声明，
-   不把引用、公开源码或语言改写当作自动取得额外授权。
-5. 每项发现给出严重度、文件及行号、证据、触发条件、影响和最小修复建议。
-   区分确定缺陷与需要进一步核实的风险，避免无依据结论。
-6. 若无确定缺陷，明确说未发现确定缺陷，同时列出测试/运行验证缺口。
-7. 不改文件，不安装依赖，不启动计算，不自动 commit/push。
-   可运行只产生临时测试输出的现有测试，报告实际执行内容。
-
-中文输出，先列发现，再总结验证情况与剩余风险。
+Copy this prompt and replace the placeholders.
 
 ---
 
-相关说明：[通用约束](../DEVELOPMENT.md)、[schema](../../docs/schema.md)。
+Read `.agents/DEVELOPMENT.md` and perform a read-only review.
+Use English for review reports and development text unless the user explicitly
+requests another communication language. Preserve original quoted evidence,
+citations, scientific syntax, paths, and user data.
+
+Scope: <files, features, current diff, or commit>
+Focus: <correctness, compatibility, science, overwrite protection, provenance, tests>
+
+Requirements:
+
+1. Inspect actual code, callers, tests, documentation, and applicable third-party
+   records; do not infer correctness from descriptions alone.
+2. Prioritize wrong results, silently lost settings, overwritten data, false passed
+   assessments, nondeterministic selection, unit confusion, injection, and CLI/API regressions.
+3. For generation check software/version, method/basis/potential, dispersion,
+   charge/multiplicity/KIND, PBC/Poisson/cell, SCF/k-points/smearing, constraints,
+   and source-inheritance semantics.
+4. Review upstream versions/files/hashes, actual use, and notices. Citations,
+   public source, or a language rewrite do not automatically grant extra permission.
+5. Give each finding a severity, file/line, evidence, trigger, impact, and minimal fix.
+   Separate certain defects from risks requiring verification.
+6. If no definite defects are found, say so and list testing/runtime-validation gaps.
+7. Do not modify files, install packages, start calculations, or commit/push automatically.
+   Existing tests with temporary outputs may be run; report exactly what ran.
+
+List findings first, then validation and remaining risks.
+
+---
+
+Related: [development rules](../DEVELOPMENT.md), [schema](../../docs/schema.md).

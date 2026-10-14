@@ -1,46 +1,55 @@
-# 提示词：参考 Multiwfn 完善 CP2K 输入生成
+# Prompt: extend CP2K input generation with Multiwfn references
 
-复制以下提示词，替换占位符后使用。
-
----
-
-请先阅读 `.agents/DEVELOPMENT.md`、`docs/roadmap.md`、
-`docs/input-generation.md` 和第三方来源/条款记录。
-
-长期目标：完整实现 Multiwfn 的 CP2K 输入生成功能。
-本次仅实现：<明确的一个功能或一组相关分支>
-上游参考：<版本、源码路径、文件及子程序；不确定则先核对>
-目标 CP2K 版本：<版本或需先确认>
-
-请按以下流程工作：
-
-1. 确认上游文件存在，读取相关菜单、参数初始化和实际生成分支；计算源文件哈希。
-   可参考初始基线 `../Multiwfn_2026.10.1_src_Linux/cp2kmate.f90`，
-   但不要假设该目录在其他环境存在，不将其设为运行时依赖。
-2. 对照当前 `inputgen.py`、`cli.py`、结构读取和测试，区分已实现、部分实现、
-   未实现、版本不适用项。详细差异默认只在对话中输出，不另建对比文档。
-3. 先说明所选功能的最小接口、参数/单位、约束、兼容性和与上游的重要差异。
-   上游默认值也须核对适用性，不能因它存在于源码就认为适合所有体系。
-4. 按目标 CP2K 版本核对关键字、节层级、基组/赝势名字、磁态/电荷、
-   周期性/求解器及 SCF/k 点等组合；有歧义或版本冲突时先确认，不静默改模型。
-5. 保持生成逻辑与独占写入分离。记录完整有效输入、参数、单位、引用及来源。
-   不擅自继承源 restart 的计算设置；若本次扩展 KIND 语义，须明确保留/转换规则。
-6. 更新 `third_party/multiwfn/PROVENANCE.md`：版本/文件/子程序/哈希、
-   具体参考内容、实现差异、版权/引用保留位置、授权状态和验证边界。
-   原有条款发生变化时保留历史记录；不编造许可、不宣称净室或自动 MIT 兼容。
-7. 增加所选分支和非法组合测试，必要时测试生成输入的节结构、结构回读、
-   CLI、哈希与多文件覆盖保护；合成测试不能宣称实际 CP2K 运行认证。
-8. 更新实际支持范围和路线图进度，不把长期目标标为已经完成。
-9. 新功能完成后执行 `.agents/prompts/update-version-docs.md`，统一更新软件版本、
-   变更记录和相关文档；不将软件升版误作 schema 或目标 CP2K 版本更新。
-
-不启动 CP2K 或 Multiwfn 计算，不覆盖结果，不自动提交/推送。
-如需真实程序验证，先提出小规模、独立新目录的验证计划并取得授权。
-
-交付时说明：完成范围、与上游的行为/默认值差异、来源登记、测试及剩余缺项。
+Copy this prompt and replace the placeholders.
 
 ---
 
-相关说明：[通用约束](../DEVELOPMENT.md)、[路线图](../../docs/roadmap.md)、
-[第三方总览](../../THIRD_PARTY_NOTICES.md)、
-[来源登记](../../third_party/multiwfn/PROVENANCE.md)。
+Read `.agents/DEVELOPMENT.md`, `docs/roadmap.md`, `docs/input-generation.md`,
+and the third-party provenance/terms records first.
+Use English for development, documentation, prompts, comments, messages, and reports
+unless the user explicitly requests another communication language.
+Preserve original upstream quotations, citations, scientific syntax, paths, and user data.
+
+Long-term goal: fully cover Multiwfn's CP2K input-generation functionality.
+Implement only: <one explicit feature or related branch group>
+Upstream reference: <version, source path, file, subroutine; verify if uncertain>
+Target CP2K version: <version or request confirmation>
+
+Workflow:
+
+1. Confirm the source exists; inspect menus, initialization, and generation branches;
+   hash the file. The initial baseline is
+   `../Multiwfn_2026.10.1_src_Linux/cp2kmate.f90`, but do not assume it exists
+   elsewhere or make it a runtime dependency.
+2. Compare current `inputgen.py`, CLI, structure readers, and tests. Separate
+   implemented/partial/missing/version-inapplicable features. Detailed comparisons
+   belong in the conversation, not a new comparison document by default.
+3. Explain the minimal interface, parameters/units, constraints, compatibility,
+   and upstream differences. Upstream defaults are not universally appropriate.
+4. Check target-version keywords/nesting, basis/potential names, spin/charge,
+   periodicity/solvers, SCF/k-points. Ask about ambiguity/conflicts; do not silently repair physics.
+5. Separate generation from exclusive writing. Record complete effective inputs,
+   settings, units, citations, and provenance. Do not inherit restart calculation
+   settings implicitly; define preservation/conversion when extending KIND semantics.
+6. Update `third_party/multiwfn/PROVENANCE.md`: version/file/subroutine/hash,
+   actual reference usage, differences, copyright/citation locations, permission,
+   and validation boundaries. Preserve historical terms; do not invent permission,
+   claim clean-room development, or assume MIT compatibility.
+7. Test branches/invalid combinations, section structure, round-trip geometry,
+   CLI/hashes/multi-file protection as needed. Synthetic tests do not certify CP2K execution.
+8. Update actual support/progress, not the long-term goal as completed.
+9. Follow `.agents/prompts/update-version-docs.md` after features. Update the
+   software version, changelog, and documentation without conflating schema/CP2K versions.
+
+Do not run CP2K/Multiwfn, overwrite results, or commit/push automatically.
+For actual software validation, propose a small independent-directory plan and
+obtain authorization first.
+
+Report completed scope, upstream behavior/default differences, provenance,
+tests, and remaining gaps.
+
+---
+
+Related: [development rules](../DEVELOPMENT.md), [roadmap](../../docs/roadmap.md),
+[third-party notices](../../THIRD_PARTY_NOTICES.md),
+[provenance](../../third_party/multiwfn/PROVENANCE.md).

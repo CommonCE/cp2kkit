@@ -1,82 +1,111 @@
-# cp2kkit 通用开发约束
+# cp2kkit development rules
 
-你是本项目的编码助手。使用中文沟通，清楚标出文件路径，区分已验证事实、
-未验证事项和后续计划。先阅读相关实现再修改，不凭记忆猜接口、科学关键字或文件格式。
+You are the coding assistant for this project. Use English for development by default:
+documentation headings and prose, prompts, code comments/docstrings, identifiers,
+user-facing messages, commit messages, and development reports. Follow an explicit
+user request for another communication language. Preserve original third-party
+quotations, citations, scientific keywords, file paths, and user data verbatim.
+Distinguish verified facts, unverified items, and planned work. Read the relevant
+implementation before changing it; do not guess interfaces, scientific keywords, or formats.
 
-## 1. 开始任务
+## 1. Starting a task
 
-根据任务阅读：
+Read the materials relevant to the task:
 
-- [README](../README.md)、[项目配置](../pyproject.toml)。
-- [架构](../docs/architecture.md)、[路线图](../docs/roadmap.md)。
-- 涉及数据交换时阅读 [schema](../docs/schema.md)；涉及输入生成时阅读
-  [生成范围](../docs/input-generation.md)。
-- 涉及第三方实现时阅读 [第三方总览](../THIRD_PARTY_NOTICES.md)、
-  [Multiwfn 条款](../third_party/multiwfn/TERMS.md)及
-  [来源登记](../third_party/multiwfn/PROVENANCE.md)。
-- 检查 `git status`、相关源码、测试与样例来源，识别用户已有修改。
+- [README](../README.md) and [project configuration](../pyproject.toml).
+- [Architecture](../docs/architecture.md) and [roadmap](../docs/roadmap.md).
+- [Schema](../docs/schema.md) for data exchange; [input generation](../docs/input-generation.md)
+  for input generation.
+- [Third-party notices](../THIRD_PARTY_NOTICES.md), [Multiwfn terms](../third_party/multiwfn/TERMS.md),
+  and [provenance](../third_party/multiwfn/PROVENANCE.md) for third-party references.
+- Git status, relevant source, tests, and fixture provenance; identify existing user changes.
 
-原分析 MVP 范围见 `cp2kkit-mvp.md`；后续新增的输入生成需求以路线图为准。
-当前输入生成是有待完善的 GPW 子集，长期目标是完整实现 Multiwfn 的 CP2K 输入生成功能。
-目标不等于已经完整移植或已通过实际软件认证。
+The original analysis MVP baseline and later input-generation requirements are
+preserved in `docs/roadmap.md`. The current generator is an incomplete GPW subset.
+Full coverage of Multiwfn's CP2K input generator is a long-term goal, not a completed
+port or evidence of validation with the actual software.
 
-## 2. 代码与接口
+## 2. Code and interfaces
 
-- Python >= 3.10，常规 `src/` 布局。核心使用标准库，绘图依赖可选。
-- 优先小范围修改，不重构无关模块、不增加无必要依赖、不另造重复解析器。
-- 复用 `Structure`、`InputSettings`、现有读写和领域异常接口；先核对实际定义。
-- CLI 只负责参数/调度，解析事实、质量判断、结构、输入生成、导出分别维护。
-- 保持退出码语义：0 完成；2 参数/I/O；3 歧义；4 解析；5 输出冲突；
-  6 可选依赖缺失；7 strict 质量未通过。
-- 修改 CLI/API/交换格式时同步测试及相关文档。每轮新增功能完成后必须更新软件版本和文档，
-  同一轮统一升版一次；执行 [版本与文档更新提示词](prompts/update-version-docs.md)。
-  使用 A.B.C：A 为大版本，仅由用户人工决定，助手不得自动修改；
-  新增/更新功能递增 B 并将 C 归零；修复功能/bug 递增 C，A/B 不变。
-  软件版本与数据 schema 独立，不能仅因软件升版就修改 schema。
-- 使用当前已配置 Python 环境，不擅自切换环境。安装前核对现有依赖，
-  仅在任务确有需要时安装缺项，不升级无关包。
+- Python >= 3.10, conventional `src/` layout. The core uses the standard library;
+  plotting dependencies are optional.
+- Prefer small targeted changes; do not refactor unrelated code, add unnecessary
+  dependencies, or create duplicate parsers.
+- Reuse `Structure`, `InputSettings`, existing readers/writers, and domain exceptions.
+  Check their actual definitions first.
+- CLI handles arguments and dispatch only. Parsing, quality assessment, structures,
+  input generation, and exports remain separate.
+- Preserve exit codes: 0 complete; 2 usage/I/O; 3 ambiguity; 4 parse;
+  5 output collision; 6 missing optional dependency; 7 strict quality not passed.
+- Update tests and relevant documentation for CLI/API/data-contract changes.
+  After each feature round, update the software version and documentation once,
+  following the [version/documentation prompt](prompts/update-version-docs.md).
+  Use A.B.C: A changes only by the user's explicit decision; features increment B
+  and reset C; fixes increment C without changing A/B. Explicit user versions take priority.
+  Software and data-schema versions are independent; do not bump the schema merely
+  because the software version changed.
+- Use the configured Python environment. Check installed/declared dependencies before
+  installing only necessary missing packages; do not upgrade unrelated packages.
 
-## 3. 非破坏性与证据
+## 3. Non-destructive operation and evidence
 
-- 分析命令只读；输入生成仅生成新文件，不提交或启动 CP2K。
-- 不覆盖或删除原输入、restart、输出、波函数、cube、checkpoint 等昂贵结果。
-- 复用 `io.new_file` 独占创建和异常清理；多文件输出必须测试碰撞及回滚。
-- 不隐式选择歧义项目或拼接重启；候选排序确定，不按更新时间猜测。
-- 未知值使用 null/空字段，不当成零。零值必须保留。
-- 保留路径、原文/行号或来源哈希、单位及参数；输出尽量确定性，不添加无必要时间戳。
-- 对部分输出、截断、非有限数字、损坏格式和不支持语法明确诊断，不能静默跳过关键证据。
-- 科学计算二进制、大型输出和敏感数据不纳入 Git。
+- Analysis is read-only; generation creates new files only and never submits or runs CP2K.
+- Do not overwrite/delete existing inputs, restart files, outputs, wavefunctions,
+  cubes, checkpoints, or other expensive results.
+- Reuse `io.new_file` and its exclusive-create/cleanup semantics. Test collisions
+  and rollback for multi-file outputs.
+- Do not silently select ambiguous projects or concatenate restarts.
+  Sort candidates deterministically; do not guess from modification time.
+- Unknown values use null/empty fields, not zero. Preserve actual zero values.
+- Record paths, original text/line numbers or source hashes, units, and parameters.
+  Keep outputs deterministic and avoid unnecessary timestamps.
+- Diagnose partial/truncated files, non-finite values, damaged formats, and unsupported
+  syntax explicitly; do not silently skip important evidence.
+- Do not commit scientific binaries, large outputs, or sensitive data.
 
-## 4. 科学设置与验证边界
+## 4. Scientific settings and validation boundaries
 
-- 核对目标 CP2K 版本、关键字、嵌套、单位、方法/基组/赝势、色散、周期性、
-  电荷/多重度、磁态、k 点/SCF 等组合，说明重要限制。
-- 普通 XYZ 的未知周期性不是 NONE；restart 结构读取不等于继承计算设置。
-- 元素、KIND 标签和磁矩有不同语义，不能无说明地合并或丢弃。
-- 不能为使输入可生成而静默改变周期性、磁态、约束或其他物理模型。
-- 原子坐标/晶胞当前标准化为 angstrom，能量保留 hartree；其他参数也需明确单位。
-- 生成成功、节平衡、回读成功、语法通过、实际计算收敛与科学结果正确是不同验证层级。
-- 合成 fixture 不是实际计算；不根据其中的版本字符串宣称 CP2K 版本认证。
-- 缺少收敛/完成证据不能判 passed；不把正常结束或单个能量当成全部收敛证明。
-- 不启动昂贵计算；真实 CP2K 验证须经用户明确授权，并使用新的运行目录。
-- 若任务涉及失败计算诊断，先加载可用的 `qchem-error-diagnosis` 技能，
-  收集软件/版本和实际失败证据，再提出参数变化及其理由。
+- Check target CP2K version, keywords/nesting/units, method/basis/potential, dispersion,
+  spin/charge, periodicity, magnetic state, k-points/SCF, and combinations.
+  State important limitations.
+- Plain XYZ has unknown periodicity, not NONE. Reading a restart structure does not
+  inherit its calculation settings.
+- Elements, KIND labels, and magnetic moments have different meanings; do not merge
+  or discard them without explanation.
+- Do not silently change periodicity, magnetism, constraints, or other physical models
+  merely to make generation succeed.
+- Coordinates/cells are standardized to angstrom; energies remain hartree.
+  Give other parameters explicit units.
+- Generation, balanced sections, round-trip reading, syntax acceptance, actual
+  convergence, and scientifically correct results are distinct validation levels.
+- Synthetic fixtures are not calculations; their version strings do not certify CP2K support.
+- Missing completion/convergence evidence cannot become passed. Normal termination
+  or a single energy value is not proof of complete convergence.
+- Do not start expensive calculations. Actual CP2K validation requires explicit
+  authorization and a new run directory.
+- For failed-job diagnosis, load `qchem-error-diagnosis`, collect software/version
+  and actual failure evidence, then propose changes with reasons.
 
-## 5. Multiwfn 参考开发与授权
+## 5. Multiwfn references and authorization
 
-- 以明确的上游版本/文件/子程序和哈希为参考，不要求相邻源码目录在部署时存在。
-- 区分参考思路、参数表、代码改写或直接移植，如实说明，不宣称未经证实的净室实现。
-- Multiwfn 自定义条款不是 MIT/BSD/GPL；免费、公开源码、改用 Python 或添加引用
-  均不能自动证明任意再许可/收费分发合法。
-- 每个参考功能更新 `third_party/multiwfn/PROVENANCE.md`，记录实际来源、
-  使用内容、行为差异、引用、授权状态和验证边界；未知授权状态不写成已获许可。
-- 保留已有版权声明及要求引用的论文，其他作者的代码另行核对授权。
-- 不擅自给项目或第三方部分指定许可证；额外许可只按实际证据及范围登记。
-- 详细功能对比默认在对话中输出；没有明确要求，不新建大篇幅对比文档或临时报告。
+- Identify the upstream version/file/subroutine and hash; deployment must not require
+  an adjacent source directory.
+- Describe reference ideas, parameter tables, rewrites, or direct ports honestly.
+  Do not claim unverified clean-room development.
+- Multiwfn has custom terms, not MIT/BSD/GPL. Free access, public source, a Python
+  rewrite, or citations do not automatically authorize arbitrary relicensing or paid distribution.
+- Update `third_party/multiwfn/PROVENANCE.md` for each referenced feature: actual
+  source, usage, differences, citations, authorization, and validation boundaries.
+  Unknown permission must not be recorded as granted.
+- Preserve copyright notices and required papers. Check other authors' code separately.
+- Do not assign a project/third-party license without authorization. Record extra
+  permission only within the evidenced scope.
+- Detailed comparisons belong in the conversation by default. Do not create long
+  comparison documents or temporary reports unless requested.
 
-## 6. 测试与交付
+## 6. Testing and delivery
 
-从项目根目录执行最小相关测试，再根据改动运行回归：
+From the project root, run relevant tests first, then regression:
 
 ```bash
 PYTHONPATH=src python -m unittest discover -s tests -v
@@ -84,10 +113,13 @@ PYTHONPATH=src python -m compileall -q src tests
 git diff --check
 ```
 
-新增功能测试应包括正常、边界、非法组合、损坏输入、来源/单位、确定性及覆盖保护；
-必要时增加 CLI 子进程冒烟。测试不要运行量化计算或改动实际用户结果。
+Cover normal, boundary, invalid-combination, damaged-input, provenance/unit,
+determinism, and overwrite-protection cases. Add CLI subprocess smoke tests where
+needed. Tests must not run quantum-chemistry calculations or alter user results.
+Keep maintained text in English and check documentation links after translation.
 
-交付说明：修改了哪些文件、实现范围、执行的检查、实际通过/跳过/未运行事项和剩余限制。
-不能沿用旧测试数量作为本次执行结果。
-只有用户明确要求时才 commit/push；禁止自动 force-push、reset 或改写历史。
-未请求时不提交或推送，保留用户已有变更。
+Report implementation scope, file paths, checks actually run/passed/skipped,
+remaining limitations, and unverified items in English unless the user explicitly
+requests another language. Do not reuse old test counts as current results.
+Commit/push only when explicitly requested. Never force-push, reset, or rewrite
+history automatically; preserve existing user changes.

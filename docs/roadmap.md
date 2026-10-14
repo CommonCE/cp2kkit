@@ -1,153 +1,206 @@
-# 开发状态与下一步
+# Development status and next steps
 
-当前软件版本 **0.2.2**（按用户指定），数据 schema **0.1.0**；变化见
-[变更记录](../CHANGELOG.md)。本轮应用主菜单、输入编辑子菜单及所有交互提示统一为英文，
-保留菜单编号、计算默认参数和 0.2.1 的 EPS/CELL/COORD 格式修复。
-完整回归 **134 项通过，无跳过**；compileall、`git diff --check` 通过，
-CLI `--version` 输出 `cp2kkit 0.2.2`。未运行 CP2K。
+Current software: **0.2.3**, explicitly requested; schema: **0.1.0**.
+See [the changelog](../CHANGELOG.md). This round standardizes maintained documentation,
+prompts, and project text in English without changing scientific defaults or CLI behavior.
+Original third-party quotations/citations, hashes, user data, and historical records are preserved.
+The original standalone MVP document has been consolidated into the planning section below.
 
-0.2.1 阶段完整回归 132 项通过，修复 EPS 科学计数法与 CELL/COORD 的 8 位小数格式，
-实际生成结构记录文本舍入值、原结构精度保留；不改变收敛阈值。
+Current validation: **138 tests passed, none skipped**; compileall and diff checks passed.
+CLI reports `cp2kkit 0.2.3`. New tests check maintained-language consistency, local
+Markdown links, English development instructions, and legacy Boolean compatibility.
+Official Multiwfn quotations and recorded source hashes were verified unchanged.
+No CP2K calculations or new dependencies were introduced.
 
-0.2.0 阶段完整回归 128 项通过，新增版本声明、README/变更记录、CLI 与生成器版本一致性测试。
-以下早期验证记录保留为历史阶段记录，不代表当前测试总数。
+## Recent historical validation
 
-原始计划估算为 22 人日 / 25 人日预算。该估算未改动；
-本次工作是可运行的初步实现，**不等同于完成全部生产验收**。
+- **0.2.2:** 134 tests passed, none skipped. Application/editor/submenu text became
+  English; numbering/defaults and 0.2.1 formatting stayed intact. Compileall/diff
+  checks passed; CLI reported 0.2.2. CP2K was not run.
+- **0.2.1:** 132 tests passed. Fixed EPS notation and eight-decimal CELL/COORD;
+  generated JSON matches rounded text, originals retain precision, thresholds unchanged.
+- **0.2.0:** 128 tests passed. Added package/module/README/changelog/CLI/generator
+  version-consistency tests.
 
-| 功能 | 当前状态 | 尚需验证 |
+All earlier counts below are historical, not current test totals.
+The original estimate remains 22 person-days within a 25-person-day budget.
+A runnable preliminary implementation **does not equal complete production acceptance**.
+
+## Status
+
+| Feature | Current state | Remaining validation |
 |---|---|---|
-| CLI / 项目识别 | 已实现、合成回归 | 真实命名习惯、大输出性能 |
-| 输出解析 | 常见标记子集已实现 | 真正的 CP2K 版本样例矩阵、不同 run type |
-| 结构导出 | 严格文本子集已实现 | 真实 restart / extXYZ、更多合法语法 |
-| 质量报告 | 保守规则已实现 | 真实收敛/失败文本及几何阈值 |
-| CSV / JSON | 版本、单位、哈希、证据已实现 | schema 冻结与用户使用反馈 |
-| 曲线 | 分片段能量/SCF次数已实现 | 真实重启路径、必要时增加残差/梯度 |
-| CP2K 输入文件生成 | GPW 子集、密度 cube 及 CLI/TUI 双模式已实现，**有待完善** | 目标完整实现 Multiwfn 的 CP2K 输入生成功能；语法核对上限 2026.2，兼顾旧版本，仍需真实程序验证 |
-| cube 检查 / 密度差 | 流式标量检查、严格网格比较、多片段相减与来源 JSON 已实现 | 真实 CP2K cube 回归、积分/采样误差验证；平面平均后续评估 |
+| CLI/discovery | Implemented, synthetic regression | Real naming patterns, large-file performance |
+| Output parser | Common-marker subset | Actual CP2K version matrix/run types |
+| Structure export | Strict text subset | Real restart/extXYZ and more legal syntax |
+| Quality reports | Conservative evidence rules | Real convergence/failure text and geometry thresholds |
+| CSV/JSON | Versions/units/hashes/evidence | Schema freeze and user feedback |
+| Plots | Segmented energies/SCF counts | Real restart paths; residual/gradient plots if needed |
+| Input generation | GPW/density cubes/CLI/TUI implemented, incomplete | Full Multiwfn generation coverage is the goal; syntax checks through 2026.2, real execution still needed |
+| Cube validation/difference | Streaming scalars, strict grids, multi-fragment subtraction/provenance | Real cubes, integration/sampling error; plane averages later |
 
-## 本次验证记录
+## Initial implementation validation record
 
-- Python 3.12.14、Matplotlib 3.11.1；未安装新依赖。
-- 标准库 unittest：41 项全部通过，包含绘图测试，无跳过项。
-- compileall：源码和测试语法检查通过。
-- 子进程 CLI 冒烟：help/version、目录发现、JSON/CSV、strict report、
-  extXYZ、能量/SCF PNG、哈希对应和覆盖保护通过。
-- 未运行 CP2K；测试数值均为合成样例，不是计算结果。
-- 尚未验证 wheel 构建或 editable 安装；当前环境没有 setuptools，
-  已声明构建依赖，实际验证入口为 PYTHONPATH=src 的模块运行方式。
+- Python 3.12.14, Matplotlib 3.11.1; no new dependencies installed.
+- 41 unittest tests passed, including plotting; no skips.
+- Compileall passed for source/tests.
+- Subprocess CLI checks passed: help/version/discovery, JSON/CSV, strict report,
+  extXYZ, energy/SCF PNG, hashes, overwrite protection.
+- CP2K was not run; values were synthetic, not calculation results.
+- Wheel/editable installation was not verified. At that stage setuptools was not
+  installed; build dependencies were declared and validation used PYTHONPATH=src.
 
-## 优先顺序
+## Priorities
 
-1. 引入来源明确、可分发、脱敏的真实 CP2K 输出和 restart。
-   至少覆盖单点正常/SCF失败/截断，以及几何正常/达到最大步数/重启。
-2. 逐版本核对输出格式并建立测试矩阵；正式声明支持版本前必须有证据。
-3. 核对实际 TIMER 表、力/应力和优化收敛阈值格式，再增加专门解析器。
-4. 基于真实 restart 完善严格语法支持；不可为了“能读”而跳过有物理意义的设置。
-5. 加入 CI、多 Python 版本测试、打包安装与发布流程；由项目所有者决定许可证。
-6. 评估流式大文件读取与 schema 兼容策略。
-7. 持续完善 CP2K 输入文件生成，目标完整实现 Multiwfn 的 CP2K 输入生成功能；
-   分阶段补齐功能、记录来源，并开展 CP2K 版本兼容与参数组合验证。
+1. Add licensed, distributable, anonymized real output/restart fixtures: normal
+   single points, SCF failure/truncation, geometry success/max steps/restarts.
+2. Check formats per version and build an evidence-based compatibility matrix.
+3. Inspect actual TIMER/force/stress/optimization thresholds before extending parsers.
+4. Extend strict restart support using real examples; do not ignore physical settings to read more files.
+5. Add CI, multiple Python versions, packaging/install/release checks. The owner decides licensing.
+6. Assess streaming large output files and schema compatibility.
+7. Extend CP2K generation in stages toward full Multiwfn coverage, recording provenance
+   and checking versions/parameter combinations.
 
-## CP2K 输入文件生成：有待完善
+## Input generation: incomplete by design
 
-**开发目标：完整实现 Multiwfn 的 CP2K 输入文件生成功能。**
-当前 `generate-input` 是含电子/适用自旋密度输出的 GPW 子集，不能视为已完成全功能移植。
-以用户提供的 Multiwfn 2026.10.1 `cp2kmate.f90` 为初始对照基线，
-后续参考新版本时明确登记版本、源码哈希与新增/变化功能。
-目标是完整覆盖可用的生成能力，不是逐行复制源码、保持所有旧默认值，
-或不加核对地输出目标 CP2K 版本已不支持的关键字。
+**Goal: cover all Multiwfn CP2K input-generation functionality.** Current generation
+is a GPW subset with electron/applicable spin density, not a completed full port.
+The initial baseline is user-provided Multiwfn 2026.10.1 cp2kmate.f90.
+Record versions/hashes/new or changed branches for subsequent references.
+The goal is useful capability coverage, not line-by-line copying, preserving every
+old default, or emitting target-version-unsupported keywords without checking.
 
-### 分阶段完善项
+### Staged extensions
 
-1. **基础设置与行为一致性**：核对默认参数差异；完善求解器选择、WAVELET 盒子形状、
-   低维真空、坐标居中、晶胞重复与外部结构文件；增加参数配置能力。
-2. **KIND、自旋与约束**：独立 KIND、逐 KIND 基组/赝势及初始磁矩、DFT+U、CDFT、
-   原子冻结、晶胞约束与各向异性外压。
-3. **方法与基组**：扩展 GGA/meta-GGA、混合泛函、ADMM/RI-HFX、GPW/GAPW、
-   辅助/全电子基组、波函数相关方法及半经验/力场设置；补齐色散模型和 SCF 选项。
-4. **任务类型**：频率/振动与 Raman、MD、dimer 过渡态、BAND/NEB、NMR、极化率、
-   BSSE、实时电子动力学、PIMD、XAS，以及适用任务的 TDDFT 设置。
-5. **环境与输出**：SCCS、外场、表面偶极修正、轨迹/重启打印、cube/Molden、
-   原子电荷、轨道/矩阵输出与 cutoff/k 点收敛测试模板。
+1. **Defaults/behavior:** verify differences, solvers, WAVELET box shapes, low-dimensional
+   vacuum, centering, cell repetition, external structures, configuration.
+2. **KIND/spin/constraints:** independent KIND, per-KIND bases/potentials/moments,
+   DFT+U/CDFT, atom freezing, cell constraints, anisotropic pressure.
+3. **Methods/bases:** GGA/meta-GGA, hybrids, ADMM/RI-HFX, GPW/GAPW, auxiliary/all-electron
+   bases, correlated wavefunctions, semiempirical/force fields, dispersion/SCF options.
+4. **Tasks:** frequencies/vibrations/Raman, MD, dimer TS, BAND/NEB, NMR, polarizability,
+   BSSE, real-time electrons, PIMD, XAS, appropriate TDDFT.
+5. **Environment/outputs:** SCCS, fields, surface dipole correction, trajectory/restart
+   printing, cube/Molden, charges, orbitals/matrices, cutoff/k-point convergence templates.
 
-### 验收与来源要求
+### Acceptance and provenance
 
-- 对上游菜单和生成分支建立逐项功能清单；已实现、部分实现、未实现及版本不适用项分开记录。
-- 每个新增模块登记上游版本/文件/子程序/哈希、参考内容、重要差异、引用及授权状态，
-  见 [模块来源登记](../third_party/multiwfn/PROVENANCE.md)。
-- 对不兼容参数组合给出明确诊断，不为生成成功而静默改变物理模型。
-- 逐阶段增加合成测试、代表性输入对照与真实 CP2K 程序验证；语法通过不等于科学设置合适。
-- 保留输入/参数/单位/来源记录和覆盖保护；生成命令不自动运行或提交计算。
-- 完整功能覆盖是开发目标，不代表当前已完成、已获额外授权或已通过版本认证；
-  发布/再许可/收费分发前仍需核对上游条款与适用许可。
+- Track upstream options/branches as implemented, partial, missing, or version-inapplicable.
+- Register source/version/file/subroutine/hash, usage/differences/citations/permission
+  for each module in [provenance](../third_party/multiwfn/PROVENANCE.md).
+- Diagnose incompatible combinations without silently repairing physics.
+- Add synthetic tests, representative input comparisons, and authorized actual execution
+  per stage. Syntax acceptance is not scientific appropriateness.
+- Preserve complete input/settings/units/source/protection. Never run/submit automatically.
+- Full coverage is a goal, not completion, extra permission, or certification.
+  Check terms and licenses before publication/relicensing/paid distribution.
 
-### 当前子集验证
+### Initial GPW subset validation
 
-当前范围见 [输入生成文档](input-generation.md)。
-新增 `generate-input` GPW 子集；原分析通道保持不变。
-新增合成生成测试，覆盖默认值、任务/节平衡、结构回读、晶胞/PBC、
-自旋/电子数、色散、SCF/k 点、本地数据头行与哈希、CLI 和覆盖保护。
-本次新增功能验证：
+See [input-generation scope](input-generation.md). Added generation without changing
+analysis. Tests covered defaults/tasks/section balance/geometry/PBC/spin/electrons/
+dispersion/SCF/k-points/local data headers/hashes/CLI/protection.
 
-- unittest：58 项全部通过（原有 41 项 + 输入生成 17 项），无跳过。
-- compileall 与 `git diff --check` 通过。
-- 子进程 CLI 冒烟：四种任务生成、JSON/输入哈希与引用对应、覆盖拒绝、help 通过。
-- 验证未安装新依赖、未启动 CP2K；测试数值不作为科学计算结果。
-- Multiwfn 官方自定义条款、来源及论文引用已记录于
-  [第三方声明](../THIRD_PARTY_NOTICES.md)，不代表单独授权或再许可边界已经确认。
+- 58 tests passed (41 previous + 17 generator tests), none skipped.
+- Compileall/diff checks passed.
+- Subprocess checks covered all four tasks, JSON/input hashes/citations, collision refusal, help.
+- No new dependencies or CP2K execution; synthetic numbers were not scientific results.
+- Terms/provenance/papers recorded in [notices](../THIRD_PARTY_NOTICES.md), not evidence
+  of separate permission or settled relicensing boundaries.
 
-仍需真实 CP2K 程序语法验证及体系参数收敛检查。
+Actual CP2K syntax execution and system-specific convergence remain necessary.
 
-## 已完成阶段：密度输出、cube 检查与密度差
+## Completed stage: density cubes and subtraction
 
-- 增加 generate-input 的电子密度/适用 UKS 自旋密度开关、三维 STRIDE 及最终步输出策略。
-- CP2K 语法核对上限为 **2026.2**，目标版本默认 2026.2；共同 GPW 密度输出语法
-  核对了 2024.1/2/3、2025.1/2、2026.1/2 的版本固定源码，未声称整个程序运行认证。
-- 新增 cube-check 与 cube-diff：逐行限长处理、单位/语义来源、非正交积分、
-  规范化单位后的容差比较、多片段相减、独占临时输出/发布与回滚。
-- 未知标量不当电子数，不从原子字段猜价电子数；电子/自旋差分分开，
-  全空间/正负积分不直接解释为片段净电荷转移。
-- cube-check/cube-diff 是本次明确新增范围；不加入 Bader、插值、配准、平面平均、
-  DOS/能带或作业提交。平面平均留待后续单独需求。
-- 现有 58 项测试保留，本阶段新增密度生成与独立手算预期的 cube 回归；
-  本次完整 unittest **92 项通过**，无跳过；语法/Git 差异及文档链接检查通过。
-- 子进程冒烟覆盖四种任务的密度输出、AB/A/B 检查→相减→回读、哈希、覆盖拒绝和 help。
-  流式烟测使用 120000 个常数样本（约 2.78 MB 合成文件），Python tracemalloc 峰值约 11.4 KB；
-  这只是该烟测的 Python 分配观测，不是所有文件的性能保证。
-- 未新增依赖、未安装或运行 CP2K。实现前 `tests/` 和授权 `test-workspace/`
-  无可用真实 cube，尚无真实样例回归；官方语法/格式核对与合成测试分开记录。
-- 使用流程、支持/拒绝格式与物理限制见 [cube 文档](cube.md)；
-  交换格式见 [schema](schema.md)，Multiwfn 参考内容已更新来源登记。
+- Added electron/applicable UKS spin switches, three-direction STRIDE, final-step policy.
+- Syntax checks through **2026.2**, default target 2026.2; tagged definitions inspected
+  for 2024.1/2/3, 2025.1/2, 2026.1/2, without whole-program certification.
+- Added bounded streaming cube-check/cube-diff, unit/meaning evidence, nonorthogonal
+  integrals, normalized-grid tolerance, multiple fragments, staged exclusive publication/rollback.
+- Unknown scalars are not electron counts; atom fields do not imply valence counts;
+  electron/spin differences remain separate and integrals are not fragment net transfer.
+- Scope excludes Bader/interpolation/registration/plane averaging/DOS/bands/submission.
+  Plane averaging awaits an explicit separate request.
+- Retained 58 tests and added independent hand-derived density/cube cases:
+  **92 passed**, no skips; compile/diff/local-link checks passed.
+- Subprocess checks covered four task outputs, AB/A/B check/subtract/reread, hashes,
+  protection/help. Streaming smoke: 120000 constant samples (~2.78 MB), Python
+  tracemalloc peak ~11.4 KB for that case only, not a general performance guarantee.
+- No new dependencies or CP2K installation/execution. No usable real cubes in tests/
+  authorized test-workspace at implementation time; no real-cube regression.
+  Official source checks and synthetic evidence remain distinct.
+- Details in [cube guide](cube.md)/[schema](schema.md); Multiwfn references recorded.
 
-## 当前阶段：输入生成 TUI 选择模式
+## Completed stage: input editor
 
-- 保留完整参数 CLI，增加 `generate-input --tui/--interactive`；参数作为菜单初值。
-  终端中未提供结构/输出时可自动进入数字菜单，非 TTY 批处理不隐式交互。
-- 标准库行式菜单覆盖现有全部 InputSettings，支持分组反复修改、单位提示、
-  完整输入预览、shell 引用的可复现命令和默认否的最终写入确认。
-- 局部类型/范围检查与共享生成器的科学校验分开；无效草稿返回菜单，
-  不自动修改电荷/多重度、SCF/PBC/k 点等物理模型。
-- 沿用原 writer、manifest、schema 和覆盖保护；不运行 shell、CP2K 或 Multiwfn。
-  新交互模块独立登记上游菜单参考来源与引用，不移植全部上游选项/默认行为。
-- 新增 19 项测试；完整回归 **111 项通过，无跳过**。覆盖菜单/参数模式等价、
-  初值、修改、预览/取消不写文件、依赖冲突后人工修正、覆盖保护、EOF/Ctrl-C、
-  非 TTY 拒绝及真实 POSIX PTY 子进程会话。编译、diff 与文档链接检查通过。
-- 未新增依赖，未运行 CP2K；本次没有新的实际 CP2K 运行认证。
+- Retained parameter CLI; added --tui/--interactive, seeded by arguments.
+  Bare generation in a terminal can open the editor; non-TTY scripts stay noninteractive.
+- Standard-library editor covers all InputSettings with grouped revisits, units,
+  complete previews, quoted replay commands, default-no confirmation.
+- Local range/type vs shared scientific validation; invalid drafts remain editable
+  without automatic charge/spin/SCF/PBC/k-point changes.
+- Existing writer/manifest/schema/protection reused; no shell/CP2K/Multiwfn execution.
+  UI references registered separately, not a full upstream-menu port.
+- Added 19 tests: **111 passed**, none skipped. Covered mode equivalence, seeds/edits,
+  previews/cancel, conflicts/manual fixes, collisions, EOF/Ctrl-C, non-TTY refusal,
+  actual POSIX PTY subprocess sessions. Compile/diff/link checks passed.
+- No new dependencies or actual CP2K certification.
 
-## 当前阶段：默认应用主菜单与结构格式扩展
+## Completed stage: application menu and structure formats
 
-- `cp2kkit` 进入应用主菜单，可选择当前目录结构或输入路径；`cp2kkit STRUCTURE`
-  先加载结构再进入主菜单。生成/取消返回应用菜单，原有批处理子命令保留。
-- 新增标准库严格 GJF/COM、CIF（显式对称展开或 P1）、VASP5 POSCAR/CONTCAR 读取；
-  部分占据/无序、不完整或不支持的结构明确拒绝，来源/约束信息保留但不继承计算设置。
-- 默认 PROJECT 为文件名去后缀，截断 400/55 Ry；OT 内/外 SCF 上限 25/20，diag 默认 128。
-  diag+展宽自动空轨道 `max(30, NINT(原子数/2))`，可覆盖；UKS 明确输出两个自旋值。
-- 外压仅 CELL_OPT 显示；padding 仅 NONE 显示；OT 隐藏且拒绝展宽/非零空轨道。
-- 完整 unittest **125 项通过，无跳过**；compileall、`git diff --check` 通过。
-  真实 POSIX PTY 冒烟覆盖默认入口加载 CIF → 生成 → 返回主菜单 → 退出。
-- 未安装新依赖，未运行 CP2K/Multiwfn，不声称真实软件或参数收敛认证。
-  结构格式子集限制及参考源码定位已同步文档与来源登记。
+- Bare/path invocations open the application menu; select current-directory files
+  or paths. Generate/cancel returns to it. Batch commands retained.
+- Strict standard-library GJF/COM, CIF (explicit symmetry/P1), VASP5 POSCAR/CONTCAR;
+  reject occupancy/disorder/incomplete/unsupported data. Record constraints/source
+  without inheriting calculation settings.
+- PROJECT from filename; 400/55 Ry; OT 25/20, diag 128; automatic smearing empty
+  orbitals max(30,NINT(natoms/2)), override allowed; explicit UKS spin values.
+- Pressure only CELL_OPT, padding only NONE, OT hides/rejects smearing/nonzero empty orbitals.
+- **125 tests passed**, none skipped; compile/diff passed. Real POSIX PTY smoke:
+  load CIF -> generate -> application menu -> exit.
+- No new dependencies or CP2K/Multiwfn runs; no convergence/runtime certification.
+  Format restrictions/provenance updated.
 
-其余暂缓列表中的 Bader、多目录汇总、NEB/DOS 后处理或模拟提交不自动扩展。
-上述 BAND/NEB 目标仅涉及输入生成，不代表同时开展 NEB 后处理或作业提交系统。
+Deferred Bader/multi-directory/NEB-DOS post-processing/submission remain outside scope.
+BAND/NEB goals above concern input generation only, not post-processing/submission systems.
+
+## Original MVP planning baseline
+
+This historical section replaces the retired standalone early-development document;
+it is not the current feature list. Goal: connect result reading and traceable analysis.
+Weights were user value 40, frequency 20, foundations/enabling value 15, ease 25.
+Six selected modules totaled 22 person-days against 25 budgeted. Estimates excluded
+learning/waiting/review; prerequisite closure was complete.
+
+| Feature | Priority | Difficulty | Days | Prerequisite |
+|---|---:|---:|---:|---|
+| CLI/project discovery | 87 | 2/5 | 3 | None |
+| Output parser | 90 | 3/5 | 6 | CLI/discovery |
+| Structure/cell export | 92 | 2/5 | 4 | CLI/discovery |
+| Convergence/quality | 92 | 2/5 | 3 | Parser |
+| CSV/JSON/provenance | 87 | 2/5 | 3 | Parser |
+| Energy/convergence plots | 77 | 2/5 | 3 | Parser and exports |
+
+Original acceptance/dependencies:
+- CLI: deterministic valid/missing/multiple-project handling, help/exit codes; Python/filesystem.
+- Parser: normal/truncated/unconverged regression, units/source/defined compatibility;
+  Python and actual CP2K output examples.
+- Structures: matching counts/coordinates/cells, explicit unknown XYZ PBC, no silent
+  cell loss; restart/XYZ and optional ASE were initial candidates (ASE is not required now).
+- Quality: separate electronic/geometry assessment, no success for unfinished jobs,
+  evidence links; rules/parser.
+- Exports: versioned schema, units, missing vs zero, deterministic repeated results;
+  standard library.
+- Plots: explicit axes/units, correct restart/reset handling, matching exported data;
+  Matplotlib.
+
+Initially deferred: multi-directory summaries, cube checks, Multiwfn batches/logs,
+Bader/transfer, density differences, plane averages/cumulative integrals, PDOS,
+bands, adsorption/reaction tables, AIMD thermodynamics/trajectories, RDF/MSD/coordination,
+orbital/real-space entry points, analysis input fragments, reproducible reports.
+Some later additions are documented above; the original deferral is not current status.
+
+Original boundaries: independent CP2K/Multiwfn installations, evidence-based version
+claims, units/settings/source on every result, no invalid data promoted to science,
+physicochemical judgment not replaced by automation, read-only analysis/no auto-submission.

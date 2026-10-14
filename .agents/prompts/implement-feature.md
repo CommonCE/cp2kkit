@@ -1,30 +1,38 @@
-# 提示词：实现功能或修复缺陷
+# Prompt: implement a feature or fix a defect
 
-复制以下提示词，替换占位符后使用。
-
----
-
-请先阅读 `.agents/DEVELOPMENT.md` 并检查仓库实际状态。
-
-任务：<要实现的功能或要修复的缺陷>
-范围：<涉及模块、接口和文件；不明确时先定位>
-验收条件：<可观察行为、输入/输出、错误处理及兼容要求>
-
-要求：
-
-1. 阅读相关源码、配置、现有测试与样例来源，先说明当前行为和最小改动方案。
-2. 范围或科学设置有歧义时先询问；不要擅自扩展至其他模块或改变物理模型。
-3. 复用项目接口和异常/独占写入机制，保持未涉及行为及退出码不变。
-4. 涉及科学关键字或格式时依据目标软件版本的实际手册/源码核对；
-   外部资料影响实现时记录实际来源，不凭记忆编造关键字或默认值。
-5. 若参考第三方实现，先核对适用条款并登记实际来源，保留引用。
-6. 补充正常/异常/边界及覆盖保护测试；先最小测试，再回归与语法检查。
-7. 只有用户要求时同步调整开发目标；每轮新增功能完成后，执行
-   `.agents/prompts/update-version-docs.md`，统一更新一次版本号、变更记录及相关文档。
-8. 不运行 CP2K，不覆盖已有计算结果，不安装无必要依赖，不自动 commit/push。
-
-完成后用中文报告实现、文件路径、验证结果和未验证限制。
+Copy this prompt and replace the placeholders.
 
 ---
 
-相关说明：[通用约束](../DEVELOPMENT.md)、[架构](../../docs/architecture.md)。
+Read `.agents/DEVELOPMENT.md` and inspect the actual repository state first.
+Use English throughout development: documentation, prompts, comments/docstrings,
+identifiers, user-facing messages, and reports, unless the user explicitly requests
+another communication language. Preserve original quotations, citations, paths, and user data.
+
+Task: <feature to implement or defect to fix>
+Scope: <modules, interfaces, files; locate them first if unclear>
+Acceptance criteria: <observable behavior, I/O, error handling, compatibility>
+
+Requirements:
+
+1. Read relevant source/configuration/tests and fixture provenance. Explain current
+   behavior and the smallest change plan first.
+2. Ask about ambiguous scope/scientific settings; do not expand to unrelated modules
+   or silently change the physical model.
+3. Reuse project interfaces, exceptions, and exclusive writers; preserve unrelated
+   behavior and exit codes.
+4. Verify scientific keywords/formats against the actual target-version manual/source.
+   Record actual external sources affecting implementation; do not invent defaults.
+5. Check terms and record provenance/citations before referencing third-party implementations.
+6. Add normal/error/boundary/overwrite-protection tests; run focused tests, then
+   regression and syntax checks.
+7. Change development goals only when requested. After a feature round, follow
+   `.agents/prompts/update-version-docs.md` and update version/changelog/documentation once.
+8. Do not run CP2K, overwrite results, install unnecessary dependencies, or commit/push automatically.
+
+Report implementation, paths, validation, and unverified limitations in English
+unless the user explicitly requests another language.
+
+---
+
+Related: [development rules](../DEVELOPMENT.md), [architecture](../../docs/architecture.md).

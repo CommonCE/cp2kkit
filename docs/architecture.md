@@ -1,119 +1,125 @@
-# cp2kkit v0.2 架构
+# cp2kkit v0.2 architecture
 
-## 设计原则
+## Design principles
 
-分析 MVP 以 `cp2kkit-mvp.md` 为原始范围依据；根据后续需求额外加入
-[输入生成](input-generation.md) 子集。不建设提交系统，不开展 Bader/PDOS/NEB 等暂缓模块。
+The initial analysis MVP baseline is preserved in [the roadmap](roadmap.md).
+Later requirements add an [input-generation](input-generation.md) subset.
+No submission system or deferred Bader/PDOS/NEB post-processing is introduced.
 
-1. **只读源文件**：分析函数不运行外部计算、不写回源文件。
-2. **数据与判断分离**：解析事实、质量规则、显示/导出各自独立。
-3. **证据优先**：来源绝对路径、SHA-256、字节数、行号与原文可追查。
-4. **保守判定**：null 为未知；未知、失败、截断不能成为 passed。
-5. **不隐式选项目或拼重启**：候选按名称排序，不按时间/大小猜测。
-6. **非破坏性输出**：独占创建；多文件导出失败时撤销本次新建文件。
-7. **最少依赖**：核心为标准库；绘图依赖隔离，不要求 ASE。
+1. **Read-only sources:** analysis never runs external calculations or writes back to sources.
+2. **Facts separate from judgments:** parsers, quality rules, display/export are independent.
+3. **Evidence first:** absolute paths, SHA-256, byte sizes, lines, and original text.
+4. **Conservative assessment:** null is unknown; unknown/failed/truncated cannot pass.
+5. **No implicit selection/restart merging:** sort candidates by name, not time/size guesses.
+6. **Non-destructive outputs:** exclusive creation; rollback newly created files on multi-file failure.
+7. **Minimal dependencies:** standard-library core, isolated optional plotting, no ASE requirement.
 
-## 模块和依赖方向
+## Modules and dependency direction
 
 ```text
 cli.py
- ├─ discovery.py ── io.py / errors.py
- ├─ parser.py ───── models.py / io.py
- ├─ quality.py ──── models.py（解析事实 → 规则判定）
- ├─ export.py ───── models.py / quality.py（CSV）
- ├─ structure.py ── models.py / io.py（独立结构通道）
- ├─ plot.py ─────── export.py / quality.py / 可选 matplotlib
- ├─ main_tui.py ─── input_tui.py / structure.py（默认应用主菜单、加载文件与功能调度）
- ├─ structure_formats.py（GJF/CIF/POSCAR 严格读取；structure.py 延迟调度）
- ├─ input_tui.py ── inputgen.py / structure.py（TTY 数字菜单；CLI 参数作为初值）
- ├─ inputgen.py ─── structure.py / models.py / io.py（纯生成 + 独占写入）
- └─ cube.py ─────── models.py / io.py / structure.py（单位常数；流式标量检查/相减）
+ |-- discovery.py -- io.py / errors.py
+ |-- parser.py ----- models.py / io.py
+ |-- quality.py ---- models.py (facts -> rules)
+ |-- export.py ----- models.py / quality.py (CSV)
+ |-- structure.py -- models.py / io.py (independent geometry)
+ |-- plot.py ------- export.py / quality.py / optional matplotlib
+ |-- main_tui.py --- input_tui.py / structure.py (application menu/load/dispatch)
+ |-- structure_formats.py (strict GJF/CIF/POSCAR; lazy dispatch from structure.py)
+ |-- input_tui.py -- inputgen.py / structure.py (TTY editor seeded by CLI)
+ |-- inputgen.py --- structure.py / models.py / io.py (pure generation/exclusive writes)
+ `-- cube.py ------- models.py / io.py / structure.py (units; streaming checks/differences)
 
-models.py  数据结构与 schema 版本
-io.py      严格读取、哈希、稳定 JSON、独占输出
-errors.py  领域异常与机器可读退出码
-__main__.py / pyproject.toml  Python 模块与 console script 入口
+models.py: data model/schema version
+io.py: strict reads, hashes, stable JSON, exclusive outputs
+errors.py: domain exceptions/machine-readable exit codes
+__main__.py / pyproject.toml: module/console-script entry points
 ```
 
-采用常规 `src/` 布局。暂不引入插件、数据库、工作流引擎或配置框架，
-避免初期复杂度大于 MVP 价值。
+Conventional src layout. No plugins, database, workflow engine, or configuration
+framework yet; avoid complexity exceeding MVP value.
 
-## 结果通道
+## Result pipeline
 
 ```text
-输出文件/目录 → 确定选择文件 → 逐行格式匹配 → Run/Segment/Quantity/Evidence
-                                                   ├→ quality_report
-                                                   ├→ JSON / 长表 CSV
-                                                   └→ PNG + 同源 CSV + manifest
+output/directory -> deterministic selection -> line format matching -> Run/Segment/Quantity/Evidence
+                                                                     |-> quality_report
+                                                                     |-> JSON/long-form CSV
+                                                                     `-> PNG/data CSV/manifest
 ```
 
-- Segment 以启动标记和不递增的优化/MD 步号分割。
-- 能量记录保留独立 record index 与可为空的计算 step。
-- 每个能量关联前面的 SCF 汇总；不会把前一步的 SCF 成功复用给后一步。
-- 任一历史 SCF 失败保留为失败证据，即便之后恢复也不能静默洗成成功。
-- 不推断进程返回码，不从总能量反推电荷或自旋。
-- 原始设置以字符串保留；标准化语义/跨输入合并为后续工作。
+- Start markers/non-increasing optimization/MD steps split segments.
+- Energies retain record indices and nullable calculation steps.
+- Associate each energy with the preceding SCF summary, never the previous step's success.
+- Historical SCF failures remain evidence even after recovery.
+- Do not infer process exit codes or charge/spin from total energies.
+- Preserve original settings strings; semantic normalization/cross-input merging is future work.
 
-质量 positive rules：正常结束 + 最后电子收敛 + 最后能量关联的 SCF 收敛 +
-存在总能量 + 支持的 run type + 无错误/历史 SCF 失败；
-GEO_OPT / CELL_OPT 还必须有几何成功证据。
-“最大优化步数”失败标记优先于通用几何结束标记。
+Positive quality requires normal completion, final electronic convergence, SCF
+convergence associated with the final energy, an energy, supported run type, and
+no errors/historical SCF failures. GEO_OPT/CELL_OPT also need geometry success evidence.
+Maximum-step failures override generic geometry-end markers.
 
-## 结构通道
+## Structure pipeline
 
 ```text
-XYZ/extXYZ/restart/GJF/CIF/POSCAR → Structure（angstrom + cell + PBC + source）
-                         ├→ extXYZ（优先，保留晶胞）
-                         └→ 普通 XYZ（有晶胞时要求显式许可）
-两种导出均生成完整结构 JSON sidecar
+XYZ/extXYZ/restart/GJF/CIF/POSCAR -> Structure (angstrom/cell/PBC/source)
+                                  |-> extXYZ (preferred, preserves cell)
+                                  `-> plain XYZ (known cell loss requires permission)
+Both exports also write a complete structure JSON sidecar.
 ```
 
-支持三矢量或 ABC/ALPHA_BETA_GAMMA 晶胞、UNIT、SCALED 与 KIND/ELEMENT 映射；
-不猜测种类标签，不截断损坏的最后一帧，也不展开 CP2K 预处理。
+Support explicit vectors or ABC/ALPHA_BETA_GAMMA, UNIT, SCALED, KIND/ELEMENT.
+Do not guess labels, drop damaged final frames, or expand CP2K preprocessing.
 
-## 输入生成通道
+## Input-generation pipeline
 
 ```text
-XYZ/extXYZ/restart/GJF/CIF/POSCAR → Structure + InputSettings → 校验 → CP2K 文本 + manifest
-                                                      → 新 .inp / .inp.json
+structures -> Structure + InputSettings -> validation -> CP2K text/manifest -> new input/JSON
 ```
 
-生成器不继承原输入计算设置；未知 PBC、电子数/多重度冲突、不支持的组合均拒绝。
-元素预设显式匹配基组与赝势价电子数，可读取本地 CP2K data 核对名字与哈希。
-不执行外部计算，不依赖 Multiwfn 程序或相邻源码路径。
-`generate-input --tui/--interactive` 使用标准库数字菜单维护参数草稿；局部类型/范围检查后，
-统一调用原生成器做跨字段与科学校验。预览不写文件，最终确认才调用原独占 writer。
-完整子命令 CLI 调用不进入交互；无结构/输出且 stdin 为 TTY 的生成入口可自动进入编辑菜单。
-`cp2kkit` / `cp2kkit STRUCTURE` 则进入应用主菜单，加载文件后可选择生成或导出等功能。
-动态过滤菜单字段，但不静默修改冲突的物理参数。
+Do not inherit original electronic settings. Unknown PBC, electron/spin conflicts,
+and unsupported combinations are rejected. Element presets explicitly match
+basis/potential valence counts; optional local data checks verify names/hashes.
+No calculation or Multiwfn/adjacent-source dependency.
 
-## cube 通道
+The standard-library editor maintains drafts, performs local type/range checks,
+then delegates chemistry/cross-field validation to the shared generator.
+Previews do not write; explicit confirmation uses the exclusive writer.
+Complete batch subcommands stay noninteractive; terminal generate-input without
+structure/output can open the editor. Bare cp2kkit/cp2kkit STRUCTURE opens the
+application menu for generation/export etc. Dynamic hiding never silently repairs
+conflicting physical settings. All maintained UI/documentation/development text is English.
+
+## Cube pipeline
 
 ```text
-CUBE → CubeReader（头部、逐行标量、字节哈希）→ Statistics → 检查 JSON
-多个已对齐密度流 → 逐点相减/统计 → 临时 cube + JSON → 独占发布
+CUBE -> CubeReader (header/streamed scalars/byte hash) -> statistics -> check JSON
+aligned density streams -> subtraction/statistics -> staged cube/JSON -> exclusive publication
 ```
 
-CubeOptions 显式定义生产者、空间/标量解释，未知语义不当成电子数。
-规范化 bohr 网格用于容差比较，密度单位转换不改变采样位置；不配准或插值。
-不同原子数合法，输出沿用 AB 的原子字段。网格步进矢量行列式给出体积元。
-`io.staged_files` 预检目标、同目录临时写入、硬链接独占发布；异常仅回滚本次仍拥有的输出 inode。
-详细格式/物理与验证范围见 [cube 文档](cube.md)。
+CubeOptions states producer/spatial/scalar meaning; unknown is not electron count.
+Bohr-normalized grids provide comparisons; scalar unit conversion does not move
+samples. No registration/interpolation. Different atom counts are valid; preserve
+AB atom fields. Step-vector determinant gives voxel volume.
+io.staged_files preflights, stages in the same directory, and publishes exclusive
+hard links. Rollback removes only outputs still owned by the operation.
+See [cube guide](cube.md) for formats/physics/validation.
 
-## 安全与可复现性
+## Safety and reproducibility
 
-- 不记录运行当前时间，保证同一输入在同一路径的 JSON/CSV 结果一致。
-- 哈希针对原始文件字节；移动文件会改变来源路径，内容哈希保持不变。
-- 行号为 1-based，片段为 0-based，能量与 SCF record index 为 1-based。
-- 图片 manifest 记录 PNG/CSV 哈希、坐标轴标签、原始解析结果和质量报告。
-- 多文件写入有异常回滚，但不承诺机器断电时的事务原子性；不覆盖仍是硬保证。
-- schema 变更须同步文档与测试；不引入大二进制样例或昂贵计算输出。
+- No current-time metadata in normal JSON/CSV: identical inputs/paths stay reproducible.
+- Hash raw bytes; moving files changes paths, not content hashes.
+- Lines/energy/SCF record indices are 1-based; segments 0-based.
+- Plot manifests record PNG/CSV hashes, axes, parsed data, and quality.
+- Multi-file rollback is supported; power-loss transaction atomicity is not promised.
+  Existing targets must never be overwritten.
+- Schema changes update docs/tests; do not add large scientific binaries/results.
 
-## 验证策略
+## Validation strategy
 
-标准库 unittest：正常/截断/未收敛、零值、科学记数、能量来源、
-多项目/重复输出、重启片段、晶胞/PBC 回读、单位转换、损坏输入、
-覆盖保护、sidecar 碰撞回滚与绘图数据对应。
-
-当前证据级别为**合成格式测试通过**。真实 CP2K 文件版本矩阵是发布前提，
-不可把测试 fixture 的版本字符串当成兼容认证。
+Standard-library unittest covers normal/truncated/nonconverged outputs, zeros,
+exponents, provenance, ambiguity/duplicate outputs, restart segmentation,
+cell/PBC/unit round-trips, damage, collisions/rollback, and plot-data consistency.
+Evidence is **synthetic format regression**, not actual CP2K version certification.
+A real-file version matrix remains a release prerequisite.

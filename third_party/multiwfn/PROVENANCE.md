@@ -1,143 +1,153 @@
-# Multiwfn 模块来源登记
+# Multiwfn module provenance
 
-本文件记录事实，不以“参考后实现”“改写语言”等标签代替授权判断。
-来源定位优先记录版本、文件、子程序和 SHA-256；行号只作辅助。
-不编造上游 commit、核对日期或作者许可。
+This records facts, not permission inferred from labels such as "reference-based"
+or "rewritten in another language". Prefer version/file/subroutine/SHA-256;
+line numbers are auxiliary. Do not invent upstream commits, inspection dates, or grants.
 
-## CP2K 输入生成
+## CP2K input generation
 
-### 定位与固定来源
+### Location and fixed source
 
-- 本地模块：`src/cp2kkit/inputgen.py`
-- 本地接口：`InputSettings`、`generate_input`、`write_input`
-- CLI 接入：`src/cp2kkit/cli.py`，`generate-input`
-- 上游版本：Multiwfn 2026.10.1
-- 上游源码包：`Multiwfn_2026.10.1_src_Linux`
-- 用户提供的本地路径：`../Multiwfn_2026.10.1_src_Linux/cp2kmate.f90`（开发定位，不是运行依赖）
-- 上游文件：`cp2kmate.f90`
-- 主要子程序：`outCP2Kinp`（行 68–3448）
-- 关联阅读：`outCP2Kinp_wrapper`、`determine_vacuumsize`
-- 源文件 SHA-256：`f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402`
-- 来源登记及哈希复核日期（UTC）：2026-10-13
-- 适用条款记录：[TERMS.md](TERMS.md)
+- Local module: `src/cp2kkit/inputgen.py`
+- Interfaces: InputSettings, generate_input, write_input
+- CLI: `src/cp2kkit/cli.py`, generate-input
+- Upstream: Multiwfn 2026.10.1
+- Package: Multiwfn_2026.10.1_src_Linux
+- User-provided local path: `../Multiwfn_2026.10.1_src_Linux/cp2kmate.f90`
+  (development locator, not runtime dependency)
+- File: cp2kmate.f90
+- Main subroutine: outCP2Kinp, lines 68-3448
+- Related inspection: outCP2Kinp_wrapper, determine_vacuumsize
+- SHA-256: `f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402`
+- Provenance/hash review (UTC): 2026-10-13
+- Applicable terms: [TERMS.md](TERMS.md)
 
-### 参考的具体内容
+### Actual references
 
-- 任务与 `GLOBAL / FORCE_EVAL / DFT / SUBSYS / MOTION` 节组织。
-- MOLOPT-GTH 基组名字及 `Nval` 价电子数表中的部分条目。
-- PBE/BLYP 对应 GTH 赝势、D3/D3(BJ) 设置方式。
-- 部分网格、SCF 和优化默认值；并非全部默认值保持一致。
-- 后续密度扩展阅读了行 2599–2641 的 `E_DENSITY_CUBE`/`STRIDE 1` 分支；
-  保留现有两篇引用。自旋适用性、最终步频率与文件行为另外按 CP2K 2024.1–2026.2
-  官方文档/源码核对，见 [cube 文档](../../docs/cube.md)。
-  `cube.py` 的流式检查/密度相减未从 Multiwfn cube 实现移植。
+- Tasks and GLOBAL/FORCE_EVAL/DFT/SUBSYS/MOTION organization.
+- MOLOPT-GTH names and selected Nval valence-count entries.
+- PBE/BLYP GTH potentials and D3/D3(BJ) configuration.
+- Some grid/SCF/optimization defaults; not every default is identical.
+- Density extension inspected E_DENSITY_CUBE/STRIDE 1 branches, lines 2599-2641,
+  retaining both citations. Spin applicability, final-step frequencies, and file
+  behavior were separately checked against CP2K 2024.1-2026.2 documentation/source:
+  [cube guide](../../docs/cube.md). cube.py streaming/difference logic was not ported
+  from Multiwfn's cube implementation.
 
-### 本地实现及重要差异
+### Implementation and differences
 
-- Python GPW 子集实现，不是逐行移植或严格净室开发；原 Fortran 源文件不随仓库分发。
-- 仅 ENERGY、ENERGY_FORCE、GEO_OPT、CELL_OPT，及 PBE/BLYP 与受限 MOLOPT 预设。
-- 元素/基组/赝势名字另行与 CP2K 数据库头行核对；运行时可选本地数据目录核对与哈希记录。
-- 保守校验周期性、显式电子数和参数组合；输出独占创建与 JSON 来源记录。
-- OT 内/外 SCF 上限现采用上游启用内外 SCF 分支的 25/20；本地默认开启 OT 内外 SCF。
-  展宽空轨道自动值现采用上游 `max(30, NINT(ncenter/2))`，不再固定为 20。
-  优化步数、低维 Poisson 策略、晶胞构造行为等仍与上游不同。
-- 不继承源 restart 的计算设置；按元素重建 KIND。
-- 详细功能差异在开发对话中说明，不另建对比文档；实际实现范围见
-  [输入生成文档](../../docs/input-generation.md)。
+- Python GPW subset, not a line-by-line port or strict clean-room implementation.
+  Original Fortran is not distributed.
+- Only ENERGY/ENERGY_FORCE/GEO_OPT/CELL_OPT, PBE/BLYP, restricted MOLOPT presets.
+- Element/basis/potential names separately checked against CP2K headers; optional
+  local data verification/hashing.
+- Conservative PBC/electron/combination checks; exclusive creation/JSON provenance.
+- OT inner/outer limits follow upstream's enabled-outer branch, 25/20, enabled by
+  default locally. Smearing empty-orbital auto uses max(30,NINT(ncenter/2)), not fixed 20.
+  Optimization steps, low-dimensional Poisson, and cell construction still differ.
+- Restart settings are not inherited; rebuild KIND by element.
+- Detailed differences belong in development conversation, not a separate comparison
+  document. Actual scope: [generation guide](../../docs/input-generation.md).
 
-### 引用与授权状态
+### Citations and authorization
 
-- 两篇上游必需引用见 [第三方总览](../../THIRD_PARTY_NOTICES.md)。
-- 引用保留于模块 docstring、生成的输入文件和 JSON。
-- 原源码阅读未发现 `cp2kmate.f90` 文件头的单独版权/许可证声明；不据此认定无版权。
-- 未取得针对本次集成的单独许可；再许可和收费分发边界未确认。
-- 不声明此模块因采用 Python 实现而自动摆脱上游条件。
+- Required papers: [notices](../../THIRD_PARTY_NOTICES.md).
+- Preserved in module docstrings, generated inputs, and JSON.
+- No separate header copyright/license statement was found in the inspected
+  cp2kmate.f90; absence is not evidence of no copyright.
+- No separate integration permission; relicensing/paid-distribution boundaries unconfirmed.
+- Python implementation does not automatically remove upstream conditions.
 
-### 验证边界
+### Validation boundary
 
-- 当前验证为合成单元测试和 CLI 冒烟，未执行 CP2K。
-- 功能对比来自指定源码的静态阅读，不是 Multiwfn 与 cp2kkit 的输出或计算结果等价性测试。
+- Synthetic unit/CLI smoke checks, no CP2K execution.
+- Comparison is static inspection of identified source, not equivalent output/
+  calculation testing between Multiwfn and cp2kkit.
 
-## CP2K 输入生成交互菜单
+## Input-generation editor
 
-### 定位与固定来源
+### Location and fixed source
 
-- 本地模块：`src/cp2kkit/input_tui.py`，`run_interactive`、`Menu`、`GROUPS`。
-- CLI 接入：`generate-input --tui/--interactive`；原传参形式保留。
-- 上游版本/包/文件：Multiwfn 2026.10.1，`Multiwfn_2026.10.1_src_Linux/cp2kmate.f90`。
-- 子程序：`outCP2Kinp`；主数字菜单约行 194–375，返回/其他设置约行 389–445。
-- 开发定位：`../Multiwfn_2026.10.1_src_Linux/cp2kmate.f90`；不是运行时依赖。
-- 源文件 SHA-256：`f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402`。
-- 本次源码哈希复核日期（UTC）：2026-10-14；适用条款：[TERMS.md](TERMS.md)。
+- Local: `src/cp2kkit/input_tui.py`, run_interactive/Menu/GROUPS.
+- CLI: generate-input --tui/--interactive; original arguments retained.
+- Upstream: Multiwfn 2026.10.1, Multiwfn_2026.10.1_src_Linux/cp2kmate.f90.
+- outCP2Kinp: main numbered menu approximately lines 194-375; return/other settings 389-445.
+- Development locator: `../Multiwfn_2026.10.1_src_Linux/cp2kmate.f90`, not runtime dependency.
+- SHA-256: `f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402`.
+- Hash recheck (UTC): 2026-10-14; terms: [TERMS.md](TERMS.md).
 
-### 参考内容与本地差异
+### References and differences
 
-- 参考反复显示当前设置、按数字选择修改、返回主菜单及最后选择生成的交互组织。
-- Python 标准库行式菜单重新实现，未复制或分发 Fortran UI 代码；不作净室声明。
-- 自行分为 8 个参数组，菜单编号不与上游对应；只展示已实现的 GPW 参数。
-- 保留本项目默认值、CLI 初值、源结构限制和原生成器科学校验；不移植上游的全部选项、
-  会话间保存状态、推断磁态、自动更换参数或直接写出行为。
-- 新增预览、引用后的可复现 CLI 命令和默认否的最终确认；TUI 不执行任何 shell/CP2K 命令。
+- Repeated current-settings display, numbered editing, return, and final generation.
+- Reimplemented using standard-library line interaction, not copied/distributed
+  Fortran UI; no clean-room claim.
+- Eight local groups with different numbering; only implemented GPW parameters.
+- Retain local defaults, CLI seeds, source restrictions, scientific checks. Do not
+  port all upstream options/session persistence/magnetic inference/automatic repairs/direct writes.
+- Add previews, quoted replay commands, and default-no confirmation; no shell/CP2K execution.
 
-### 引用、授权及验证边界
+### Citations, permission, validation
 
-- 两篇必需论文引用保留在 `input_tui.py` docstring、共享输入/JSON 和第三方声明。
-- 适用原自定义条款；未取得本次集成单独许可，不宣称再许可/收费分发边界已确认。
-- 单元与 CLI/PTY 测试采用合成结构；未运行 Multiwfn 或 CP2K，不声称两者菜单/结果等价。
+- Both papers remain in input_tui.py/shared input/JSON/notices.
+- Original custom terms apply; no extra grant or confirmed relicensing boundary.
+- Synthetic unit/CLI/PTY cases; no Multiwfn/CP2K execution or menu/result equivalence claim.
 
-## 默认入口与 SCF / 空轨道自动值调整
+## Default entry and SCF/empty-orbital automatic values
 
-### 定位与来源
+### Location and source
 
-- 本地模块：`cli.py`、`main_tui.py`、`input_tui.py`、`inputgen.py`。
-- 上游仍为 Multiwfn 2026.10.1 `cp2kmate.f90` / `outCP2Kinp`；
-  本次实际复核 SHA-256：`f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402`。
-- 行 2437–2440：diag 128，启用内外 SCF 的 OT 内层 25；行 2487–2492：外层 20。
-- 行 1124–1134：开启展宽时 `nADDED_MOS=nint(ncenter/2D0)`、下限 30，关闭时设 0。
-- 适用条款仍见 [TERMS.md](TERMS.md)，引用与授权状态不变。
+- Local: cli.py, main_tui.py, input_tui.py, inputgen.py.
+- Same Multiwfn 2026.10.1 cp2kmate.f90/outCP2Kinp;
+  actually rechecked hash: `f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402`.
+- Lines 2437-2440: diag 128, enabled-outer OT inner 25; lines 2487-2492: outer 20.
+- Lines 1124-1134: smearing on assigns nADDED_MOS=nint(ncenter/2D0), minimum 30;
+  turning it off assigns 0.
+- Terms/citations/authorization unchanged: [TERMS.md](TERMS.md).
 
-### 使用内容与差异
+### Use and differences
 
-- 采用上述参数/自动值公式；Python 用 `(natoms+1)//2` 实现正半整数的 Fortran NINT 取整。
-- 参考加载文件后进入数字主菜单的交互组织；应用菜单自行实现，仅调度当前已有功能。
-- 未移植上游全部菜单或结构格式解析器。GJF/CIF/POSCAR 读取器为本项目的标准库严格子集实现，
-  不参考/分发 Multiwfn 对应读取源码。
-- 行 2525–2529 的 UKS 双 spin 值组织亦用于本地输出；ADDED_MOS integer 数组与每自旋含义
-  另按 CP2K 2026.2 官方 SCF 文档核对（链接见输入生成文档）。
-- 自动空轨道只在 diag+展宽且未显式覆盖时生效；显式值保留。OT 拒绝展宽及非零空轨道，
-  不自动改成对角化。auto 随当前结构变化，不保留上游会话里的赋值状态。
-- 截断 400/55 Ry 为用户要求，不宣称来自上游或已按体系收敛。
-- 应用主菜单、动态字段隐藏与自动值仅做合成测试；未运行 Multiwfn/CP2K，
-  不声称完整行为等价或科学充分性。两篇必需引用继续由共享生成器保留。
+- Use these formulas; Python (natoms+1)//2 implements Fortran positive half-integer rounding.
+- Reference load-then-numbered-menu organization; application dispatch is locally
+  implemented for existing functions.
+- Not a complete menu/reader port. GJF/CIF/POSCAR are local strict standard-library
+  readers, without referencing/distributing Multiwfn reader source.
+- UKS dual-spin organization from lines 2525-2529 also used; ADDED_MOS integer-array/
+  per-spin meaning separately checked in CP2K 2026.2 SCF documentation linked in the guide.
+- Auto applies only to diag+smearing without explicit override. OT rejects smearing/
+  nonzero empty orbitals instead of switching to diag. Auto follows current structures,
+  not upstream session assignments.
+- 400/55 Ry is the user's request, not claimed upstream provenance or system convergence.
+- Application/dynamic hiding/auto checks are synthetic; no Multiwfn/CP2K run or full
+  behavior-equivalence/scientific-sufficiency claim. Shared generator retains both citations.
 
-## 后续功能登记模板
+## Template for future features
 
-每加入一个参考功能，复制以下结构并填入有证据支持的信息。
-若涉及其他作者的代码，应另立第三方条目并保留其声明。
+Copy this structure for each referenced feature and supply evidenced facts.
+Register other authors' code separately and preserve notices.
 
 ```markdown
-## <功能名>
+## <Feature>
 
-### 定位与固定来源
-- 本地模块/函数：
-- 上游版本/源码包：
-- 上游文件/子程序：
-- 源文件 SHA-256 或实际存在的上游 commit：
-- 来源登记/复核日期：
-- 适用条款记录：
+### Location and fixed source
+- Local module/function:
+- Upstream version/package:
+- Upstream file/subroutine:
+- Source SHA-256 or an actual upstream commit:
+- Registration/recheck date:
+- Applicable terms:
 
-### 参考的具体内容
-- <算法描述、流程、参数表、默认值或具体代码片段；如实说明>
+### Actual references
+- <Algorithm, workflow, tables, defaults, or code portions actually used>
 
-### 本地实现及重要差异
-- <参考后实现、部分改写或直接移植；不作自动免责结论>
-- <重要行为差异、重新核对依据>
+### Implementation and differences
+- <Reference-based implementation, rewrite, or direct port; no automatic exemption>
+- <Behavior differences and verification sources>
 
-### 引用与授权状态
-- <引用和已有版权声明的保留位置>
-- <额外方法论文>
-- <是否取得单独许可，实际证据与适用范围；未知则写未知>
+### Citations and authorization
+- <Citation/copyright preservation locations>
+- <Additional method papers>
+- <Separate grants, actual evidence/scope, or explicitly unknown>
 
-### 验证边界
-- <测试与未验证事项；不把预期结果当成已验证结果>
+### Validation boundary
+- <Tests/unverified items; requested outcomes are not verified results>
 ```

@@ -1,36 +1,44 @@
-# cp2kkit 开发提示词
+# cp2kkit development prompts
 
-此目录保存针对本项目的开发约束和可复用提示词，适合纳入 Git。
-它不是运行时配置、第三方许可证或计算结果存储目录。
+This directory stores project-specific development rules and reusable prompts for Git.
+It is not runtime configuration, a third-party license, or a calculation-results store.
 
-## 使用方式
+## Usage
 
-新会话先让编码助手阅读 [通用开发约束](DEVELOPMENT.md)，再选择任务模板：
+Start a session with the [development rules](DEVELOPMENT.md), then choose a template:
 
-| 模板 | 用途 |
+| Template | Purpose |
 |---|---|
-| [实现功能](prompts/implement-feature.md) | 增加功能或修复缺陷，保持接口与现有行为 |
-| [参考 Multiwfn](prompts/multiwfn-reference.md) | 查阅上游源码、分阶段补齐 CP2K 输入生成、登记来源 |
-| [代码审查](prompts/review.md) | 只读审查实现、科学设置、测试和授权记录 |
-| [版本与文档更新](prompts/update-version-docs.md) | 每轮新增功能后统一升版，同步文档、变更记录并验证一致性 |
+| [Implement a feature](prompts/implement-feature.md) | Add features/fix defects while preserving unrelated interfaces and behavior |
+| [Reference Multiwfn](prompts/multiwfn-reference.md) | Inspect upstream source, extend CP2K generation in stages, and record provenance |
+| [Review](prompts/review.md) | Read-only review of implementation, scientific settings, tests, and authorization |
+| [Update version and documentation](prompts/update-version-docs.md) | Bump once per feature round, update documentation/changelog, and verify consistency |
 
-将模板中的 `<...>` 替换为实际任务、文件或版本；未明确的信息不要猜测。
-例如可以发送：
+Replace `<...>` with actual tasks, files, or versions; do not guess missing information.
+For example:
 
-> 阅读 `.agents/DEVELOPMENT.md` 和 `.agents/prompts/multiwfn-reference.md`，
-> 本次只完善 CP2K 输入生成的逐 KIND 初始磁矩设置。先检查现有接口和来源，
-> 再提出最小实现方案；不启动计算，不自动提交或推送。
+> Read `.agents/DEVELOPMENT.md` and `.agents/prompts/multiwfn-reference.md`.
+> Extend only per-KIND initial magnetic moments in CP2K input generation.
+> Inspect existing interfaces and sources before proposing a minimal implementation.
+> Do not start calculations or automatically commit/push.
 
-**不能假定工具会自动加载 `.agents/` 中的文件。** 请在会话中显式引用；
-如需自动加载，应按所用工具的实际规则另行配置，不把这里的模板当成通用自动加载入口。
+**Do not assume tools automatically load `.agents/`.** Reference these files explicitly.
+If automatic loading is needed, configure it according to the actual tool's rules;
+these templates are not a universal automatic-loading entry point.
 
-## 维护规则
+## Maintenance rules
 
-- 版本采用 A.B.C：A 仅由用户人工决定；新增/更新功能递增 B、C 归零；
-  修复功能/bug 递增 C，A/B 不变。每轮统一升版一次并更新文档，详见版本更新模板。
-- 当前源码、测试和用户明确要求优先于历史说明；模板不能扩大用户授权范围。
-- 只保存可复用开发规则，不存密钥、个人数据、原始对话、大型计算结果或临时日志。
-- 项目目标和进度以 [路线图](../docs/roadmap.md) 为准，不把预期目标写成已完成结果。
-- 第三方授权和模块来源保留在 [第三方总览](../THIRD_PARTY_NOTICES.md)及 `third_party/`，
-  不用本目录替代，也不将这些合规记录放入忽略目录。
-- 实现发生变化时同步核对本目录，避免固化测试数量、环境路径或未验证的兼容性结论。
+- Use English by default for all development, documentation, prompts, comments,
+  messages, and reports. Follow explicit user language requests; preserve original
+  third-party text, citations, scientific syntax, paths, and user data.
+- Versions use A.B.C: A is the user's decision only; features increment B/reset C;
+  fixes increment C with A/B unchanged. Bump once per round and update documentation.
+- Current code/tests and explicit user requirements override historical notes.
+  Templates do not expand authorization.
+- Store reusable rules only: no secrets, personal data, raw conversations, large
+  calculation results, or transient logs.
+- Goals/progress follow the [roadmap](../docs/roadmap.md); planned outcomes are not completed results.
+- Keep third-party authorization/provenance in [notices](../THIRD_PARTY_NOTICES.md)
+  and `third_party/`, not here or in ignored directories.
+- Recheck these templates as implementation changes. Do not freeze obsolete test
+  counts, environment paths, or unverified compatibility claims.

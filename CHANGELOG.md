@@ -1,70 +1,103 @@
-# 变更记录
+# Changelog
 
-软件版本与数据 schema 分开维护。本文件记录实际实现变化，不代表已经发布到软件包仓库，
-也不代表完成真实 CP2K 运行认证。
+Software and data-schema versions are maintained independently.
+This file records actual implementation changes, not publication to a package
+repository or certification with actual CP2K calculations.
 
-版本规则为 **A.B.C**：A 仅由用户人工决定；新增/更新功能递增 B 并将 C 归零；
-修复功能/bug 递增 C，A/B 不变。同一轮同时包含功能更新与修复时统一递增 B。
+Versions use **A.B.C**: A is decided manually by the user; features increment B
+and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
+increments B once. Explicit user version requests take priority.
+
+## 0.2.3
+
+### English project content
+
+- Translate all maintained Markdown titles/prose and development prompts into
+  English, including architecture/schema/roadmap, the original MVP, and third-party
+  notices/provenance. Consolidate the original MVP into the roadmap's historical
+  planning section and remove the retired standalone file. Preserve original terms
+  quotations, citations, scientific
+  facts, source hashes, paths, and historical validation records.
+- Require English development text by default in all agent templates; honor
+  explicit communication-language requests and preserve user/original evidence.
+- Keep legacy Boolean aliases through Unicode escapes without non-English
+  literals in maintained source. Runtime behavior and input compatibility are unchanged.
+- Update to 0.2.3 as explicitly requested; schema remains 0.1.0.
+  No CP2K calculations, package publication, or runtime certification are implied.
+- Full regression: 138 tests passed, none skipped; compileall, diff checks, and CLI
+  version checks passed. Added maintained-language, local-link, English-prompt, and
+  legacy-Boolean compatibility checks. Official quotations/source hashes are unchanged.
 
 ## 0.2.2
 
-### 交互调整
+### Interaction changes
 
-- 应用主菜单标题改为 `cp2kkit Main menu`；输入编辑标题为 `Main menu: current settings`。
-- 所有子菜单、参数标签、选择/校验提示、状态显示、预览、写入确认和取消信息统一为英文。
-- 菜单编号、操作方式、参数默认值、生成内容与覆盖保护不变；中文布尔输入别名保留兼容。
-- 本轮版本按用户明确指定更新为 0.2.2；保留 0.2.1 格式修复，schema 仍为 0.1.0。
-  未运行 CP2K，不代表真实程序运行认证。
-- 完整回归 134 项通过，无跳过；新增全部子菜单/预览/确认及应用菜单的英文显示检查。
-  compileall、`git diff --check` 与 CLI 版本检查通过。
+- Application title becomes `cp2kkit Main menu`; input editor title is
+  `Main menu: current settings`.
+- Translate all submenus, field labels, selection/validation prompts, status,
+  previews, write confirmations, and cancellation messages into English.
+- Menu numbers, operations, defaults, generated content, and overwrite protection
+  stay unchanged; legacy Boolean aliases remain accepted.
+- Version 0.2.2 was explicitly requested; retain the 0.2.1 format fixes and schema 0.1.0.
+  No CP2K execution/runtime certification.
+- Full regression: 134 tests passed, none skipped; new checks cover all submenus,
+  previews/confirmation, and the application menu's English output.
+  Compileall, diff checks, and CLI version checks passed.
 
 ## 0.2.1
 
-### 修复
+### Fixes
 
-- 修复 EPS_DEFAULT、内/外层 EPS_SCF 的浮点显示尾数，采用简洁大写科学计数法，
-  如 `1.0E-12`、`1.0E-06`；自定义 EPS 保留有效数字，现有阈值不变。
-- CELL/COORD 按列对齐，固定 8 位小数，规范负零并保留大数之间的分隔空格；
-  CELL PERIODIC 附带几何 PBC 注释。按用户示例省略单位关键词，仍使用 CP2K 默认 angstrom。
-- JSON 的实际生成结构与文本舍入值一致；原结构保留原始精度，舍入后奇异晶胞拒绝生成。
-- 修复版本递增 C：0.2.0 → 0.2.1；A/B、数据 schema 0.1.0、目标 CP2K 默认值不变。
-  几何文本/输入 SHA-256 会变化，不改已有文件；未运行 CP2K。
-- 完整回归 132 项通过，无跳过；compileall、`git diff --check` 与 CLI 版本检查通过。
-  新测试覆盖指定格式、自定义 EPS 精度、负零、大数、文本/JSON 回读与舍入后奇异晶胞。
+- Remove floating-point display tails from EPS_DEFAULT and inner/outer EPS_SCF;
+  use readable uppercase scientific notation such as `1.0E-12`/`1.0E-06`.
+  Preserve custom EPS significant digits and existing numerical thresholds.
+- Align CELL/COORD columns at eight decimal places, normalize negative zero,
+  and preserve separators for oversized numbers. Add the geometry PBC comment.
+  Omit unit keywords as requested, using CP2K's angstrom defaults.
+- Generated-structure JSON matches the rounded text; original structure retains
+  its precision. Reject cells made singular by rounding.
+- Fix version increments C: 0.2.0 -> 0.2.1; A/B, schema 0.1.0, and CP2K target defaults unchanged.
+  Geometry text/input SHA-256 changes; existing files are untouched. CP2K was not run.
+- Full regression: 132 tests passed, none skipped. Compileall, diff/version checks passed.
+  Added exact-format/custom-EPS/negative-zero/large-number/round-trip/singular-cell tests.
 
 ## 0.2.0
 
-### 新增
+### Added
 
-- `cp2kkit` 默认进入应用主菜单；`cp2kkit STRUCTURE` 加载结构后进入主菜单。
-  支持选择/更换文件、输入生成、extXYZ 导出和 CP2K 输出质量报告。
-- 标准库结构读取扩展：Cartesian GJF/COM、CIF、VASP5 POSCAR/CONTCAR，
-  以及 `.vasp` / `.poscar` 文件；保留已有 XYZ/extXYZ/restart 支持。
-- diag + smearing 且未显式指定空轨道时，根据原子数自动设置
-  `ADDED_MOS = max(30, NINT(原子数/2))`；UKS 分别写入 alpha/beta 数量。
-- 可配置 OT 外层上限 `--max-outer-scf`，默认 20。
-- `.agents/prompts/update-version-docs.md`：新增功能完成后统一更新版本与文档的提示词，
-  已接入通用开发约束、功能实现及 Multiwfn 参考模板；遵循用户规定的 A.B.C 升版规则。
+- `cp2kkit` opens the application menu; `cp2kkit STRUCTURE` loads a structure first.
+  Load/change structures, generate inputs, export extXYZ, and report output quality.
+- Standard-library Cartesian GJF/COM, CIF, VASP5 POSCAR/CONTCAR, `.vasp`, and
+  `.poscar` readers alongside XYZ/extXYZ/restart.
+- With diag+smearing and no explicit override, automatically set
+  `ADDED_MOS = max(30, NINT(atom_count/2))`; write alpha/beta values separately for UKS.
+- Configurable OT outer limit `--max-outer-scf`, default 20.
+- `.agents/prompts/update-version-docs.md`, integrated with development rules,
+  feature/Multiwfn templates, following the user's A.B.C convention.
 
-### 默认值与交互变化
+### Defaults and interaction
 
-- PROJECT 默认由固定 `cp2kkit` 改为结构文件名去后缀；可显式覆盖。
-- CUTOFF / REL_CUTOFF 从 350/50 Ry 改为 **400/55 Ry**。
-- 默认 OT 内外 SCF 上限为 **25/20**；对角化默认上限仍为 128。
-- 空轨道从固定默认 20 改为自动值：diag + 展宽采用上述公式，否则默认 0。
-- 外压仅 CELL_OPT 显示；孤立盒子 padding 仅有效周期性 NONE 显示。
-  OT 隐藏展宽与空轨道；显式请求展宽或非零空轨道会报错，不再静默忽略空轨道。
+- PROJECT changes from fixed `cp2kkit` to the structure filename without suffix; override allowed.
+- CUTOFF/REL_CUTOFF change from 350/50 Ry to **400/55 Ry**.
+- OT inner/outer defaults are **25/20**; diagonalization remains 128.
+- Empty orbitals change from fixed 20 to the smearing heuristic, otherwise 0.
+- Pressure appears only for CELL_OPT; isolated padding only for effective NONE.
+  OT hides smearing/empty orbitals and rejects explicitly requested smearing or
+  nonzero empty orbitals instead of silently ignoring them.
 
-### 迁移与限制
+### Migration and limitations
 
-- 原有批处理子命令保留；默认应用菜单要求 TTY，脚本应继续使用子命令。
-- 需要复现旧网格/项目名时显式传入 `--cutoff 350 --rel-cutoff 50 --project cp2kkit`；
-  OT 旧内层上限可显式指定 `--max-scf 128`。旧 diag 空轨道可指定 `--added-mos 20`；
-  不要给 OT 传入非零空轨道。
-- GJF 电荷/多重度、POSCAR 约束等只记录来源，不继承为 CP2K 计算设置。
-  CIF 要求显式对称操作或明确 P1；部分占据/无序、旧式缺元素 POSCAR、GJF 内坐标等拒绝。
-- 空轨道公式是 Multiwfn 通常用于 300 K 展宽的经验规则，不保证所有体系/温度充分。
-- 软件版本升为 **0.2.0**；数据 schema 保持 **0.1.0**，目标 CP2K 默认仍为 2026.2。
-- 完整回归 128 项通过，无跳过；compileall、`git diff --check` 与 CLI 版本检查通过。
-  版本一致性测试覆盖项目元数据、模块、README/变更记录、CLI 与生成器。
-- 未运行 CP2K/Multiwfn 计算；回归使用合成格式样例，真实软件认证和参数收敛仍待验证。
+- Existing batch commands remain. Application menus require TTY; scripts use subcommands.
+- Reproduce old grid/project defaults with `--cutoff 350 --rel-cutoff 50 --project cp2kkit`;
+  old OT inner limit with `--max-scf 128`; old diag empty orbitals with `--added-mos 20`.
+  Do not pass nonzero empty orbitals to OT.
+- GJF charge/multiplicity and POSCAR constraints are source metadata, not inherited
+  CP2K settings. CIF requires explicit symmetry or declared P1; partial occupancy/disorder,
+  VASP4 without elements, and GJF internal coordinates are rejected.
+- The empty-orbital rule is Multiwfn's usual 300 K heuristic, not a guarantee for every
+  system/temperature.
+- Software becomes **0.2.0**; schema remains **0.1.0**, CP2K target default 2026.2.
+- Full regression: 128 tests passed, none skipped; compileall/diff/CLI-version checks passed.
+  Consistency tests cover package metadata/module, README/changelog, CLI, and generator.
+- No CP2K/Multiwfn calculations. Synthetic fixtures are not scientific results;
+  actual software certification and parameter convergence remain unverified.
