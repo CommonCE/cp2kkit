@@ -47,8 +47,9 @@ def build_parser():
     structure.add_argument("--frame", type=int, default=-1, help="XYZ frame index, default last; negative indices allowed")
     structure.add_argument("--allow-cell-loss", action="store_true", help="Explicitly allow plain XYZ to omit a known cell")
     gen = sub.add_parser("generate-input", help="Generate a conservative GPW CP2K input and provenance JSON")
-    gen.add_argument("path", help="XYZ, extXYZ or text restart structure")
-    gen.add_argument("-o", "--output", required=True)
+    gen.add_argument("path", nargs="?", help="XYZ, extXYZ or text restart structure; prompted in TUI mode")
+    gen.add_argument("-o", "--output", help="New input path; required unless using TUI")
+    gen.add_argument("--interactive", "--tui", action="store_true", help="Edit CLI-seeded settings in a Multiwfn-style numbered terminal menu")
     gen.add_argument("--frame", type=int, default=-1)
     gen.add_argument("--project", default="cp2kkit")
     gen.add_argument("--run-type", type=str.upper, choices=RUN_TYPES, default="ENERGY")
@@ -121,11 +122,16 @@ def execute(args):
             print(f"WARNING: {warning}", file=sys.stderr)
         return 0
     if args.command == "generate-input":
-        structure = read_structure(args.path, args.frame)
         values = {name: getattr(args, name) for name in InputSettings.__dataclass_fields__}
         values["cell"] = tuple(args.cell) if args.cell is not None else None
         values["kpoints"] = tuple(args.kpoints)
         values["cube_stride"] = tuple(args.cube_stride) if args.cube_stride is not None else None
+        if args.interactive:
+            from .input_tui import run_interactive
+            return run_interactive(args.path, args.frame, args.output, InputSettings(**values))
+        if args.path is None or args.output is None:
+            raise KitError("generate-input requires PATH and --output; use --tui for a terminal menu")
+        structure = read_structure(args.path, args.frame)
         output, sidecar, warnings = write_input(structure, InputSettings(**values), args.output)
         for warning in warnings:
             print(f"WARNING: {warning}", file=sys.stderr)
@@ -177,6 +183,11 @@ def execute(args):
 def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.command == "generate-input":
+        if args.path is None and args.output is None and sys.stdin.isatty():
+            args.interactive = True
+        if not args.interactive and (args.path is None or args.output is None):
+            parser.error("generate-input requires PATH and --output; use --tui for a terminal menu")
     try:
         return execute(args)
     except KitError as exc:

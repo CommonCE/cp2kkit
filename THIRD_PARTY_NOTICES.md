@@ -22,7 +22,8 @@
 - [模块来源登记](third_party/multiwfn/PROVENANCE.md)：本地模块、上游版本/文件/子程序、
   源文件哈希、使用内容、实现差异与授权状态；附后续登记模板。
 
-当前登记的模块为 `src/cp2kkit/inputgen.py`（CP2K 输入生成）。
+当前登记的模块为 `src/cp2kkit/inputgen.py`（CP2K 输入生成）及
+`src/cp2kkit/input_tui.py`（参考上游数字菜单交互方式，非 Fortran UI 代码移植）。
 不分发原 Fortran 文件、不依赖 Multiwfn 二进制，并不等同于严格净室实现，
 也不能据此断定不受上游条件约束。
 

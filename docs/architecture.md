@@ -23,6 +23,7 @@ cli.py
  ├─ export.py ───── models.py / quality.py（CSV）
  ├─ structure.py ── models.py / io.py（独立结构通道）
  ├─ plot.py ─────── export.py / quality.py / 可选 matplotlib
+ ├─ input_tui.py ── inputgen.py / structure.py（TTY 数字菜单；CLI 参数作为初值）
  ├─ inputgen.py ─── structure.py / models.py / io.py（纯生成 + 独占写入）
  └─ cube.py ─────── models.py / io.py / structure.py（单位常数；流式标量检查/相减）
 
@@ -78,6 +79,9 @@ XYZ/extXYZ/restart → Structure + InputSettings → 校验 → CP2K 文本 + ma
 生成器不继承原输入计算设置；未知 PBC、电子数/多重度冲突、不支持的组合均拒绝。
 元素预设显式匹配基组与赝势价电子数，可读取本地 CP2K data 核对名字与哈希。
 不执行外部计算，不依赖 Multiwfn 程序或相邻源码路径。
+`generate-input --tui/--interactive` 使用标准库数字菜单维护参数草稿；局部类型/范围检查后，
+统一调用原生成器做跨字段与科学校验。预览不写文件，最终确认才调用原独占 writer。
+完整 CLI 调用不进入交互；无结构/输出且 stdin 为 TTY 的入口可自动进入菜单。
 
 ## cube 通道
 

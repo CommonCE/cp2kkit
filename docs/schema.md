@@ -80,6 +80,8 @@ CSV 包含所有两类记录；kind 指示图片实际使用的子集。
 ## Generated input JSON：密度输出扩展
 
 本阶段在 schema 0.1.0 中增加新通道与可选/新增字段，不改变既有结果模型的含义。
+输入生成的 TUI 和普通 CLI 复用相同 manifest；参数草稿只在确认后写出，
+最终 `settings` 记录实际选择，不新增 UI 会话/交互历史字段，也不更改 schema 版本。
 
 - `target_version` / `settings.cp2k_version`：明确请求的 CP2K 语法目标，默认 2026.2。
   `runtime_version=null` / `runtime_validated=false`：未实际运行，不将目标版本当执行版本。

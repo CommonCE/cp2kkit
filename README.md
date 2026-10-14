@@ -85,6 +85,20 @@ cp2kkit generate-input solid.extxyz -o solid.inp --run-type CELL_OPT \
   --scf diag --kpoints 3 3 3 --smearing 300
 ```
 
+另有 Multiwfn 风格的数字菜单模式，原有传参方式保持不变：
+
+```bash
+cp2kkit generate-input --tui
+# 已传参数作为菜单初值，可以继续修改
+cp2kkit generate-input water.xyz -o water.inp --periodic NONE --tui
+# 终端中直接运行 generate-input（不提供结构/输出）也进入菜单
+cp2kkit generate-input
+```
+
+支持分组编辑、完整输入预览、可复现命令及写入前明确确认；q 取消不生成文件。
+仅需标准库，不依赖 curses/Multiwfn；是数字选择的行式 TUI，不是全屏方向键界面。
+非终端批处理仍使用原 CLI，不会自动进入菜单。详情见 [输入生成文档](docs/input-generation.md)。
+
 支持 ENERGY / ENERGY_FORCE / GEO_OPT / CELL_OPT，PBE/BLYP、MOLOPT-GTH、
 D3/D3(BJ)、电荷/多重度、晶胞/PBC、OT/对角化与 k 点。
 输出输入文件及 `<output>.json`，两者均拒绝覆盖。

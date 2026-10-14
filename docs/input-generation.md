@@ -36,6 +36,57 @@ cp2kkit generate-input --help
 输出 `<output>` 和 `<output>.json`。任何一个已存在则拒绝覆盖（退出码 5），
 sidecar 冲突时撤销本次新建输入；无 `--force`。父目录必须存在。
 
+## Multiwfn 风格 TUI 选择模式
+
+```bash
+# 纯交互入口，提示填写结构和新输出路径
+cp2kkit generate-input --tui
+cp2kkit generate-input --interactive     # 同义选项
+
+# 传参 + 交互：给定参数作为初值，没有不同的默认方法/网格
+cp2kkit generate-input water.xyz -o water-opt.inp --periodic NONE \
+  --run-type GEO_OPT --dispersion d3bj --electron-density --tui
+
+# 在终端中，未提供结构和输出时自动进入菜单
+cp2kkit generate-input
+```
+
+数字菜单逐项修改，每次显示当前值；不是必须从头走完的向导。
+使用标准库行式交互，支持常规终端/SSH，不安装 curses 或额外 UI 依赖。
+不依赖 Multiwfn 二进制或开发时邻目录源码。
+
+| 主菜单 | 内容 |
+|---:|---|
+| 1 | 结构、XYZ 帧、新输出路径、项目名、目标 CP2K 版本 |
+| 2 | ENERGY/ENERGY_FORCE/GEO_OPT/CELL_OPT、优化器、步数、外压 |
+| 3 | GPW 泛函、MOLOPT-GTH 基组、色散、可选 data 目录 |
+| 4 | 电荷和自旋多重度 |
+| 5 | PBC、正交晶胞覆盖（angstrom）、孤立盒子 padding（angstrom） |
+| 6 | OT/diag、EPS_SCF、步数、k 点、展宽（K）、空轨道 |
+| 7 | CUTOFF / REL_CUTOFF（Ry） |
+| 8 | 电子/自旋密度开关与 STRIDE |
+| 9 | 校验并预览完整输入、来源相关告警和可复现 CLI 命令；不写文件 |
+| 0 | 校验、显示有效参数与告警，明确输入 y/yes 后才生成 |
+| q / quit | 取消整个会话，不生成文件 |
+
+- 进入组后选择字段编号；组内 `0` 返回主菜单。字段编辑时回车保留原值。
+- 枚举值接受列出的编号或名称；布尔值接受 y/n；三元参数用空格分隔。
+- 可选字段输入 `auto` 恢复默认/取消覆盖。PBC 的 `auto` 是继承源 PBC，**不是 NONE**；
+  smearing 的 `auto` 是关闭展宽；cell 的 `auto` 保留源晶胞；cube_stride 的 `auto` 恢复有效默认。
+- 路径可包含空格，菜单中输入字面路径、不加 shell 引号。`q`/`quit` 是取消命令，
+  字面同名文件可用 `./q`/`./quit`。输出父目录需存在。
+- 类型/范围错误就地重输；跨字段/结构错误在预览或生成时提示，并返回菜单供修改。
+  例如开自旋密度而未启用 UKS、OT + 非 Gamma k 点、未知 PBC，都不自动改变其他参数来修复。
+- 生成确认默认否，空回车返回菜单。目标已存在仍退出 5；不提供覆盖按钮。
+  EOF/Ctrl-C 以错误码 2 结束；未完成写入沿用原 writer 回滚，已完成文件保留。
+- TUI 要求 stdin 为 TTY，不能用管道伪装交互式确认；脚本应使用原 CLI。
+  stdout 可重定向保存菜单/预览记录。带完整结构/输出的普通调用即使在终端也不会进入 TUI。
+
+两种模式使用同一个 `InputSettings`、`generate_input`、`write_input`。
+相同结构/参数生成相同输入和 JSON；无额外 TUI 特有的物理默认值，schema 保持不变。
+预览给出 shell 引用后的可复现命令，仅显示，不执行。菜单只覆盖当前 GPW 子集，
+不暗示已实现 Multiwfn 全部任务/方法；CP2K 版本和科学限制与下面的 CLI 相同。
+
 ## 范围与默认值
 
 | 设置 | 支持 / 默认 |
