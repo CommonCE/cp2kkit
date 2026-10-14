@@ -82,6 +82,12 @@ CSV 包含所有两类记录；kind 指示图片实际使用的子集。
 本阶段在 schema 0.1.0 中增加新通道与可选/新增字段，不改变既有结果模型的含义。
 输入生成的 TUI 和普通 CLI 复用相同 manifest；参数草稿只在确认后写出，
 最终 `settings` 记录实际选择，不新增 UI 会话/交互历史字段，也不更改 schema 版本。
+`settings.project`、`max_scf`、`added_mos` 在生成时解析 auto，保存实际值而不是 null：
+项目名来自源文件 basename 去后缀；OT 内层默认 25、diag 默认 128；
+diag+展宽默认空轨道 `max(30, NINT(原子数/2))`，否则 0。
+`settings.max_outer_scf` 是 OT 外层上限（默认 20），diag 不使用。
+CIF 对称展开、GJF 原电荷/多重度、POSCAR selective dynamics 等格式信息存于
+`source_structure.source`，不代表继承为 CP2K 计算设置或约束。
 
 - `target_version` / `settings.cp2k_version`：明确请求的 CP2K 语法目标，默认 2026.2。
   `runtime_version=null` / `runtime_validated=false`：未实际运行，不将目标版本当执行版本。

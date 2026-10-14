@@ -32,10 +32,10 @@ class Field:
 # Every InputSettings field is editable; menu numbering is local, not upstream's.
 GROUPS = (
     ("文件、项目与版本", (
-        Field("path", "结构路径（XYZ/extXYZ/restart；路径含空格时无需引号）"),
-        Field("frame", "XYZ 帧索引（默认 -1；restart 忽略）", "int"),
+        Field("path", "结构路径（XYZ/extXYZ/restart/GJF/CIF/POSCAR；路径含空格时无需引号）"),
+        Field("frame", "XYZ 帧索引（默认 -1；其他格式必须为 -1）", "int"),
         Field("output", "新输入文件路径（同时生成 .json）"),
-        Field("project", "项目名"),
+        Field("project", "项目名（auto 使用结构文件名去后缀）", optional=True),
         Field("cp2k_version", "目标 CP2K 版本（非运行认证）", choices=CP2K_VERSIONS))),
     ("任务与优化", (
         Field("run_type", "任务", choices=RUN_TYPES),
@@ -59,11 +59,12 @@ GROUPS = (
     ("SCF、k 点与占据", (
         Field("scf", "SCF（OT 适用于有隙体系，金属应核对 diag/展宽）", choices=("ot", "diag")),
         Field("eps_scf", "EPS_SCF（auto 为任务默认值）", "float", optional=True, positive=True),
-        Field("max_scf", "最大 SCF 步数", "int", minimum=1),
+        Field("max_scf", "内层/对角化最大 SCF 步数（auto: OT 25 / diag 128）", "int", optional=True, minimum=1),
         Field("kpoints", "MONKHORST-PACK NX NY NZ（非 Gamma 要求 XYZ + diag）", "int3", minimum=1),
         Field("smearing", "Fermi-Dirac 温度 [K]（auto 关闭；要求 diag）",
               "float", optional=True, positive=True),
-        Field("added_mos", "ADDED_MOS（展宽要求 >0）", "int", minimum=0))),
+        Field("added_mos", "ADDED_MOS（auto: 展宽 max(30, NINT(原子数/2))，否则 0）", "int", optional=True, minimum=0),
+        Field("max_outer_scf", "外层 SCF 最大步数（OT 默认开启）", "int", minimum=1))),
     ("积分网格", (
         Field("cutoff", "CUTOFF [Ry]", "float", positive=True),
         Field("rel_cutoff", "REL_CUTOFF [Ry]", "float", positive=True))),
@@ -73,6 +74,39 @@ GROUPS = (
         Field("cube_stride", "STRIDE NX NY NZ（auto 为 1 1 1；需先开启密度）",
               "int3", optional=True, minimum=1))),
 )
+
+
+def visible_fields(fields, values):
+    periodic = values['periodic']
+    if periodic is None and values.get('path') and any(f.name == 'vacuum' for f in fields):
+        try:
+            structure = read_structure(values['path'], values['frame'])
+            if structure.pbc is not None:
+                periodic = ''.join(a for a, flag in zip('XYZ', structure.pbc) if flag) or 'NONE'
+        except (KitError, OSError):
+            pass  # Invalid drafts remain editable; review reports the exact error.
+    return tuple(f for f in fields
+                 if not (f.name == 'pressure' and values['run_type'] != 'CELL_OPT')
+                 and not (f.name == 'vacuum' and periodic != 'NONE')
+                 and not (f.name in {'smearing', 'added_mos'} and values['scf'] == 'ot')
+                 and not (f.name == 'max_outer_scf' and values['scf'] != 'ot'))
+
+
+def field_display(field, values):
+    value = values[field.name]
+    if value is None and field.name == 'project' and values.get('path'):
+        return Path(values['path']).stem + ' (auto)'
+    if value is None and field.name == 'max_scf':
+        return ('25' if values['scf'] == 'ot' else '128') + ' (auto)'
+    if value is None and field.name == 'added_mos':
+        if values['smearing'] is None:
+            return '0 (auto)'
+        try:
+            n = len(read_structure(values['path'], values['frame']).symbols)
+            return f'{max(30, (n+1)//2)} (auto)'
+        except (KitError, OSError):
+            pass
+    return display(value)
 
 
 def display(value):
@@ -180,10 +214,12 @@ class Menu:
                 self.show(f"无效输入: {exc}")
 
     def group(self, title, fields, values):
+        all_fields = fields
         while True:
+            fields = visible_fields(all_fields, values)
             self.show(f"\n--- {title} ---")
             for i, field in enumerate(fields, 1):
-                self.show(f"  {i}. {field.label}: {display(values[field.name])}")
+                self.show(f"  {i}. {field.label}: {field_display(field, values)}")
             raw = self.ask("选择项目编号；0 返回主菜单；q 取消: ")
             if raw == "0":
                 return
@@ -233,7 +269,7 @@ def run_interactive(path, frame, output, settings, stdin=None, stdout=None):
         while True:
             menu.show("\n=== 主菜单：当前设置 ===")
             for i, (title, fields) in enumerate(GROUPS, 1):
-                summary = "; ".join(f"{f.name}={display(values[f.name])}" for f in fields)
+                summary = "; ".join(f"{f.name}={field_display(f, values)}" for f in visible_fields(fields, values))
                 menu.show(f"  {i}. {title}: {summary}")
             raw = menu.ask("9 预览完整输入与命令；0 校验并确认生成；q 取消；或选择组编号: ")
             if raw in ("0", "9"):

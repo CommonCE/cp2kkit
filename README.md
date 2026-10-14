@@ -1,7 +1,7 @@
 # cp2kkit
 
 连接 CP2K 结果读取、可追溯后处理与非破坏性输入生成的 Python 工具。根据
-[`cp2kkit-mvp.md`](cp2kkit-mvp.md) 开发的 **v0.1.1 初步实现**，不是已完成真实版本认证的生产发布。
+[`cp2kkit-mvp.md`](cp2kkit-mvp.md) 开发的 **v0.2.0 初步实现**，不是已完成真实版本认证的生产发布。
 
 - 分析命令保持只读；不提交或运行 CP2K，不改已有输入、restart 或原始输出。
 - 六项 MVP 已有实现入口；另有 `generate-input`、`cube-check`、`cube-diff`；不自动运行计算。
@@ -9,6 +9,13 @@
 - 输出带 schema、单位、文件 SHA-256、行号与原文；缺失值不等同于零。
 - 任何已有目标文件都拒绝覆盖，包括派生 CSV、JSON 和图片。
 - 能量数值可以从失败任务提取，但不自动成为有效结果。
+
+## 当前版本：0.2.0
+
+新增默认应用主菜单与 GJF/CIF/POSCAR 结构读取；默认 PROJECT、SCF、截断与空轨道设置
+已调整。原有批处理子命令保留。升级时请注意：旧版默认值不再沿用；要复现旧输入，
+请显式传入相应参数。完整变化与限制见 [变更记录](CHANGELOG.md)。
+软件版本为 0.2.0，JSON/CSV 数据 schema 仍为 0.1.0；不代表 CP2K 运行认证。
 
 ## 快速开始
 
@@ -33,7 +40,20 @@ cp2kkit --help
 
 以上 `tests/fixtures` **都是合成格式样例，不是科学计算结果**。
 
-## CLI
+## 默认主菜单与 CLI
+
+```bash
+cp2kkit                 # 进入主菜单，可按编号选择当前目录文件或输入路径
+cp2kkit crystal.cif     # 加载结构后进入主菜单
+cp2kkit water.gjf
+cp2kkit POSCAR
+```
+
+主菜单提供加载/更换结构、CP2K 输入生成、extXYZ 导出和输出质量报告。
+输入生成完成或取消后回到应用主菜单；加载失败不会替换已加载结构。
+交互入口要求 TTY；脚本仍使用以下子命令，原有批处理接口保留。
+
+## CLI 子命令
 
 ```bash
 # 目录识别：仅扫描一层；无项目时返回空列表
@@ -102,7 +122,10 @@ cp2kkit generate-input
 支持 ENERGY / ENERGY_FORCE / GEO_OPT / CELL_OPT，PBE/BLYP、MOLOPT-GTH、
 D3/D3(BJ)、电荷/多重度、晶胞/PBC、OT/对角化与 k 点。
 输出输入文件及 `<output>.json`，两者均拒绝覆盖。
-普通 XYZ 必须明确指定周期性；仅从 restart 继承结构而非计算设置。
+结构支持 XYZ/extXYZ、restart、Cartesian GJF/COM、CIF 与 VASP5 POSCAR/CONTCAR。
+默认 PROJECT 为结构文件名去后缀，网格为 400/55 Ry；OT 内/外 SCF 上限为 25/20。
+diag 开启展宽后自动设空轨道 `max(30, NINT(原子数/2))`，可手动覆盖。
+普通 XYZ 必须明确指定周期性；仅从源文件继承结构而非计算设置。
 可用 `--data-dir` 核对基组/赝势名字并记录数据文件哈希。
 **未运行 CP2K 验证；不等于完整移植 Multiwfn。**
 范围、默认参数与限制见 [输入生成文档](docs/input-generation.md)。

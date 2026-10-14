@@ -122,7 +122,7 @@ class InputGenerationTests(unittest.TestCase):
                                                      scf="diag", smearing=300., kpoints=(2, 2, 2)))
         self.assertIn("SCHEME MONKHORST-PACK 2 2 2", text)
         self.assertIn("ELECTRONIC_TEMPERATURE [K] 300", text)
-        self.assertIn("ADDED_MOS 20", text)
+        self.assertIn("ADDED_MOS 30", text)
         self.assertNotIn("&OT", text)
 
     def test_validation(self):

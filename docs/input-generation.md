@@ -1,5 +1,8 @@
 # CP2K 输入生成
 
+本文描述 cp2kkit **0.2.0** 的当前行为；旧版本默认值及迁移提示见
+[变更记录](../CHANGELOG.md)。
+
 `generate-input` 是在原只读 MVP 外新增的显式写入入口，不运行或提交计算。
 这是参考 Multiwfn `outCP2Kinp` 开发的 Python GPW 子集，不是 Fortran 全量移植或严格净室实现。
 来源、官方自定义授权条款及必需的两篇论文引用见
@@ -9,6 +12,18 @@
 相关研究论文仍应按照官方条款在正文中恰当引用。
 
 ## 使用
+
+```bash
+cp2kkit              # 应用主菜单，选择文件后使用生成/导出功能
+cp2kkit solid.cif    # 先加载结构，再进入应用主菜单
+cp2kkit water.gjf
+cp2kkit POSCAR
+```
+
+应用主菜单与下面的输入参数编辑菜单分开；生成或取消后返回应用主菜单。
+未指定 `--project` 时自动使用结构文件 basename 去后缀；POSCAR 默认 PROJECT 为 POSCAR。
+仍要求安全项目名（字母/数字/下划线/点/横杠）；含空格等不支持字符的文件名请手动指定项目名。
+新输入路径可在编辑菜单修改，确认之前不写入文件。
 
 ```bash
 # 普通 XYZ 不带周期信息，必须明确 NONE 或周期方向
@@ -69,7 +84,12 @@ cp2kkit generate-input
 | 0 | 校验、显示有效参数与告警，明确输入 y/yes 后才生成 |
 | q / quit | 取消整个会话，不生成文件 |
 
-- 进入组后选择字段编号；组内 `0` 返回主菜单。字段编辑时回车保留原值。
+- 进入组后选择字段编号；组内 `0` 返回输入编辑主菜单。字段编辑时回车保留原值。
+- 外压仅 CELL_OPT 显示；孤立盒子 padding 仅有效周期性 NONE 显示。
+  OT 隐藏展宽/空轨道，并显示外层 SCF 上限；diag 显示展宽/空轨道，隐藏外层上限。
+  字段编号随可用选项变化；切换算法不会静默清除冲突的显式参数，需手动修正。
+- PROJECT、MAX_SCF、ADDED_MOS 可输入 `auto` 恢复自动值；PROJECT 随结构文件变化，
+  OT 内层默认 25、diag 默认 128。ADDED_MOS 自动值按原子数与是否开启展宽动态计算。
 - 枚举值接受列出的编号或名称；布尔值接受 y/n；三元参数用空格分隔。
 - 可选字段输入 `auto` 恢复默认/取消覆盖。PBC 的 `auto` 是继承源 PBC，**不是 NONE**；
   smearing 的 `auto` 是关闭展宽；cell 的 `auto` 保留源晶胞；cube_stride 的 `auto` 恢复有效默认。
@@ -91,7 +111,7 @@ cp2kkit generate-input
 
 | 设置 | 支持 / 默认 |
 |---|---|
-| 结构 | `.xyz` / `.extxyz` / 文本 `.restart`；继承现有严格读取限制；XYZ 默认末帧 |
+| 结构 | `.xyz` / `.extxyz` / 文本 `.restart` / `.gjf` / `.com` / `.cif` / POSCAR / CONTCAR / `.vasp` / `.poscar`；XYZ 默认末帧 |
 | 任务 | ENERGY（默认）、ENERGY_FORCE、GEO_OPT、CELL_OPT |
 | 方法 | Quickstep / GPW；PBE（默认）、BLYP |
 | 基组 | 默认 DZVP-MOLOPT-SR-GTH；另有 SZV-MOLOPT-SR-GTH、DZVP/TZVP/TZV2P-MOLOPT-GTH |
@@ -100,10 +120,10 @@ cp2kkit generate-input
 | 电荷 / 自旋 | 0 / 1（默认）；显式价电子计数检查奇偶性，multiplicity > 1 时 UKS |
 | SCF | OT + FULL_ALL/DIIS + outer SCF（默认）；或对角化 + Broyden mixing |
 | SCF 阈值 | ENERGY 为 5e-6，其余任务为 1e-6；可覆盖 |
-| SCF 步数 | 内层 / 对角化最大 128，OT outer SCF 最大 20 |
-| 网格 | CUTOFF 350 Ry、REL_CUTOFF 50 Ry；非 SR 基组 NGRIDS 5，SR 为 4 |
+| SCF 步数 | OT 默认开启内外 SCF，上限 25/20；diag 默认 128；`--max-scf` / `--max-outer-scf` 可覆盖 |
+| 网格 | CUTOFF 400 Ry、REL_CUTOFF 55 Ry；非 SR 基组 NGRIDS 5，SR 为 4 |
 | k 点 | 默认 Gamma；非 Gamma 仅支持 XYZ + 对角化 |
-| 展宽 | 可选 Fermi-Dirac 温度（K）；要求对角化和正的 ADDED_MOS |
+| 展宽 / 空轨道 | 可选 Fermi-Dirac 温度（K）；要求 diag；启用展宽且未指定空轨道时 `max(30, NINT(原子数/2))`，否则默认 0；OT 拒绝展宽及非零空轨道 |
 | 优化 | BFGS（默认）、LBFGS、CG；最大 400 步 |
 | CELL_OPT | 要求 XYZ、下三角晶胞，输出解析应力；默认外压 1.01325 bar |
 | 目标版本 | `--cp2k-version` 默认 2026.2；密度输出共同语法配置提供 2024.1/2/3、2025.1/2、2026.1/2，不是运行认证 |
@@ -122,6 +142,22 @@ Hf Ta W Re Os Ir Pt Au Hg Tl Pb Bi Po At Rn
 BLYP 不提供 Nb Tc Cd Sn Hf Ta Re Os Ir Pt Hg Tl Po At Rn 的预设，缺项直接拒绝。
 这不是任意元素或任意赝势的自动推断；实际安装库必须含匹配名字。
 
+## 新结构格式的读取范围
+
+新增读取器仅使用标准库；不运行 Gaussian/VASP/Multiwfn，来源保留原文件哈希。
+
+- **GJF/COM**：单个 Gaussian 作业、显式 Cartesian 坐标，支持元素或原子序数、
+  angstrom/bohr 与三个 TV 周期矢量。无 TV 时明确 NONE。
+  电荷/多重度仅在来源中记录，不继承。Z-matrix、冻结标记/复杂原子标签、Link1、checkpoint 几何拒绝。
+- **POSCAR/CONTCAR**：要求 VASP5 元素行；支持 Direct/Cartesian、单比例（含负体积）、
+  三方向比例与 selective dynamics。约束标记保留在来源，但不自动转成 CP2K 约束，生成时告警。
+  VASP4 缺元素名、速度/预测器等尾部数据拒绝。
+- **CIF**：单 data block、晶胞参数与分数坐标、显式对称操作展开与周期边界去重；
+  支持常见 `x/y/z` 加减及有理数平移、数值不确定度与分号文本元数据。
+  无对称操作时仅接受明确 P1；其他空间群不能只读非对称单元后静默遗漏原子。
+  部分占据、无序、重叠不同元素、缺失坐标及不支持的对称表达式拒绝；
+  不由空间群编号自动查询对称操作，也不支持 Cartesian-only CIF。
+
 ## 周期性、晶胞与科学限制
 
 - 不把普通 XYZ 默认为孤立分子。未知周期性必须提供 `--periodic`。
@@ -132,6 +168,10 @@ BLYP 不提供 Nb Tc Cd Sn Hf Ta Re Os Ir Pt Hg Tl Po At Rn 的预设，缺项�
 - CELL 与 POISSON 周期方向一致。XYZ 用 PERIODIC，NONE 用 WAVELET，
   1D/2D 用 ANALYTIC。后者收敛可能慢，需检查真空与静电误差。
 - 本版 OT 不带金属所需的高级旋转/占据配置。金属应选择 diag、适当 k 点、展宽及空轨道数。
+  UKS 显式写入两个相同的 ADDED_MOS 值，分别用于 alpha/beta；关键词类型已核对
+  [CP2K 2026.2 SCF 文档](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/SCF.html)。
+  自动空轨道公式参考 Multiwfn 开启展宽分支（源码注释通常用于 300 K），不是按电子数/基组
+  精确计算出的充分性保证；高温、金属或特殊轨道分析需自行检查并覆盖。正半整数取整与 Fortran NINT 一致。
 - 电荷/多重度检查仅保证显式电子数的一致性，不保证正确磁态。
   不支持反铁磁、破缺对称单重态或逐 KIND MAGNETIZATION。
 - restart **只提供结构**；原 KIND 标签按元素合并，原方法、U、约束、磁矩、

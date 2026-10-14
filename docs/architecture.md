@@ -1,4 +1,4 @@
-# cp2kkit v0.1 架构
+# cp2kkit v0.2 架构
 
 ## 设计原则
 
@@ -23,6 +23,8 @@ cli.py
  ├─ export.py ───── models.py / quality.py（CSV）
  ├─ structure.py ── models.py / io.py（独立结构通道）
  ├─ plot.py ─────── export.py / quality.py / 可选 matplotlib
+ ├─ main_tui.py ─── input_tui.py / structure.py（默认应用主菜单、加载文件与功能调度）
+ ├─ structure_formats.py（GJF/CIF/POSCAR 严格读取；structure.py 延迟调度）
  ├─ input_tui.py ── inputgen.py / structure.py（TTY 数字菜单；CLI 参数作为初值）
  ├─ inputgen.py ─── structure.py / models.py / io.py（纯生成 + 独占写入）
  └─ cube.py ─────── models.py / io.py / structure.py（单位常数；流式标量检查/相减）
@@ -60,7 +62,7 @@ GEO_OPT / CELL_OPT 还必须有几何成功证据。
 ## 结构通道
 
 ```text
-XYZ/extXYZ/restart → Structure（angstrom + cell + PBC + source）
+XYZ/extXYZ/restart/GJF/CIF/POSCAR → Structure（angstrom + cell + PBC + source）
                          ├→ extXYZ（优先，保留晶胞）
                          └→ 普通 XYZ（有晶胞时要求显式许可）
 两种导出均生成完整结构 JSON sidecar
@@ -72,7 +74,7 @@ XYZ/extXYZ/restart → Structure（angstrom + cell + PBC + source）
 ## 输入生成通道
 
 ```text
-XYZ/extXYZ/restart → Structure + InputSettings → 校验 → CP2K 文本 + manifest
+XYZ/extXYZ/restart/GJF/CIF/POSCAR → Structure + InputSettings → 校验 → CP2K 文本 + manifest
                                                       → 新 .inp / .inp.json
 ```
 
@@ -81,7 +83,9 @@ XYZ/extXYZ/restart → Structure + InputSettings → 校验 → CP2K 文本 + ma
 不执行外部计算，不依赖 Multiwfn 程序或相邻源码路径。
 `generate-input --tui/--interactive` 使用标准库数字菜单维护参数草稿；局部类型/范围检查后，
 统一调用原生成器做跨字段与科学校验。预览不写文件，最终确认才调用原独占 writer。
-完整 CLI 调用不进入交互；无结构/输出且 stdin 为 TTY 的入口可自动进入菜单。
+完整子命令 CLI 调用不进入交互；无结构/输出且 stdin 为 TTY 的生成入口可自动进入编辑菜单。
+`cp2kkit` / `cp2kkit STRUCTURE` 则进入应用主菜单，加载文件后可选择生成或导出等功能。
+动态过滤菜单字段，但不静默修改冲突的物理参数。
 
 ## cube 通道
 

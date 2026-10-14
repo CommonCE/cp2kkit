@@ -13,7 +13,7 @@ import hashlib
 import math
 import re
 from contextlib import ExitStack
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from . import __version__
@@ -58,7 +58,7 @@ PERIODICITIES = ("NONE", "X", "Y", "Z", "XY", "XZ", "YZ", "XYZ")
 
 @dataclass(frozen=True)
 class InputSettings:
-    project: str = "cp2kkit"
+    project: str | None = None
     run_type: str = "ENERGY"
     functional: str = "PBE"
     basis: str = "DZVP-MOLOPT-SR-GTH"
@@ -69,13 +69,14 @@ class InputSettings:
     cell: tuple[float, float, float] | None = None  # orthorhombic, angstrom
     vacuum: float = 5.0  # each side, angstrom; only for isolated cell construction
     scf: str = "ot"
-    cutoff: float = 350.0  # Ry
-    rel_cutoff: float = 50.0  # Ry
+    cutoff: float = 400.0  # Ry
+    rel_cutoff: float = 55.0  # Ry
     eps_scf: float | None = None
-    max_scf: int = 128
+    max_scf: int | None = None  # auto: OT inner 25, diagonalization 128
+    max_outer_scf: int = 20
     kpoints: tuple[int, int, int] = (1, 1, 1)
     smearing: float | None = None  # kelvin
-    added_mos: int = 20
+    added_mos: int | None = None  # auto: smearing max(30, NINT(natoms/2)), otherwise 0
     optimizer: str = "BFGS"
     max_iter: int = 400
     pressure: float = 1.01325  # bar
@@ -98,10 +99,19 @@ def data_header_exists(text, element, name):
 
 def generate_input(structure: Structure, settings: InputSettings):
     """Return (complete input text, deterministic provenance/settings manifest)."""
-    s = settings
+    project = settings.project
+    if project is None:
+        if not structure.source.get('path'):
+            raise KitError("Automatic project name requires a source path; specify project explicitly")
+        project = Path(structure.source['path']).stem
+    s = replace(settings,
+                project=project,
+                max_scf=settings.max_scf if settings.max_scf is not None else (25 if settings.scf == 'ot' else 128),
+                added_mos=settings.added_mos if settings.added_mos is not None else
+                (max(30, (len(structure.symbols)+1)//2) if settings.scf == 'diag' and settings.smearing is not None else 0))
     if s.cp2k_version not in CP2K_VERSIONS:
         raise KitError("CP2K target version must be one of the checked 2024.1–2026.2 profiles")
-    if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*", s.project):
+    if not isinstance(s.project, str) or not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*", s.project):
         raise KitError("Project must be a safe name (letters, digits, _, ., -); no paths or directives")
     for value, choices, name in ((s.run_type, RUN_TYPES, "run type"), (s.functional, FUNCTIONALS, "functional"),
                                  (s.basis, BASES, "basis"), (s.dispersion, ("none", "d3", "d3bj"), "dispersion"),
@@ -109,7 +119,8 @@ def generate_input(structure: Structure, settings: InputSettings):
         if value not in choices:
             raise KitError(f"Unsupported {name}: {value}")
     for value, name, minimum in ((s.charge, "charge", None), (s.multiplicity, "multiplicity", 1),
-                                 (s.max_scf, "max_scf", 1), (s.max_iter, "max_iter", 1),
+                                 (s.max_scf, "max_scf", 1), (s.max_outer_scf, "max_outer_scf", 1),
+                                 (s.max_iter, "max_iter", 1),
                                  (s.added_mos, "added_mos", 0)):
         if type(value) is not int or (minimum is not None and value < minimum):
             raise KitError(f"Invalid integer {name}: {value}")
@@ -158,6 +169,8 @@ def generate_input(structure: Structure, settings: InputSettings):
         raise KitError("CELL_OPT currently requires full XYZ periodicity")
     if s.kpoints != (1, 1, 1) and (periodic != "XYZ" or s.scf != "diag"):
         raise KitError("Non-Gamma kpoints require XYZ periodicity and diagonalization (--scf diag)")
+    if s.scf == "ot" and s.added_mos != 0:
+        raise KitError("OT does not support added_mos; use diagonalization or --added-mos 0")
     if s.smearing is not None:
         positive(s.smearing, "smearing temperature")
         if s.scf != "diag" or s.added_mos < 1:
@@ -194,6 +207,10 @@ def generate_input(structure: Structure, settings: InputSettings):
         warnings.append("Low-dimensional ANALYTIC Poisson solver converges slowly; check vacuum and electrostatic convergence.")
     if s.scf == "ot":
         warnings.append("OT without smearing is intended for gapped systems, not metals.")
+    if s.scf == 'diag' and s.smearing is not None and settings.added_mos is None:
+        warnings.append("Automatic ADDED_MOS = max(30, NINT(atom_count/2)) follows Multiwfn's smearing heuristic (usually for 300 K); verify enough unoccupied states for this system/temperature.")
+    if structure.source.get('selective_dynamics') and any('F' in flags for flags in structure.source['selective_dynamics']):
+        warnings.append("POSCAR selective-dynamics constraints are recorded in source metadata but NOT inherited in this new CP2K input.")
     if density_enabled:
         warnings.append("GPW/GTH cube contains pseudopotential valence electron density, not all-electron/core density; stride and grid need convergence checks.")
         if s.multiplicity > 1:
@@ -235,9 +252,10 @@ def generate_input(structure: Structure, settings: InputSettings):
               "    &SCF", "      SCF_GUESS ATOMIC", f"      EPS_SCF {num(eps)}", f"      MAX_SCF {s.max_scf}"]
     if s.scf == "ot":
         lines += ["      &OT", "        PRECONDITIONER FULL_ALL", "        MINIMIZER DIIS", "      &END OT",
-                  "      &OUTER_SCF", f"        EPS_SCF {num(eps)}", "        MAX_SCF 20", "      &END OUTER_SCF"]
+                  "      &OUTER_SCF", f"        EPS_SCF {num(eps)}", f"        MAX_SCF {s.max_outer_scf}", "      &END OUTER_SCF"]
     else:
-        lines += [f"      ADDED_MOS {s.added_mos}", "      &DIAGONALIZATION", "        ALGORITHM STANDARD", "      &END DIAGONALIZATION",
+        added_mos = ' '.join([str(s.added_mos)] * (2 if s.multiplicity > 1 else 1))
+        lines += [f"      ADDED_MOS {added_mos}", "      &DIAGONALIZATION", "        ALGORITHM STANDARD", "      &END DIAGONALIZATION",
                   "      &MIXING", "        METHOD BROYDEN_MIXING", "        ALPHA 0.4", "        NBROYDEN 8", "      &END MIXING"]
         if s.smearing is not None:
             lines += ["      &SMEAR", "        METHOD FERMI_DIRAC", f"        ELECTRONIC_TEMPERATURE [K] {num(s.smearing)}", "      &END SMEAR"]

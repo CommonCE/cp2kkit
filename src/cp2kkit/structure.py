@@ -10,11 +10,12 @@ from .io import read_text
 from .models import SCHEMA_VERSION
 
 BOHR_TO_ANGSTROM = 0.529177210903
-ELEMENTS = set(("H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn "
+ELEMENT_ORDER = ("H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn "
                 "Ga Ge As Se Br Kr Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd In Sn Sb Te I Xe Cs Ba La Ce "
                 "Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu Hf Ta W Re Os Ir Pt Au Hg Tl Pb Bi Po At "
                 "Rn Fr Ra Ac Th Pa U Np Pu Am Cm Bk Cf Es Fm Md No Lr Rf Db Sg Bh Hs Mt Ds Rg Cn "
-                "Nh Fl Mc Lv Ts Og").split())
+                "Nh Fl Mc Lv Ts Og").split()
+ELEMENTS = set(ELEMENT_ORDER)
 
 
 @dataclass
@@ -249,11 +250,15 @@ def read_structure(path, frame=-1):
     suffix = Path(path).suffix.lower()
     if suffix in {".xyz", ".extxyz"}:
         return read_xyz(path, frame)
-    if suffix == ".restart":
+    from .structure_formats import read_cif, read_gjf, read_poscar
+    readers = {".restart": read_restart, ".gjf": read_gjf, ".com": read_gjf,
+               ".cif": read_cif, ".vasp": read_poscar}
+    reader = read_poscar if Path(path).name.upper() in {"POSCAR", "CONTCAR"} or suffix == ".poscar" else readers.get(suffix)
+    if reader:
         if frame != -1:
             raise ParseError("--frame applies only to XYZ trajectories")
-        return read_restart(path)
-    raise ParseError("Supported structure extensions: .xyz, .extxyz, .restart")
+        return reader(path)
+    raise ParseError("Supported structures: .xyz, .extxyz, .restart, .gjf, .com, .cif, POSCAR/CONTCAR, .vasp, .poscar")
 
 
 def xyz_text(structure, extended=True):

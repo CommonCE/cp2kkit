@@ -21,7 +21,7 @@ from .structure import read_structure, xyz_text
 
 
 def build_parser():
-    parser = argparse.ArgumentParser(prog="cp2kkit", description="CP2K analysis and non-destructive input generation with provenance")
+    parser = argparse.ArgumentParser(prog="cp2kkit", description="CP2K toolkit: cp2kkit [STRUCTURE] opens the terminal main menu; subcommands support batch use")
     parser.add_argument("--version", action="version", version=f"cp2kkit {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
     scan = sub.add_parser("discover", help="List projects in one directory (no recursion)")
@@ -40,18 +40,18 @@ def build_parser():
             cmd.add_argument("--strict", action="store_true", help="Exit 7 if quality is not passed")
         else:
             cmd.add_argument("--kind", choices=["energy", "scf"], default="energy")
-    structure = sub.add_parser("export-structure", help="Read XYZ/restart; export with a provenance sidecar")
+    structure = sub.add_parser("export-structure", help="Read XYZ/restart/GJF/CIF/POSCAR; export with a provenance sidecar")
     structure.add_argument("path")
     structure.add_argument("-o", "--output", required=True)
     structure.add_argument("--format", choices=["extxyz", "xyz"], default="extxyz")
     structure.add_argument("--frame", type=int, default=-1, help="XYZ frame index, default last; negative indices allowed")
     structure.add_argument("--allow-cell-loss", action="store_true", help="Explicitly allow plain XYZ to omit a known cell")
     gen = sub.add_parser("generate-input", help="Generate a conservative GPW CP2K input and provenance JSON")
-    gen.add_argument("path", nargs="?", help="XYZ, extXYZ or text restart structure; prompted in TUI mode")
+    gen.add_argument("path", nargs="?", help="XYZ/extXYZ/restart/GJF/CIF/POSCAR structure; prompted in TUI mode")
     gen.add_argument("-o", "--output", help="New input path; required unless using TUI")
     gen.add_argument("--interactive", "--tui", action="store_true", help="Edit CLI-seeded settings in a Multiwfn-style numbered terminal menu")
     gen.add_argument("--frame", type=int, default=-1)
-    gen.add_argument("--project", default="cp2kkit")
+    gen.add_argument("--project", help="Default: structure filename without its suffix")
     gen.add_argument("--run-type", type=str.upper, choices=RUN_TYPES, default="ENERGY")
     gen.add_argument("--functional", type=str.upper, choices=FUNCTIONALS, default="PBE")
     gen.add_argument("--basis", choices=BASES, default="DZVP-MOLOPT-SR-GTH")
@@ -63,13 +63,14 @@ def build_parser():
     gen.add_argument("--cell", type=float, nargs=3, metavar=("A", "B", "C"), help="Override orthorhombic lengths (angstrom)")
     gen.add_argument("--vacuum", type=float, default=5.0, help="Padding on each side for an automatically built isolated box (angstrom)")
     gen.add_argument("--scf", choices=["ot", "diag"], default="ot")
-    gen.add_argument("--cutoff", type=float, default=350.0, help="Ry")
-    gen.add_argument("--rel-cutoff", type=float, default=50.0, help="Ry")
+    gen.add_argument("--cutoff", type=float, default=400.0, help="Ry")
+    gen.add_argument("--rel-cutoff", type=float, default=55.0, help="Ry")
     gen.add_argument("--eps-scf", type=float)
-    gen.add_argument("--max-scf", type=int, default=128)
+    gen.add_argument("--max-scf", type=int, help="Default: OT inner 25; diagonalization 128")
+    gen.add_argument("--max-outer-scf", type=int, default=20, help="OT outer SCF limit")
     gen.add_argument("--kpoints", type=int, nargs=3, default=(1, 1, 1), metavar=("NX", "NY", "NZ"))
     gen.add_argument("--smearing", type=float, help="Fermi-Dirac electronic temperature (K); requires diag")
-    gen.add_argument("--added-mos", type=int, default=20)
+    gen.add_argument("--added-mos", type=int, help="Auto: max(30, NINT(atom_count/2)) with diag+smearing, otherwise 0")
     gen.add_argument("--optimizer", type=str.upper, choices=["BFGS", "LBFGS", "CG"], default="BFGS")
     gen.add_argument("--max-iter", type=int, default=400)
     gen.add_argument("--pressure", type=float, default=1.01325, help="CELL_OPT external pressure (bar)")
@@ -182,6 +183,18 @@ def execute(args):
 
 def main(argv=None):
     parser = build_parser()
+    argv = list(sys.argv[1:] if argv is None else argv)
+    commands = {"discover", "parse", "report", "plot", "export-structure", "generate-input", "cube-check", "cube-diff"}
+    if not argv or (len(argv) == 1 and argv[0] not in commands and not argv[0].startswith("-")):
+        try:
+            from .main_tui import run_main_menu
+            return run_main_menu(argv[0] if argv else None)
+        except KitError as exc:
+            print(f"cp2kkit: {exc}", file=sys.stderr)
+            return exc.code
+        except OSError as exc:
+            print(f"cp2kkit: filesystem error: {exc}", file=sys.stderr)
+            return 2
     args = parser.parse_args(argv)
     if args.command == "generate-input":
         if args.path is None and args.output is None and sys.stdin.isatty():
