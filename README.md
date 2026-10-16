@@ -2,7 +2,7 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.2.5 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.2.6 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 - Analysis remains read-only: no submission/execution or modification of existing
@@ -15,14 +15,18 @@ release certified with actual CP2K runs.
 - All existing targets, including derived CSV/JSON/images, are protected from overwrite.
 - Energies can be extracted from failed jobs without becoming valid scientific results.
 
-## Current version: 0.2.5
+## Current version: 0.2.6
 
-This round fixes ENERGY token boundaries (trailing whitespace/annotations no longer
-hide valid energies), unifies structure-format recognition, tests CLI/menu routing,
-and shares protected structure export directly between CLI and menus. Existing
-scrolling menus, optional Rich/plain rendering, scientific defaults, batch formats/
-exit codes, and schema 0.1.0 are retained. Use `cp2kkit --plain -- -water.xyz` for
-an option-looking structure path; bare single unknown words still mean paths.
+This round adds PBEsol, revPBE and Libxc RPBE profiles, TZVP/TZV2P short-range and
+TZV2PX MOLOPT families, and explicit element-specific mixed bases. Header catalogs
+pin CP2K v2026.2 source hashes and select actual basis files/potential q values.
+Unmatched-functional GTH-PBE approximations require explicit user approval; RPBE
+requires an explicit assertion that the target CP2K build has Libxc. New profiles
+require target 2026.2, not runtime certification. Default PBE/DZVP-MOLOPT-SR-GTH,
+physical settings, scrolling menus, batch exit codes and schema 0.1.0 are retained;
+JSON receives additive method/catalog metadata. See the examples below.
+Use `cp2kkit --plain -- -water.xyz` for an option-looking structure path; bare single
+unknown words still mean paths.
 See [the changelog](CHANGELOG.md), [architecture](docs/architecture.md), and
 [remaining review work](docs/roadmap.md#review-follow-up-backlog).
 A version number is not CP2K runtime certification.
@@ -185,10 +189,10 @@ Slots **124 / 125** now configure **DFT+U / magnetic initialization**, respectiv
 Cell overrides and data directories remain available through `--cell` / `--data-dir`.
 Complete CLI calls remain noninteractive, and machine-readable JSON/CSV is never
 rendered through Rich. Add `--plain` for unstyled interaction.
-Neither curses nor Multiwfn is a runtime dependency. Version 0.2.5 retains this menu layout.
+Neither curses nor Multiwfn is a runtime dependency. Version 0.2.6 retains this menu layout.
 See [input generation](docs/input-generation.md).
 
-Supported: ENERGY/ENERGY_FORCE/GEO_OPT/CELL_OPT, PBE/BLYP, MOLOPT-GTH,
+Supported: ENERGY/ENERGY_FORCE/GEO_OPT/CELL_OPT, PBE/BLYP/PBEsol/revPBE/RPBE, MOLOPT-GTH,
 D3/D3(BJ), charge/multiplicity, cell/PBC, OT/diagonalization, and k-points.
 For target CP2K **2026.2**, explicit Hubbard Ueff/L and collinear magnetic initial
 states are also supported, including same-element opposite-spin KIND splitting.
@@ -240,6 +244,34 @@ Cube/JSON outputs are staged then published exclusively; existing targets are re
 **Positive/negative difference integrals are not fragment net charge transfer.
 Matching grids do not establish matching reference states.**
 See [the cube guide](docs/cube.md) for formats, units, physics, AB/A/B examples, and validation.
+
+## Additional GGA and basis profiles (0.2.6)
+
+New CLI/menu controls: `128` / `--basis-overrides`, `129` / `--allow-pbe-potential`,
+`130` / `--libxc-available`. Approval is shown for new GGA profiles; the Libxc
+assertion is shown for RPBE. Hidden values are retained, not silently reset.
+
+```bash
+# Syntax examples only: inputs, spin, U, dispersion and convergence need system-specific checks.
+cp2kkit generate-input solid.extxyz -o solid-pbesol.inp --functional PBEsol \
+  --allow-pbe-potential --dispersion d3bj
+cp2kkit generate-input surface.extxyz -o surface-rpbe.inp --functional RPBE \
+  --allow-pbe-potential --libxc-available
+# UCL triple-zeta SR families do NOT contain H/C/N/O at current q presets.
+# Choose mixed bases explicitly rather than silently substituting a different family.
+cp2kkit generate-input FeO.extxyz -o FeO-mixed.inp --basis TZV2P-MOLOPT-GTH \
+  --basis-overrides 'Fe=TZV2P-MOLOPT-SR-GTH'
+```
+
+TZVP-SR/TZV2P-SR each cover 54 current preset elements; non-SR DZVP covers 11,
+TZVP/TZV2P/TZV2PX cover 10. These are basis/PBE q matches, not unrestricted functional
+or convergence guarantees. Actual basis libraries may include additional elements/
+q values that cp2kkit intentionally does not enable. The existing default valence
+policy is unchanged. No automatic q changes or SR/non-SR fallbacks are performed.
+`--data-dir` checks each selected file/header read-only and records hashes; without it,
+file availability is unverified. The Libxc flag is a user assertion, not build detection.
+PBEsol/revPBE/RPBE D3 and D3(BJ) reference names were checked in tagged CP2K sources;
+no PBE dispersion parameters are substituted. See [the full guide](docs/input-generation.md#functional-and-basis-profiles-026).
 
 ## Implemented scope and limitations
 

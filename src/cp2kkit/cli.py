@@ -17,6 +17,7 @@ from .plot import plot_run
 from .quality import quality_report
 from .structure import read_structure
 from .spin_settings import parse_dft_plus_u, parse_magnetism
+from .method_profiles import parse_basis_overrides
 
 
 def build_parser():
@@ -56,6 +57,12 @@ def build_parser():
     gen.add_argument("--run-type", type=str.upper, choices=RUN_TYPES, default="ENERGY")
     gen.add_argument("--functional", type=str.upper, choices=FUNCTIONALS, default="PBE")
     gen.add_argument("--basis", choices=BASES, default="DZVP-MOLOPT-SR-GTH")
+    gen.add_argument('--basis-overrides', type=parse_basis_overrides, default=(),
+                     help='Target 2026.2: Element=basis entries separated by semicolons; explicit mixed basis, off clears')
+    gen.add_argument('--allow-pbe-potential', action='store_true',
+                     help='Explicitly approve GTH-PBE approximation where the requested GGA has no matched potential')
+    gen.add_argument('--libxc-available', action='store_true',
+                     help='User assertion that target CP2K was built with Libxc, required for RPBE; not detected')
     gen.add_argument("--dispersion", choices=["none", "d3", "d3bj"], default="none")
     gen.add_argument("--charge", type=int, default=0)
     gen.add_argument("--multiplicity", type=int, default=1)

@@ -8,6 +8,44 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.2.6
+
+### Explicit GGA and basis profiles
+
+- Add native PBEsol/revPBE parametrized PBE and Libxc RPBE (GGA_X_RPBE + GGA_C_PBE).
+  RPBE requires an explicit user assertion of target-build Libxc support; the tool
+  does not install/probe Libxc or execute CP2K. New profiles require target 2026.2.
+- Add TZVP-MOLOPT-SR-GTH, TZV2P-MOLOPT-SR-GTH and TZV2PX-MOLOPT-GTH. Header-only
+  catalogs pin tagged v2026.2 URLs/hashes and actual element/q/file availability.
+  Expand non-SR DZVP to Cu/Br and TZVP/TZV2P/TZV2PX to Br using UCL entries.
+  The SR triple-zeta families cover 54 current preset elements, not H/C/N/O.
+  Existing 71-element valence presets stay fixed; Mg-q2 does not replace Mg-q10.
+- Add explicit --basis-overrides / menu 128 for element-specific mixed bases.
+  Apply overrides to all split magnetic KINDs while preserving atom order, +U,
+  charge and multiplicity. No implicit family/q fallback. Emit and independently
+  check/hash each required basis library. NGRIDS follows actual KIND bases.
+- Prefer checked matched-functional potentials, including B GTH-PBESOL-q3.
+  Missing matches require --allow-pbe-potential / menu 129; record each approved
+  PBE approximation explicitly. Never fabricate GTH names from new functional labels.
+  --libxc-available / menu 130 is an assertion, not verified build compatibility.
+- Whitelist none/D3/D3(BJ) per profile after checking the actual PBESOL/REVPBE/RPBE
+  reference branches in tagged CP2K sources. Do not substitute PBE damping parameters.
+- Retain default PBE/DZVP-SR, 400/55 Ry grids, charge/spin/SCF and protected writers.
+  Schema remains 0.1.0 with additive settings, KIND file/potential metadata and
+  method_profile source/build/approximation records. Existing single-library
+  data_sources keys remain; extra basis sources use basis:<filename>.
+- Reinspect Multiwfn outCP2Kinp XC/q-suffix/dispersion branches; record actual
+  references/differences and unchanged custom authorization status. Read user
+  modc.py only as a UZH migration reference; do not run/copy it or enable an unverified
+  rename-based conversion. UZH protocol support remains planned separately.
+- Explicit requested version 0.2.6. No Python dependencies added, calculation,
+  package release or runtime/scientific certification implied.
+- Validation: 216 tests passed, none skipped, including 23 new method/profile test
+  methods, current-q family coverage, approvals/build assertions, multi-file headers/
+  hashes, wrong-library/q rejection, combined RPBE/+U/AFM/mixed bases, CLI replay,
+  menu edit/clear/retained hidden flags and collision protection. Compileall, diff,
+  version and local-documentation checks passed.
+
 ## 0.2.5
 
 ### Parser correctness and shared interface operations

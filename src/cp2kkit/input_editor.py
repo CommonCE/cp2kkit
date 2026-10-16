@@ -20,7 +20,8 @@ FIELD_IDS = (
     (101, 'charge'), (102, 'multiplicity'), (105, 'cutoff'), (106, 'rel_cutoff'),
     (107, 'vacuum'), (112, 'added_mos'), (120, 'eps_scf'), (121, 'max_scf'),
     (122, 'max_outer_scf'), (123, 'max_iter'), (124, 'dft_plus_u'), (125, 'magnetism'),
-    (126, 'spin_density'), (127, 'cube_stride'),
+    (126, 'spin_density'), (127, 'cube_stride'), (128, 'basis_overrides'),
+    (129, 'allow_pbe_potential'), (130, 'libxc_available'),
 )
 NUMBERED_FIELDS = tuple((number, FIELDS[name]) for number, name in FIELD_IDS)
 LABELS = {
@@ -34,6 +35,8 @@ LABELS = {
     'max_outer_scf': 'Maximum outer SCF steps', 'max_iter': 'Maximum optimization steps',
     'dft_plus_u': 'DFT+U [eV]', 'magnetism': 'Magnetic initialization',
     'spin_density': 'Spin density', 'cube_stride': 'Cube stride NX NY NZ',
+    'basis_overrides': 'Element basis overrides', 'allow_pbe_potential': 'Allow GTH-PBE approximation',
+    'libxc_available': 'Target CP2K has Libxc (user assertion)',
 }
 
 

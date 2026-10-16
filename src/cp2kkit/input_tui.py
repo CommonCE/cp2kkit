@@ -17,6 +17,7 @@ from .inputgen import (BASES, CP2K_VERSIONS, FUNCTIONALS, PERIODICITIES, RUN_TYP
                        InputSettings, generate_input)
 from .structure import read_structure
 from .presentation import Presenter
+from .method_profiles import parse_basis_overrides, format_basis_overrides
 from .spin_settings import (parse_dft_plus_u, parse_magnetism,
                             format_dft_plus_u, format_magnetism)
 
@@ -48,9 +49,12 @@ GROUPS = (
         Field("pressure", "CELL_OPT external pressure [bar]", "float"))),
     ("Method, basis and dispersion", (
         Field("functional", "Functional (GPW/GTH)", choices=FUNCTIONALS),
-        Field("basis", "Basis set (potential matched to functional/element preset)", choices=BASES),
+        Field("basis", "Basis family (availability and fixed q checked per element; no implicit fallback)", choices=BASES),
         Field("dispersion", "Dispersion", choices=("none", "d3", "d3bj")),
-        Field("data_dir", "CP2K data directory (verify names and hashes)", optional=True))),
+        Field("data_dir", "CP2K data directory (verify names and hashes)", optional=True),
+        Field('basis_overrides', 'Element basis overrides: Element=basis; separate entries with semicolons; off clears. No implicit SR/non-SR fallback.', 'basis_map'),
+        Field('allow_pbe_potential', 'Explicitly approve GTH-PBE potentials when matched-functional entries are absent; this is an approximation', 'bool'),
+        Field('libxc_available', 'Assert target CP2K was built with Libxc (required for RPBE; not detected by this tool)', 'bool'))),
     ("Charge and spin", (
         Field("charge", "Total charge [e] (not inherited from restart)", "int"),
         Field("multiplicity", "Spin multiplicity (>1 enables UKS; magnetic state not inherited)", "int", minimum=1))),
@@ -96,11 +100,15 @@ def visible_fields(fields, values):
                  if not (f.name == 'pressure' and values['run_type'] != 'CELL_OPT')
                  and not (f.name == 'vacuum' and periodic != 'NONE')
                  and not (f.name in {'smearing', 'added_mos'} and values['scf'] == 'ot')
-                 and not (f.name == 'max_outer_scf' and values['scf'] != 'ot'))
+                 and not (f.name == 'max_outer_scf' and values['scf'] != 'ot')
+                 and not (f.name == 'allow_pbe_potential' and values.get('functional') not in {'PBESOL', 'REVPBE', 'RPBE'})
+                 and not (f.name == 'libxc_available' and values.get('functional') != 'RPBE'))
 
 
 def field_display(field, values):
     value = values[field.name]
+    if field.kind == 'basis_map':
+        return format_basis_overrides(value)
     if field.kind == 'hubbard':
         return format_dft_plus_u(value)
     if field.kind == 'magnetic':
@@ -139,6 +147,8 @@ def display(value):
 
 def parse_value(field, raw):
     """Local lexical/range validation only; cross-field chemistry stays in inputgen."""
+    if field.kind == 'basis_map':
+        return parse_basis_overrides(raw)
     if field.kind == 'hubbard':
         return parse_dft_plus_u(raw)
     if field.kind == 'magnetic':
@@ -188,7 +198,10 @@ def command_arguments(path, frame, output, settings):
             f"--frame={frame}", f"--output={output}"]
     for name, value in asdict(settings).items():
         flag = "--" + name.replace("_", "-")
-        if name == 'dft_plus_u':
+        if name == 'basis_overrides':
+            if value:
+                args.append(flag+'='+format_basis_overrides(value))
+        elif name == 'dft_plus_u':
             if value:
                 args.append(flag+'='+format_dft_plus_u(value))
         elif name == 'magnetism':
@@ -242,7 +255,8 @@ class Menu:
         for i, choice in enumerate(field.choices, 1):
             self.show(f"  {i}. {choice}")
         extra = "; auto restores automatic/disabled optional values" if field.optional else ""
-        current_text = (format_dft_plus_u(current) if field.kind == 'hubbard' else
+        current_text = (format_basis_overrides(current) if field.kind == 'basis_map' else
+                        format_dft_plus_u(current) if field.kind == 'hubbard' else
                         format_magnetism(current) if field.kind == 'magnetic' else display(current))
         while True:
             raw = self.ask(f"Current [{current_text}]; Enter keeps{extra}; back returns; cancel cancels; q exits: ")
@@ -301,11 +315,16 @@ class Menu:
             self.show(f"External pressure: {settings.pressure} bar")
         self.show(f"Atoms: {len(structure.symbols)}; Explicit valence electrons: {manifest['valence_electron_count']}")
         self.show(f"Target version: {settings.cp2k_version}; Run type: {settings.run_type}; Method: GPW/{settings.functional}")
+        self.show(f"XC backend: {manifest['method_profile']['xc_backend']}; target build verified: False")
+        self.show(f"Basis files: {', '.join(manifest['method_profile']['basis_files'])}")
+        if settings.basis_overrides:
+            self.show(f"Element basis overrides: {format_basis_overrides(settings.basis_overrides)}")
         self.show(f"SCF: {settings.scf}; Effective EPS_SCF: {manifest['effective_eps_scf']}; Poisson: {manifest['poisson_solver']}")
         self.show(f"Generated cell [angstrom]: {manifest['generated_structure']['cell']}")
         self.show(f"Coordinates translated: {manifest['coordinates_translated']}")
         for element, kind in manifest['kinds'].items():
             self.show(f"{element}: basis={kind['basis']}; pseudopotential={kind['potential']}")
+            self.show(f"  Basis file: {kind['basis_file']}; potential approximation: {kind['potential_approximation']}")
             if kind.get('initial_magnetization') is not None:
                 self.show(f"  Initial MAGNETIZATION: {kind['initial_magnetization']}; element: {kind['element']}")
         self.show(f"Effective density output: electron={manifest['density_output']['electron_density']}, "

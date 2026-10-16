@@ -158,6 +158,11 @@ class InputGenerationTests(unittest.TestCase):
     def test_functionals_basis_dispersion(self):
         for functional in ("PBE", "BLYP"):
             for basis in BASES:
+                if basis in {'TZVP-MOLOPT-SR-GTH', 'TZV2P-MOLOPT-SR-GTH'}:
+                    # These UCL families lack H/O at the fixed valence: never infer a fallback.
+                    with self.assertRaises(KitError):
+                        generate_input(self.water, replace(self.settings, functional=functional, basis=basis))
+                    continue
                 for dispersion in ("none", "d3", "d3bj"):
                     text, _ = generate_input(self.water, replace(self.settings, functional=functional, basis=basis, dispersion=dispersion))
                     self.assertIn(f"POTENTIAL GTH-{functional}-q6", text)

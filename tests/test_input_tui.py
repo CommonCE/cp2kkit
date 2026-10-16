@@ -87,7 +87,7 @@ class MenuTests(unittest.TestCase):
         self.assertNotIn('Common/advanced options', log)
         rendered = log.split('Select a displayed number')[0]
         for number, field in NUMBERED_FIELDS:
-            if field.name in {'pressure', 'smearing', 'added_mos', 'optimizer', 'max_iter'}:
+            if field.name in {'pressure', 'smearing', 'added_mos', 'optimizer', 'max_iter', 'allow_pbe_potential', 'libxc_available'}:
                 self.assertNotIn(f'{number:3}. {LABELS[field.name]}:', rendered)
             else:
                 self.assertIn(f'{number:3}. {LABELS[field.name]}:', rendered)
@@ -158,7 +158,7 @@ class MenuTests(unittest.TestCase):
         displays = log.split('=== CP2K input generation: all settings ===')[1:]
         self.assertEqual(len(displays), 3)
         for index, display in enumerate(displays):
-            hidden = ({12, 6, 112, 10, 123}, {6, 112}, {122})[index]
+            hidden = ({12, 6, 112, 10, 123}, {6, 112}, {122})[index] | {129, 130}
             for number, field in NUMBERED_FIELDS:
                 text = f'{number:3}. {LABELS[field.name]}:'
                 if number in hidden:
@@ -278,7 +278,8 @@ class MenuTests(unittest.TestCase):
             101: 'charge', 102: 'multiplicity', 105: 'cutoff', 106: 'rel_cutoff',
             107: 'vacuum', 112: 'added_mos', 120: 'eps_scf', 121: 'max_scf',
             122: 'max_outer_scf', 123: 'max_iter', 124: 'dft_plus_u', 125: 'magnetism',
-            126: 'spin_density', 127: 'cube_stride'})
+            126: 'spin_density', 127: 'cube_stride', 128: 'basis_overrides',
+            129: 'allow_pbe_potential', 130: 'libxc_available'})
         _, log = self.session('0\n\n-10\n')
         self.assertIn('Not confirmed', log)
         self.assertFalse(self.output.exists())

@@ -29,7 +29,9 @@ cli.py
  |-- input_tui.py -- input_editor.py / inputgen.py / structure.py (TTY navigation/fields)
  |-- input_editor.py (single numbered settings menu, drafts, review; same generator/writer)
  |-- presentation.py (scrolling text, optional Rich; no batch rendering)
- |-- inputgen.py --- structure.py / spin_settings.py / models.py / io.py (pure generation/exclusive writes)
+ |-- inputgen.py --- structure.py / spin_settings.py / method_profiles.py / models.py / io.py
+ |-- method_profiles.py -- data_catalog.py / structure.py (explicit XC, q/file matching, approvals)
+ |-- data_catalog.py (header-only names/q/files and pinned official source hashes)
  |-- spin_settings.py (explicit Ueff/L parsing, collinear atom seeds, stable KIND splitting)
  `-- cube.py ------- models.py / io.py / structure.py (units; streaming checks/differences)
 
@@ -90,6 +92,15 @@ Do not guess labels, drop damaged final frames, or expand CP2K preprocessing.
 structures -> Structure + InputSettings -> validation -> CP2K text/manifest -> new input/JSON
 ```
 
+method_profiles resolves explicit XC branches, per-element basis overrides and fixed-q
+catalog entries; inputgen still orchestrates physical validation, rendering and
+protected writes. Multiple basis files are emitted/checked independently. Matched
+potentials are preferred; explicit approval is required for a GTH-PBE approximation.
+RPBE requires a user Libxc-build assertion, not runtime/build detection. Method
+metadata distinguishes catalog references from installed-data hashes and preserves
+actual potential library identity. No generic input-rewriting migration is introduced.
+This is not the deferred ARC-3 prepared-state/render/manifest separation.
+
 Do not inherit original electronic settings. Unknown PBC, electron/spin conflicts,
 and unsupported combinations are rejected. Element presets explicitly match
 basis/potential valence counts; optional local data checks verify names/hashes.
@@ -120,8 +131,12 @@ Default input text and protected writers are unchanged. Slots 124/125 now reques
 explicit Ueff/L and collinear magnetic initialization; --cell/--data-dir remain
 CLI-only. spin_settings validates and maps element/atom selectors without changing
 charge/multiplicity or source geometry. Split KIND labels retain ELEMENT-specific
-basis/potential/U. Only target 2026.2 is checked for these opt-in features. Schema
-0.1.0 gains additive raw settings, generated KIND mapping and reference metadata.
+basis/potential/U. Only target 2026.2 is checked for these opt-in features. The 0.2.6 GGA/basis profiles
+also require target 2026.2. Menu 128 configures explicit element basis overrides;
+129 approves unmatched-functional PBE potentials; 130 asserts target Libxc support.
+129/130 follow functional applicability while preserving hidden values. NGRIDS uses
+actual per-KIND SR/non-SR bases. Schema 0.1.0 gains additive raw settings, generated
+KIND mapping, method/catalog/file identity and reference metadata.
 
 ## Cube pipeline
 

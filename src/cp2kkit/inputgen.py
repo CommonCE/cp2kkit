@@ -23,6 +23,8 @@ from .io import json_text, new_file, read_text
 from .models import SCHEMA_VERSION
 from .structure import Structure, check_cell
 from .spin_settings import atomic_kinds, validate_requests
+from .method_profiles import BASES, FUNCTIONALS, resolve_method, xc_lines
+from .data_catalog import CATALOG_SOURCES
 
 MULTIWFN_CITATIONS = (
     "Tian Lu, Feiwu Chen, J. Comput. Chem. 33, 580-592 (2012). DOI: 10.1002/jcc.22885",
@@ -40,9 +42,6 @@ DENSITY_DEFINITION_HASHES = {
     "2026.2": "2cef0bc8e85f0ec6c291a5c5101da55fea0658440c15647d42220f530c0aa2bc",
 }
 RUN_TYPES = ("ENERGY", "ENERGY_FORCE", "GEO_OPT", "CELL_OPT")
-FUNCTIONALS = ("PBE", "BLYP")
-BASES = ("SZV-MOLOPT-SR-GTH", "DZVP-MOLOPT-SR-GTH", "DZVP-MOLOPT-GTH",
-         "TZVP-MOLOPT-GTH", "TZV2P-MOLOPT-GTH")
 # cp2kmate.f90 Nval, restricted to matching SR basis/GTH-PBE entries
 # checked against CP2K data/BASIS_MOLOPT and data/GTH_POTENTIALS.
 _SR_ELEMENTS = ("H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn "
@@ -53,6 +52,7 @@ _SR_VALENCES = (1, 2, 3, 4, 3, 4, 5, 6, 7, 8, 9, 10, 3, 4, 5, 6, 7, 8,
                 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 11, 12, 13, 4, 5, 6, 7, 8, 9, 10,
                 12, 13, 14, 15, 16, 17, 18, 11, 12, 13, 4, 5, 6, 7, 8)
 VALENCE = dict(zip(_SR_ELEMENTS, _SR_VALENCES))
+# Legacy import-compatible coverage constants; resolution now uses data_catalog.
 DIFFUSE_ELEMENTS = set("H C N O F Si P S Cl".split())
 PBE_ONLY_ELEMENTS = set("Nb Tc Cd Sn Hf Ta Re Os Ir Pt Hg Tl Po At Rn".split())
 PERIODICITIES = ("NONE", "X", "Y", "Z", "XY", "XZ", "YZ", "XYZ")
@@ -89,6 +89,9 @@ class InputSettings:
     cube_stride: tuple[int, int, int] | None = None
     dft_plus_u: tuple[tuple[str, int, float], ...] = ()  # element, L, Ueff [eV]
     magnetism: tuple[tuple[str, float], ...] | None = None  # None: auto; (): UKS; element/@atom seeds
+    basis_overrides: tuple[tuple[str, str], ...] = ()
+    allow_pbe_potential: bool = False  # Explicit approval, not an automatic fallback.
+    libxc_available: bool = False  # User assertion about target build, never probed.
 
 
 def positive(value, name):
@@ -171,10 +174,8 @@ def generate_input(structure: Structure, settings: InputSettings):
     unsupported = set(elements) - VALENCE.keys()
     if unsupported:
         raise KitError("No verified basis/potential preset for: " + ", ".join(sorted(unsupported)))
-    if '-SR-' not in s.basis and set(elements) - DIFFUSE_ELEMENTS:
-        raise KitError("Non-SR MOLOPT preset only supports H C N O F Si P S Cl; use an SR basis")
-    if s.functional == "BLYP" and set(elements) & PBE_ONLY_ELEMENTS:
-        raise KitError("No verified GTH-BLYP preset for: " + ", ".join(sorted(set(elements) & PBE_ONLY_ELEMENTS)))
+    method_profile, basis_overrides, element_records, method_warnings = resolve_method(s, elements, VALENCE)
+    s = replace(s, basis_overrides=basis_overrides)
     hubbard, magnetism = validate_requests(s.dft_plus_u, s.magnetism, structure.symbols, VALENCE)
     s = replace(s, dft_plus_u=hubbard, magnetism=magnetism)
     if (hubbard or magnetism is not None) and s.cp2k_version != '2026.2':
@@ -232,6 +233,9 @@ def generate_input(structure: Structure, settings: InputSettings):
     solver = "PERIODIC" if periodic == "XYZ" else "WAVELET" if periodic == "NONE" else "ANALYTIC"
     warnings = ["Generated template is not CP2K-runtime validated; converge basis, cutoff and kpoints for the target property.",
                 "Only geometry/cell/PBC are read from the source; charge, spin, method and per-kind settings are NOT inherited."]
+    warnings.extend(method_warnings)
+    if any('-SR-' not in record['basis'] for record in element_records.values()):
+        warnings.append('Non-SR MOLOPT functions may increase cost/overlap ill-conditioning; converge basis and grid independently. Increasing CUTOFF does not complete the Gaussian basis.')
     if periodic == "NONE":
         warnings.append("WAVELET requires electronic density to vanish at cell faces; verify box size and molecular placement.")
     elif periodic != "XYZ":
@@ -258,8 +262,7 @@ def generate_input(structure: Structure, settings: InputSettings):
     kinds = {}
     u_by_element = {el: (angular, energy) for el, angular, energy in hubbard}
     for label, (el, moment) in sorted(kind_specs.items()):
-        kind = {"basis": f"{s.basis}-q{VALENCE[el]}",
-                "potential": f"GTH-{s.functional}-q{VALENCE[el]}", "valence_electrons": VALENCE[el]}
+        kind = dict(element_records[el])
         if hubbard or magnetism is not None:
             kind['element'] = el
             kind['initial_magnetization'] = moment
@@ -268,19 +271,31 @@ def generate_input(structure: Structure, settings: InputSettings):
                 kind['dft_plus_u'] = {'L': angular, 'U_minus_J': energy, 'unit': 'eV', 'method': 'MULLIKEN'}
         kinds[label] = kind
     data_sources = {}
-    files = {"basis": "BASIS_MOLOPT", "potential": "GTH_POTENTIALS", "dispersion": "dftd3.dat"}
+    basis_names = sorted({record['basis_file'] for record in element_records.values()})
+    basis_files = list(basis_names)
+    files = {'potential': 'GTH_POTENTIALS', 'dispersion': 'dftd3.dat'}
     if s.data_dir is not None:
-        for key in ("basis", "potential") + (("dispersion",) if s.dispersion != "none" else ()):
-            text, source = read_text(Path(s.data_dir) / files[key])
+        requests = [('basis' if i == 0 else 'basis:'+name, name, 'basis')
+                    for i, name in enumerate(basis_names)]
+        requests += [('potential', files['potential'], 'potential')]
+        if s.dispersion != 'none':
+            requests.append(('dispersion', files['dispersion'], 'dispersion'))
+        for key, name, role in requests:
+            path = str((Path(s.data_dir)/name).resolve())
+            if any(c in path for c in ('"', '\n', '\r', '#', '!', '@', '$')):
+                raise KitError('CP2K data paths contain unsupported special characters')
+            text, source = read_text(path)
             data_sources[key] = source
-            if key != "dispersion":
-                for label, kind in kinds.items():
-                    el = kind.get('element', label)
-                    if not data_header_exists(text, el, kind[key]):
-                        raise KitError(f"{files[key]} has no {el} {kind[key]}")
-            files[key] = str((Path(s.data_dir) / files[key]).resolve())
-            if any(c in files[key] for c in ('"', '\n', '\r', '#', '!', '@', '$')):
-                raise KitError("CP2K data paths contain unsupported special characters")
+            if role != 'dispersion':
+                for el, record in element_records.items():
+                    if role == 'basis' and record['basis_file'] != name:
+                        continue
+                    if not data_header_exists(text, el, record[role]):
+                        raise KitError(f'{name} has no {el} {record[role]}')
+            if role == 'basis':
+                basis_files[basis_names.index(name)] = path
+            else:
+                files[role] = path
     else:
         warnings.append("Data files resolved through CP2K_DATA_DIR at runtime; supply --data-dir to verify names and record file hashes.")
     def num(v):
@@ -292,12 +307,12 @@ def generate_input(structure: Structure, settings: InputSettings):
              "&FORCE_EVAL", "  METHOD Quickstep"]
     if s.run_type == "CELL_OPT":
         lines.append("  STRESS_TENSOR ANALYTICAL")
-    lines += ["  &DFT", f'    BASIS_SET_FILE_NAME "{files["basis"]}"',
+    lines += ['  &DFT', *(f'    BASIS_SET_FILE_NAME "{file}"' for file in basis_files),
               f'    POTENTIAL_FILE_NAME "{files["potential"]}"', f"    CHARGE {s.charge}",
               f"    MULTIPLICITY {s.multiplicity}", f"    UKS {'T' if uks else 'F'}",
               "    &QS", "      METHOD GPW", f"      EPS_DEFAULT {scientific_number(1e-11 if s.run_type == 'ENERGY' else 1e-12)}", "    &END QS",
               "    &MGRID", f"      CUTOFF [Ry] {num(s.cutoff)}", f"      REL_CUTOFF [Ry] {num(s.rel_cutoff)}",
-              f"      NGRIDS {5 if '-SR-' not in s.basis else 4}", "    &END MGRID",
+              f"      NGRIDS {5 if any('-SR-' not in r['basis'] for r in element_records.values()) else 4}", "    &END MGRID",
               "    &POISSON", f"      PERIODIC {periodic}", f"      POISSON_SOLVER {solver}", "    &END POISSON",
               "    &SCF", "      SCF_GUESS ATOMIC", f"      EPS_SCF {scientific_number(eps)}", f"      MAX_SCF {s.max_scf}"]
     if hubbard:
@@ -312,7 +327,7 @@ def generate_input(structure: Structure, settings: InputSettings):
                   "      &MIXING", "        METHOD BROYDEN_MIXING", "        ALPHA 0.4", "        NBROYDEN 8", "      &END MIXING"]
         if s.smearing is not None:
             lines += ["      &SMEAR", "        METHOD FERMI_DIRAC", f"        ELECTRONIC_TEMPERATURE [K] {num(s.smearing)}", "      &END SMEAR"]
-    lines += ["    &END SCF", "    &XC", f"      &XC_FUNCTIONAL {s.functional}", "      &END XC_FUNCTIONAL"]
+    lines += ['    &END SCF', '    &XC', *xc_lines(s.functional)]
     if s.dispersion != "none":
         lines += ["      &VDW_POTENTIAL", "        POTENTIAL_TYPE PAIR_POTENTIAL", "        &PAIR_POTENTIAL",
                   f"          TYPE {'DFTD3' if s.dispersion == 'd3' else 'DFTD3(BJ)'}",
@@ -388,6 +403,14 @@ def generate_input(structure: Structure, settings: InputSettings):
                 "source_structure": structure.to_dict(), "generated_structure": effective.to_dict(),
                 "coordinates_translated": translated, "warnings": warnings,
                 "input_text": text, "input_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
+    manifest['method_profile'] = {
+        'functional': s.functional, 'xc_backend': 'Libxc' if method_profile.libxc else 'CP2K-native',
+        'libxc_required': method_profile.libxc, 'libxc_user_asserted': s.libxc_available,
+        'build_verified': False, 'dispersion_reference': s.functional if s.dispersion != 'none' else None,
+        'basis_files': basis_files, 'potential_file': files['potential'],
+        'catalog_reference_version': '2026.2',
+        'catalog_sources': [dict(source) for source in CATALOG_SOURCES], 'runtime_validated': False,
+        'potential_approximations': [el for el, r in element_records.items() if r['potential_approximation']]}
     if hubbard or magnetism is not None:
         manifest['electronic_extensions'] = {
             'uks': uks, 'atom_kinds': atom_labels, 'atom_index_base': 1,

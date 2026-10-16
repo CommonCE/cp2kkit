@@ -183,6 +183,40 @@ line numbers are auxiliary. Do not invent upstream commits, inspection dates, or
 - Existing two Multiwfn citations and custom [terms](TERMS.md) remain applicable.
   No extra grant, full-port, clean-room, license-compatibility or release claim.
 
+## GGA and basis profile extension (0.2.6)
+
+- Local: method_profiles.py, data_catalog.py, inputgen.py and the shared CLI/editor.
+- Re-inspected the same Multiwfn 2026.10.1 cp2kmate.f90/outCP2Kinp, SHA-256
+  `f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402`:
+  basis names around 137-147, functional selection 939-999, q suffixes/potential
+  policy around 1535-1575, Libxc RPBE 2015-2020, native parametrized PBE 2086-2092,
+  and dispersion reference normalization around 2335-2349.
+- Actual references: PBEsol/revPBE use PBE PARAMETRIZATION; RPBE separates exchange
+  GGA_X_RPBE and correlation GGA_C_PBE; explicit basis q suffixes; RPBE D3 reference
+  removes the upstream _LIBXC implementation suffix. Local canonical name is RPBE.
+- Independent official CP2K v2026.2 checks: native XC parametrization, Libxc
+  registration/name lookup, both D3 damping reference branches, repeated basis-file
+  keyword, and exact basis/potential headers. data_catalog.py records all eight
+  version-fixed URLs/raw-byte SHA-256 hashes; no upstream Fortran or coefficients
+  are distributed. Header aliases/element/q/file metadata are derived, not inferred.
+- TZV2PX matches an inspected upstream family; UCL triple-zeta SR and new element
+  coverage were derived from official data, not claimed to be Multiwfn dropdown ports.
+  Preserve the existing 71-element valence policy; do not substitute q2 for Mg-q10.
+- Differences: explicit per-element mixed bases; no missing-family fallback. Prefer
+  matched potentials (including B GTH-PBESOL-q3), and require approval for unmatched
+  GTH-PBE approximations rather than reproducing upstream's unconditional fallback.
+  RPBE requires a user target-build Libxc assertion. Gate new profiles to 2026.2;
+  assertions/header checks are not native execution or scientific suitability.
+- Supplied modc.py was read-only design reference for future UZH protocol migration,
+  not executed/copied/redistributed. Its established hash and UZH source checks are
+  recorded in [the roadmap](../../docs/roadmap.md#uzh-protocol-follow-up-modcpy-reference).
+  Preserve data-library identity, not just shared aliases/q. In-place overwrites,
+  forced numerical resets and regex migration are not implemented.
+- The original two citations and custom [terms](TERMS.md) remain applicable.
+  No new grant, full-port, clean-room or license-compatibility claim. Synthetic
+  generation/round trips do not validate energies, forces/stress, magnetic states,
+  convergence, projector-dependent U, or Libxc/runtime library availability.
+
 ## Template for future features
 
 Copy this structure for each referenced feature and supply evidenced facts.

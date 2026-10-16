@@ -1,6 +1,6 @@
 # CP2K input generation
 
-This guide describes cp2kkit **0.2.5**. Older defaults and migration notes are in
+This guide describes cp2kkit **0.2.6**. Older defaults and migration notes are in
 [the changelog](../CHANGELOG.md).
 
 `generate-input` is an explicit write entry point added beyond the read-only MVP;
@@ -69,9 +69,8 @@ Multiwfn-style direct selection. There are no sequential steps, hidden advanced
 pages, or group-selection submenus. Corresponding main-menu IDs follow the inspected
 Multiwfn 2026.10.1 source; unsupported entries are omitted, not reassigned.
 This changes presentation only; the same `InputSettings`, generator and protected
-writer remain in use. Version **0.2.5** retains the menu introduced in 0.2.4;
-this round changes parser boundaries and shared interface infrastructure, not
-scientific generator defaults.
+writer remain in use. Version **0.2.6** retains the menu introduced in 0.2.4;
+new profiles are explicit opt-ins, not changes to the default scientific settings.
 
 | ID | Setting/action | Numbering origin |
 |---|---|---|
@@ -89,6 +88,7 @@ scientific generator defaults.
 | 120 / 121 / 122 | EPS_SCF / inner-diag limit / outer limit | Local extensions |
 | 123 / 124 / 125 | Optimization steps / DFT+U / magnetic initialization | Local extensions |
 | 126 / 127 | Spin density / cube stride | Local extensions |
+| 128 / 129 / 130 | Element basis overrides / approve GTH-PBE approximation / target Libxc assertion | Local extensions |
 
 Only corresponding implemented main-menu IDs are reused; this is not full upstream
 menu/choice/default equivalence. In particular, OT outer-limit editing is not the
@@ -145,9 +145,9 @@ unchanged; identical structure/settings produce identical text/manifest.
 |---|---|
 | Structure | `.xyz`/`.extxyz`/text `.restart`/`.gjf`/`.com`/`.cif`/POSCAR/CONTCAR/`.vasp`/`.poscar`; XYZ last frame |
 | Task | ENERGY (default), ENERGY_FORCE, GEO_OPT, CELL_OPT |
-| Method | Quickstep/GPW; PBE (default), BLYP |
-| Basis | DZVP-MOLOPT-SR-GTH (default); SZV-MOLOPT-SR-GTH, DZVP/TZVP/TZV2P-MOLOPT-GTH |
-| Potential | GTH-PBE/GTH-BLYP; basis and potential explicitly matched with `-qN` |
+| Method | Quickstep/GPW; PBE (default), BLYP; target 2026.2 adds PBEsol/revPBE/Libxc RPBE |
+| Basis | DZVP-MOLOPT-SR-GTH (default); SZV-SR, DZVP/TZVP/TZV2P non-SR; target 2026.2 adds TZVP-SR/TZV2P-SR/TZV2PX and explicit element overrides |
+| Potential | Catalog-checked GTH entries with fixed `-qN`; prefer actual matched functional, explicitly approved PBE approximation otherwise |
 | Dispersion | none (default), D3, D3(BJ); dftd3.dat and REFERENCE_FUNCTIONAL |
 | Charge/spin | 0/1; explicit valence-electron parity check; UKS for multiplicity > 1 or explicit magnetic request |
 | SCF | OT+FULL_ALL/DIIS+outer SCF (default), or diagonalization+Broyden mixing |
@@ -171,8 +171,10 @@ Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd In Sn Sb Te I Xe Cs Ba
 Hf Ta W Re Os Ir Pt Au Hg Tl Pb Bi Po At Rn
 ```
 
-Non-SR presets cover only H C N O F Si P S Cl. BLYP presets exclude
+The original non-SR core is H C N O F Si P S Cl. Target 2026.2 adds UCL Cu for
+DZVP and Br for DZVP/TZVP/TZV2P/TZV2PX. BLYP presets still exclude
 Nb Tc Cd Sn Hf Ta Re Os Ir Pt Hg Tl Po At Rn; missing entries are rejected.
+See the per-family coverage below rather than assuming every family covers all 71.
 This is not arbitrary element/potential inference; the actual installed library
 must contain matching names.
 
@@ -228,12 +230,113 @@ Standard-library readers preserve original hashes and do not run Gaussian/VASP/M
 - Default cutoff/basis/vacuum/k-points are not converged for the target system.
   Deprecated CELL_OPT TYPE DIRECT_CELL_OPT is not emitted.
 
+## Functional and basis profiles (0.2.6)
+
+New functional names, new families, UCL coverage extensions and nonempty element
+overrides are restricted to target **2026.2**. Existing PBE/BLYP/core basis requests
+retain their older target profiles. Defaults remain PBE / DZVP-MOLOPT-SR-GTH,
+charge 0 / multiplicity 1, GPW and no dispersion. No calculation is executed.
+
+### Functional definitions and approval
+
+| CLI/menu name | Actual XC definition | Requirement |
+|---|---|---|
+| PBE / BLYP | Existing native shortcuts | Unchanged matched GTH presets |
+| PBESOL (PBEsol) | PBE with PARAMETRIZATION PBESOL | Prefer matched GTH-PBESOL; explicitly approve PBE where absent |
+| REVPBE (revPBE) | PBE with PARAMETRIZATION REVPBE | Explicitly approve PBE where matched entries are absent |
+| RPBE | Libxc GGA_X_RPBE + GGA_C_PBE | Explicit target-build Libxc assertion plus potential approval where needed |
+
+RPBE and revPBE are different functionals, not aliases. CLI names are case-insensitive.
+The v2026.2 GTH_POTENTIALS catalog contains matched **B GTH-PBESOL-q3**;
+that entry is preferred even when approximation approval is enabled. For missing
+matches, generation errors until `--allow-pbe-potential` / menu **129** is explicitly
+enabled. Every affected KIND records the actual potential and approximation status,
+and review warns that this is not a matched-functional potential. No unverified
+GTH-RPBE/GTH-REVPBE names are fabricated, and no q values are changed.
+
+RPBE additionally requires `--libxc-available` / menu **130**. This is a user assertion
+about the target CP2K build, not probing, installation, a detected Libxc version, or
+runtime certification. Native PBEsol/revPBE do not require Libxc in these profiles.
+The menu hides 129 outside the new GGA choices and 130 outside RPBE; values remain
+retained for later edits. Selecting a functional never automatically grants approval.
+
+All five profiles explicitly allow none/D3/D3(BJ); the new reference identifiers
+PBESOL, REVPBE and RPBE were checked in the zero/BJ parameter branches of tagged
+CP2K `src/qs_dispersion_utils.F`. The generator emits the actual functional reference,
+not PBE as a substitute. D3 parameters remain CP2K's responsibility; no numerical
+parameter table is copied. Availability of runtime libraries/data is still unverified.
+
+### Per-element basis catalog and mixed bases
+
+Header-only name/q/file catalogs come from tagged v2026.2 BASIS_MOLOPT,
+BASIS_MOLOPT_UCL and GTH_POTENTIALS. No coefficients or potential parameters are bundled.
+Counts below use the existing fixed 71-element valence policy and matching PBE q
+values; functional-specific potential restrictions still apply.
+
+| Family | Current matching elements | Primary library |
+|---|---|---|
+| SZV-MOLOPT-SR-GTH / DZVP-MOLOPT-SR-GTH | 71 each, unchanged | BASIS_MOLOPT |
+| DZVP-MOLOPT-GTH | 11: original nine plus Cu/Br | BASIS_MOLOPT + UCL where needed |
+| TZVP-MOLOPT-GTH / TZV2P-MOLOPT-GTH / TZV2PX-MOLOPT-GTH | 10 each: original nine plus Br | BASIS_MOLOPT + UCL where needed |
+| TZVP-MOLOPT-SR-GTH / TZV2P-MOLOPT-SR-GTH | 54 each | BASIS_MOLOPT_UCL |
+
+The new triple-zeta SR families **lack H/C/N/O**. UCL Mg-q2 does not satisfy the
+existing Mg-q10 preset; the generator refuses it instead of changing electron counts.
+Lanthanide/other q entries in the upstream libraries do not expand the generator's
+element/valence policy automatically. No family is an implicit substitute for another.
+
+Use `--basis-overrides 'Element=basis; Element=basis'` or menu **128** for explicit
+mixed bases. `off`/`auto` clears overrides. Each selector must be a unique present
+element; each family/q must actually exist. Element overrides apply to all of that
+element's split magnetic KINDs; source atom order, +U, charge and multiplicity remain
+unchanged. Changing the source may invalidate a retained override and will warn,
+not clear or repair it.
+
+```bash
+# Syntax examples, not validated magnetic states or converged computational settings.
+cp2kkit generate-input solid.extxyz -o pbesol.inp --functional PBEsol \
+  --allow-pbe-potential --dispersion d3bj
+cp2kkit generate-input surface.extxyz -o rpbe.inp --functional RPBE \
+  --allow-pbe-potential --libxc-available
+cp2kkit generate-input FeO.extxyz -o mixed.inp --basis TZV2P-MOLOPT-GTH \
+  --basis-overrides 'Fe=TZV2P-MOLOPT-SR-GTH' --data-dir /path/to/cp2k/data
+```
+
+Only actually needed basis libraries are emitted, in deterministic order, using
+repeatable BASIS_SET_FILE_NAME. With `--data-dir`, each selected file/header is
+checked separately and raw bytes are hashed. An entry in the wrong library or with
+a different q cannot satisfy a selection. User data files verify existing profiles,
+not automatically add arbitrary functional/basis/potential choices.
+NGRIDS is 5 if any effective KIND basis is non-SR, otherwise 4. CUTOFF/REL_CUTOFF
+remain 400/55 Ry by default, not property-converged values. Larger Gaussian bases,
+grid convergence and overlap conditioning are separate checks.
+
+### Evidence and remaining work
+
+`src/cp2kkit/data_catalog.py` contains exact versioned URLs/SHA-256 for inspected
+headers, native XC, Libxc registration/wrapper, D3 parameter lookup, and repeatable
+basis-file definitions. `method_profile` in JSON records backend, assertions,
+basis files, approved approximation elements and those references with
+build_verified/runtime_validated=false. Local supplied-file hashes remain separate
+from bundled reference-source hashes. Schema stays 0.1.0 with additive fields.
+
+Multiwfn 2026.10.1 outCP2Kinp informed the parametrized-PBE, separated Libxc RPBE,
+q-suffix and D3-reference branches; see [provenance](../third_party/multiwfn/PROVENANCE.md).
+The UCL header credits Sanliang Ling and Ben Slater, and follows the MOLOPT strategy
+of VandeVondele and Hutter, J. Chem. Phys. 127, 114105 (2007),
+DOI [10.1063/1.2770708](https://doi.org/10.1063/1.2770708).
+Header checks/synthetic round trips are not native CP2K acceptance, converged
+energies/forces/stress, recommended bases/U, or validation of an adsorption model.
+
+r2SCAN/meta-GGAs, hybrids/HF/ADMM, UZH protocol pairs, arbitrary q changes and
+additional basis families remain roadmap items, not enabled options.
+
 ## DFT+U and magnetic initialization (124 / 125)
 
 These are real generator features, not renamed placeholders. They are opt-in and
 currently keyword-checked only against CP2K **2026.2**; explicit requests with other
 target profiles are rejected rather than presented as verified. These controls
-were introduced in 0.2.4 and remain unchanged in 0.2.5. Schema 0.1.0 retains the
+were introduced in 0.2.4 and remain compatible with the 0.2.6 method/basis profiles. Schema 0.1.0 retains the
 additive settings/extension metadata.
 
 - **124 — DFT+U:** enter `Element:L:Ueff_eV`, separated by semicolons.

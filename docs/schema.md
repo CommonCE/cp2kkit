@@ -112,6 +112,39 @@ Fields/units/schema 0.1.0 are unchanged.
 - syntax_reference_checked/runtime_validated describe density-print validation,
   not certification of the entire generator.
 
+## Generated input JSON: method profiles (software 0.2.6)
+
+Schema stays 0.1.0; additions do not imply changes to default physical settings.
+
+- settings.basis_overrides: ordered canonical [element, family] pairs, [] by default.
+  Element names must be present and unique; the fixed valence q is not overridden.
+- settings.allow_pbe_potential / libxc_available: false by default. These are explicit
+  user approval/assertion flags, not detected runtime facts or an automatic fallback.
+  Hidden UI values are retained; raw assertions may be true even for a native profile.
+- kinds[label] retains basis/potential/valence_electrons and adds basis_file,
+  potential_functional and potential_approximation (Boolean). Labels may be split
+  magnetic kinds; every kind of an overridden element receives the same basis.
+  File identity matters: identical basis/potential aliases in different libraries
+  do not establish identical coefficients/protocols.
+- method_profile records canonical functional, XC backend, libxc_required,
+  libxc_user_asserted, build_verified=false, dispersion_reference (null when disabled),
+  ordered basis_files, potential_file and potential_approximations (element list).
+  catalog_reference_version=2026.2 and catalog_sources {url, sha256} identify fixed
+  inspected header/keyword bytes, not installed files or a tested build.
+  runtime_validated=false remains distinct from keyword/header checks.
+- data_sources retains basis/potential/dispersion keys for the first selected basis
+  library and legacy roles. Each additional basis library adds basis:<filename>,
+  with its own absolute path/raw-byte sha256/size_bytes. method_profile.basis_files
+  lists the actual emitted paths (absolute with data_dir, basenames otherwise).
+  kinds.basis_file identifies the catalog library basename. Supplied file hashes
+  are separate from catalog reference hashes; no data_dir means no local verification.
+- New functionals/families, UCL coverage extensions and nonempty element overrides
+  require target 2026.2. Older target profiles still support the original requests.
+  Failed approval/availability checks occur before protected output creation.
+- source/generated structure geometry and symbols are unchanged by these method
+  requests. No inferred spin, q, missing basis substitution or source-file rewriting.
+  Default generated physics is retained; software-version and additive metadata differ.
+
 ## Generated input JSON: optional electronic extensions
 
 Schema remains 0.1.0; the following fields are additive. Older inputs without new

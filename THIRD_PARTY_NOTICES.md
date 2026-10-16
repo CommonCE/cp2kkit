@@ -25,6 +25,7 @@ workflows, parameter tables, defaults, or rewritten code. Record actual use hone
 
 Registered modules include `src/cp2kkit/inputgen.py` (generation),
 `src/cp2kkit/spin_settings.py` (explicit Ueff/L and initial-spin KIND organization),
+`src/cp2kkit/method_profiles.py` (inspected parametrized-PBE/Libxc RPBE/q/reference branches),
 and `src/cp2kkit/input_tui.py` / `src/cp2kkit/input_editor.py` (numbered interaction
 and selected inspected upstream main-menu IDs, not a full Fortran UI port).
 The local 124/125 U/magnetism extensions are not upstream main-menu IDs;
@@ -63,6 +64,11 @@ do not replace paper citations. Register additional method/upstream references p
 
 The generator checks keywords/nesting and basis/potential names using official
 input references and database headers; sources are in [input generation](docs/input-generation.md).
-This repository does not distribute basis coefficients, potential parameters,
-or dftd3.dat. User-supplied --data-dir files are checked read-only and hashed;
+src/cp2kkit/data_catalog.py derives header-only name/element/q/file metadata from
+CP2K v2026.2 BASIS_MOLOPT, BASIS_MOLOPT_UCL and GTH_POTENTIALS; versioned URLs/hashes
+also identify inspected XC/D3/input definitions. No Fortran implementations, basis
+coefficients, potential parameters or dftd3.dat are distributed. These metadata do
+not establish whole-project license compatibility or native-runtime certification.
+The UCL library header credits Sanliang Ling and Ben Slater; MOLOPT references
+VandeVondele and Hutter, J. Chem. Phys. 127, 114105 (2007), DOI 10.1063/1.2770708. User-supplied --data-dir files are checked read-only and hashed;
 their actual use/distribution must follow the applicable terms.

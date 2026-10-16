@@ -1,11 +1,12 @@
 # Development status and next steps
 
-Current software: **0.2.5**, explicitly requested; schema: **0.1.0**.
-See [the changelog](../CHANGELOG.md). This round fixes BUG-1 ENERGY numeric-token
-boundaries, implements ARC-4 shared structure recognition, CLI-1 tested menu/batch
-routing, and ARC-1 shared protected structure export. Whitespace-delimited energy
-annotations are accepted without prefix-parsing adjacent garbage. Evidence/hashes,
-conservative quality rules, batch contracts and output protection are retained.
+Current software: **0.2.6**, explicitly requested; schema: **0.1.0**.
+See [the changelog](../CHANGELOG.md). This round adds native PBEsol/revPBE and Libxc
+RPBE, TZVP/TZV2P short-range and TZV2PX MOLOPT families, and explicit element basis
+overrides. Tagged v2026.2 header catalogs select actual basis files and fixed-q
+potentials. Matched potentials are preferred; unmatched GTH-PBE approximations need
+explicit approval. RPBE requires a user target-build Libxc assertion, not probing.
+New requests are gated to target 2026.2, not runtime/scientific certification.
 
 The scrolling grouped application menu and single numbered editor introduced in
 0.2.4 remain. No alternate screen, redraw or full-screen framework is used. Applicable
@@ -14,18 +15,28 @@ frame controls stay in the header; 0 reviews/generates with confirmation, -10 re
 Slots 124/125 retain explicit Ueff/L and collinear initial moments for target 2026.2,
 including split same-element KIND labels. U values, charge/multiplicity and scientific
 defaults are not inferred or changed. No U-value dictionary is implemented.
+Menu 128 edits element basis overrides, 129 approves a potential approximation,
+and 130 asserts Libxc availability; 129/130 follow functional applicability without
+resetting values. New UCL triple-zeta SR families cover 54 current elements and lack
+H/C/N/O. Mixed bases must be explicit; q values and source files are never rewritten.
+Multiple libraries are checked/hashed separately. Schema 0.1.0 gets additive method,
+file-identity and reference metadata; default PBE/DZVP-SR/400-55 Ry is unchanged.
 
-Current validation: **193 tests passed, none skipped**; compileall, diff, CLI version,
-and local Markdown-link checks passed. Added 17 test methods cover ENERGY whitespace/
-annotations/malformed tokens, registry aliases, CLI routing, direct CLI/menu export
-byte equality, cell-loss permissions, collisions, failure and interrupt rollback.
-Existing PTY/navigation/generation/CUBE/plain/fallback regression remains passing.
-No dependencies were installed and no calculations, submissions or package publication
-were performed in this 0.2.5 work round. Runtime/scientific certification and real-file
-version coverage remain unverified.
+Current validation: **216 tests passed, none skipped**; compileall, diff, CLI version,
+and local Markdown-link checks passed. Added 23 profile test methods cover fixed-q
+family availability, XC definitions, approval/build assertions, actual potential
+identities, multi-file name/hash checks, malformed API maps, combined RPBE/+U/AFM/
+mixed bases, CLI replay and menu edit/clear/hidden flags. All legacy parser, export,
+PTY/navigation, generation, CUBE and collision/rollback tests remain passing.
+No Python dependencies were installed; no calculations, submissions or package
+publication were performed. RPBE's target CP2K Libxc requirement is not detected or
+installed by cp2kkit. Runtime/scientific validation remains pending.
 
 ## Recent historical validation
 
+- **0.2.5:** 193 tests passed, none skipped. Fixed ENERGY token boundaries and
+  completed ARC-4 shared format recognition, CLI-1 menu routing, ARC-1 shared
+  protected export. Remaining architecture review items were explicitly deferred.
 - **0.2.4:** 176 tests passed, none skipped. Added scrolling menus, optional Rich
   styling/plain fallback, conditional settings and explicit Ueff/initial magnetism.
   Rich 15.0.0 import/render was verified in the existing environment; ui declares
@@ -104,6 +115,35 @@ rollback overwrites files. Refactoring is not automatically low-risk where physi
 settings, provenance, or write safety are involved. No plugin/configuration engine,
 mandatory UI dependency, relaxed quality rule or parallel CLI/TUI generator is planned.
 
+## UZH protocol follow-up: modc.py reference
+
+UZH protocol pairs remain planned separately from the 0.2.6 UCL/legacy-MOLOPT
+profiles. User-provided `test-workspace/modc.py` was inspected read-only (SHA-256
+`b37f4c2cb1b7051f6fd4d3a19cd00dbb511f9aca355e0fb936f3d033362e7dbd`),
+not executed, copied, modified or committed. No redistribution authorization for
+that user script is inferred. It demonstrates preserving q while selecting UZH
+basis/potential libraries, but string renaming alone is not protocol verification.
+
+Confirmed tagged v2026.2 header examples include H/C/O/Fe
+TZVP-MOLOPT-PBE-GTH-q1/q4/q6/q16 and TZV2P equivalents with corresponding
+POTENTIAL_UZH GTH-PBE aliases. This is representative header evidence, not complete
+coverage or CP2K execution. Future protocol implementation must audit every enabled
+pair and retain library identity even when aliases match an older library.
+
+- [BASIS_MOLOPT_UZH_2026.2](https://raw.githubusercontent.com/cp2k/cp2k/v2026.2/data/BASIS_MOLOPT_UZH_2026.2),
+  SHA-256 `8ca617142cc73b02e47d5806d97e91d2c3312444c411c5a093f4dfe8fb9355c4`.
+- [POTENTIAL_UZH_2026.2](https://raw.githubusercontent.com/cp2k/cp2k/v2026.2/data/POTENTIAL_UZH_2026.2),
+  SHA-256 `8ab49093391f67f2705679f0b3bfc5b84bbeb4003955b556ded322e9d1d6093d`.
+
+Do not port the script's in-place overwrite default, forced EPS_SCF/cutoff resets,
+order-dependent KIND rewriting or substring replacements. In particular, switching
+BASIS_MOLOPT without reliably replacing GTH_POTENTIALS can mix protocols, and a
+BASIS_MOLOPT prefix substitution can produce an invalid UZH_UCL filename. Quoted
+paths, units, numeric exponents and basis roles require structured handling.
+A future UZH feature should be an explicit paired profile in the protected generator,
+not a general overwrite-based regex migration. r2SCAN and hybrids/HF/ADMM remain
+separate later stages; arbitrary q changes require their own charge/spin review.
+
 ## Input generation: incomplete by design
 
 **Goal: cover all Multiwfn CP2K input-generation functionality.** Current generation
@@ -121,8 +161,10 @@ old default, or emitting target-version-unsupported keywords without checking.
    are implemented for target 2026.2. Remaining: arbitrary independent KIND/basis/
    potential controls, richer +U projectors/occupations, CDFT, atom freezing,
    cell constraints, anisotropic pressure, and actual magnetic-state validation.
-3. **Methods/bases:** GGA/meta-GGA, hybrids, ADMM/RI-HFX, GPW/GAPW, auxiliary/all-electron
-   bases, correlated wavefunctions, semiempirical/force fields, dispersion/SCF options.
+3. **Methods/bases:** 0.2.6 adds PBEsol/revPBE/RPBE and explicit catalog-backed
+   MOLOPT/UCL mixed bases. Remaining: r2SCAN/meta-GGAs, verified UZH protocol pairs,
+   hybrids/HF/ADMM/RI-HFX, GPW/GAPW, auxiliary/all-electron bases, additional families/
+   q policies, correlated wavefunctions, semiempirical/force fields and SCF options.
 4. **Tasks:** frequencies/vibrations/Raman, MD, dimer TS, BAND/NEB, NMR, polarizability,
    BSSE, real-time electrons, PIMD, XAS, appropriate TDDFT.
 5. **Environment/outputs:** SCCS, fields, surface dipole correction, trajectory/restart
