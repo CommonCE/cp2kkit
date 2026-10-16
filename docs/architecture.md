@@ -21,10 +21,10 @@ cli.py
  |-- discovery.py -- io.py / errors.py
  |-- parser.py ----- models.py / io.py
  |-- quality.py ---- models.py (facts -> rules)
- |-- export.py ----- models.py / quality.py (CSV)
+ |-- export.py ----- structure.py / io.py / models.py / quality.py (shared structure export/CSV)
  |-- structure.py -- models.py / io.py (independent geometry)
  |-- plot.py ------- export.py / quality.py / optional matplotlib
- |-- main_tui.py --- input_tui.py / structure.py (application menu/load/dispatch)
+ |-- main_tui.py --- input_tui.py / structure.py / export.py (menu/load/direct operations)
  |-- structure_formats.py (strict GJF/CIF/POSCAR; lazy dispatch from structure.py)
  |-- input_tui.py -- input_editor.py / inputgen.py / structure.py (TTY navigation/fields)
  |-- input_editor.py (single numbered settings menu, drafts, review; same generator/writer)
@@ -53,6 +53,9 @@ output/directory -> deterministic selection -> line format matching -> Run/Segme
 
 - Start markers/non-increasing optimization/MD steps split segments.
 - Energies retain record indices and nullable calculation steps.
+- ENERGY values require a complete numeric token followed by whitespace or line end.
+  Whitespace-delimited annotations are accepted; adjacent garbage/incomplete exponents
+  are not prefix-parsed. Evidence retains the entire original line and byte hash.
 - Associate each energy with the preceding SCF summary, never the previous step's success.
 - Historical SCF failures remain evidence even after recovery.
 - Do not infer process exit codes or charge/spin from total energies.
@@ -69,7 +72,13 @@ Maximum-step failures override generic geometry-end markers.
 XYZ/extXYZ/restart/GJF/CIF/POSCAR -> Structure (angstrom/cell/PBC/source)
                                   |-> extXYZ (preferred, preserves cell)
                                   `-> plain XYZ (known cell loss requires permission)
-Both exports also write a complete structure JSON sidecar.
+Both exports also write a complete structure JSON sidecar through
+export.export_structure_files(Structure, output, fmt, allow_cell_loss), returning
+output/sidecar paths and structured warnings. CLI and menus call this same operation;
+the menu no longer imports cli, constructs argv or extracts warnings from stderr.
+Existing exclusive creation, cell-loss permission and exception rollback are retained.
+structure_format/is_structure_path share the suffix/name aliases used by reader
+dispatch and menu discovery. Recognition does not validate file contents.
 ```
 
 Support explicit vectors or ABC/ALPHA_BETA_GAMMA, UNIT, SCALED, KIND/ELEMENT.
@@ -100,7 +109,12 @@ existing business APIs. Review/previews do not write; 0/w plus explicit y/yes us
 exclusive writer; -10/back/cancel returns from the generator. Collisions have a
 new-target recovery prompt, not a permanent path setting.
 Complete batch calls stay noninteractive; stdin/stdout TTY are required for menus.
-Bare cp2kkit/cp2kkit STRUCTURE opens the grouped application menu. --plain/NO_COLOR
+Bare cp2kkit/cp2kkit STRUCTURE opens the grouped application menu. cli.menu_request
+handles this syntax separately from batch parsing; command names come from actual
+argparse registrations, not a second list. A single unknown word retains path
+semantics. -- PATH (optionally preceded by --plain) treats PATH literally, including
+leading hyphens; invalid mixed arguments still go through argparse usage errors.
+Both streams must still be TTY. --plain/NO_COLOR
 disable styling. EOF/q exits the session; Ctrl+C cancels an operation (exits at main).
 Default input text and protected writers are unchanged. Slots 124/125 now request
 explicit Ueff/L and collinear magnetic initialization; --cell/--data-dir remain

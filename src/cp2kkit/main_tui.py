@@ -2,18 +2,15 @@
 import math
 import sys
 from collections import Counter
-from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
-from io import StringIO
 from pathlib import Path
 
 from .errors import KitError
+from .export import export_structure_files
 from .input_tui import Cancelled, SessionExit, Field, Menu, run_interactive
 from .inputgen import InputSettings
 from .presentation import require_terminal
-from .structure import read_structure
-
-STRUCTURE_SUFFIXES = {'.xyz', '.extxyz', '.restart', '.gjf', '.com', '.cif', '.vasp', '.poscar'}
+from .structure import is_structure_path, read_structure
 
 
 @dataclass(frozen=True)
@@ -63,7 +60,7 @@ def structure_summary(structure, path):
 
 def choose_structure(menu):
     candidates = sorted((p for p in Path.cwd().iterdir() if p.is_file() and
-                         (p.suffix.lower() in STRUCTURE_SUFFIXES or p.name.upper() in {'POSCAR', 'CONTCAR'})),
+                         is_structure_path(p)),
                         key=lambda p: p.name)
     menu.show('\n--- Select a structure file (current directory) ---')
     for i, path in enumerate(candidates, 1):
@@ -180,20 +177,15 @@ def analysis(menu, action):
 
 
 def export_structure(menu, path):
-    from .cli import build_parser, execute
     output = required_path(menu, 'New extXYZ output path')
-    diagnostics = StringIO()
-    # Reuse batch export and its rollback; keep interactive summaries on the menu stream.
-    with redirect_stdout(menu.stdout), redirect_stderr(diagnostics):
-        execute(build_parser().parse_args(['export-structure', path, '-o', output]))
-    menu.show('Success: Structure exported; source unchanged.')
     structure = read_structure(path)
+    output, sidecar, warnings = export_structure_files(structure, output)
+    menu.show('Success: Structure exported; source unchanged.')
     menu.show(f'Atoms: {len(structure.symbols)}; Periodicity: {periodicity(structure)}')
-    for target in (output, output+'.json'):
+    for target in (output, sidecar):
         menu.show(f'Generated path: {Path(target).resolve()}')
-    for line in diagnostics.getvalue().splitlines():
-        if line.startswith('WARNING:'):
-            menu.show('Warning: '+line.removeprefix('WARNING:'))
+    for warning in warnings:
+        menu.show('Warning: '+warning)
     menu.ask('Enter to return to the main menu; q exits: ')
 
 

@@ -1,6 +1,6 @@
 # CP2K input generation
 
-This guide describes cp2kkit **0.2.4**. Older defaults and migration notes are in
+This guide describes cp2kkit **0.2.5**. Older defaults and migration notes are in
 [the changelog](../CHANGELOG.md).
 
 `generate-input` is an explicit write entry point added beyond the read-only MVP;
@@ -69,7 +69,9 @@ Multiwfn-style direct selection. There are no sequential steps, hidden advanced
 pages, or group-selection submenus. Corresponding main-menu IDs follow the inspected
 Multiwfn 2026.10.1 source; unsupported entries are omitted, not reassigned.
 This changes presentation only; the same `InputSettings`, generator and protected
-writer remain in use. Version remains **0.2.4**, as explicitly requested.
+writer remain in use. Version **0.2.5** retains the menu introduced in 0.2.4;
+this round changes parser boundaries and shared interface infrastructure, not
+scientific generator defaults.
 
 | ID | Setting/action | Numbering origin |
 |---|---|---|
@@ -230,8 +232,9 @@ Standard-library readers preserve original hashes and do not run Gaussian/VASP/M
 
 These are real generator features, not renamed placeholders. They are opt-in and
 currently keyword-checked only against CP2K **2026.2**; explicit requests with other
-target profiles are rejected rather than presented as verified. Software version
-stays 0.2.4 as requested. Schema 0.1.0 gains additive settings/extension metadata.
+target profiles are rejected rather than presented as verified. These controls
+were introduced in 0.2.4 and remain unchanged in 0.2.5. Schema 0.1.0 retains the
+additive settings/extension metadata.
 
 - **124 — DFT+U:** enter `Element:L:Ueff_eV`, separated by semicolons.
   `L=0/1/2/3` means s/p/d/f; Ueff is finite, nonnegative, in eV, and equals U-J.

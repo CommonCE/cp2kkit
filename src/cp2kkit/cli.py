@@ -3,21 +3,19 @@
 """
 import argparse
 import sys
-from contextlib import ExitStack
-from pathlib import Path
 
 from . import __version__
 from .cube import DIALECTS, SCALAR_TYPES, SCALAR_UNITS, CubeOptions, check_cube, diff_cubes
 from .discovery import discover, resolve_output
 from .errors import KitError
-from .export import write_csv
+from .export import export_structure_files, write_csv
 from .io import json_text, new_file
 from .inputgen import BASES, CP2K_VERSIONS, FUNCTIONALS, PERIODICITIES, RUN_TYPES, InputSettings, write_input
 from .models import SCHEMA_VERSION
 from .parser import parse_output
 from .plot import plot_run
 from .quality import quality_report
-from .structure import read_structure, xyz_text
+from .structure import read_structure
 from .spin_settings import parse_dft_plus_u, parse_magnetism
 
 
@@ -100,7 +98,30 @@ def build_parser():
             cmd.add_argument("--grid-atol", type=float, default=1e-6, help="Componentwise absolute grid tolerance (bohr)")
             cmd.add_argument("--grid-rtol", type=float, default=0.0, help="Dimensionless relative grid tolerance")
             cmd.add_argument("--integral-atol", type=float, default=1e-3, help="Nonzero integral warning threshold (electrons); no correction")
+    # Snapshot actual registrations, not a separately maintained command-name list.
+    parser.command_names = frozenset(sub.choices)
     return parser
+
+
+def menu_request(argv, command_names):
+    """Return (path_or_none, plain) for menu syntax, otherwise defer to argparse.
+
+    Bare unknown single words remain paths for compatibility. An explicit -- PATH
+    allows option-looking paths or paths equal to a registered subcommand name.
+    Only --plain may precede that delimiter; batch command arguments stay untouched.
+    """
+    if '--' in argv:
+        index = argv.index('--')
+        prefix, paths = argv[:index], argv[index+1:]
+        if any(arg != '--plain' for arg in prefix) or len(paths) != 1:
+            return None
+        return paths[0], '--plain' in prefix
+    paths = [arg for arg in argv if arg != '--plain']
+    if not paths:
+        return None, '--plain' in argv
+    if len(paths) == 1 and paths[0] not in command_names and not paths[0].startswith('-'):
+        return paths[0], '--plain' in argv
+    return None
 
 
 def emit(data, output):
@@ -150,20 +171,8 @@ def execute(args):
         return 0
     if args.command == "export-structure":
         structure = read_structure(args.path, args.frame)
-        if args.format == "xyz" and structure.cell is not None and not args.allow_cell_loss:
-            raise KitError("Plain XYZ loses the cell; use extxyz or explicitly pass --allow-cell-loss")
-        warnings = []
-        if structure.cell is None:
-            warnings.append("Source has no cell: periodicity is unknown, not assumed non-periodic")
-        if args.format == "xyz" and structure.cell is not None:
-            warnings.append("Plain XYZ omits cell/PBC; full values retained in provenance JSON")
-        output = Path(args.output)
-        manifest_path = Path(str(output) + ".json")
-        with ExitStack() as stack:
-            stream = stack.enter_context(new_file(output))
-            manifest = stack.enter_context(new_file(manifest_path))
-            stream.write(xyz_text(structure, extended=args.format == "extxyz"))
-            manifest.write(json_text({**structure.to_dict(), "export_format": args.format, "warnings": warnings}))
+        output, manifest_path, warnings = export_structure_files(
+            structure, args.output, args.format, args.allow_cell_loss)
         for warning in warnings:
             print(f"WARNING: {warning}", file=sys.stderr)
         print(f"Wrote {output} and {manifest_path}", file=sys.stderr)
@@ -191,12 +200,12 @@ def execute(args):
 def main(argv=None):
     parser = build_parser()
     argv = list(sys.argv[1:] if argv is None else argv)
-    commands = {"discover", "parse", "report", "plot", "export-structure", "generate-input", "cube-check", "cube-diff"}
-    menu_argv = [arg for arg in argv if arg != "--plain"]
-    if not menu_argv or (len(menu_argv) == 1 and menu_argv[0] not in commands and not menu_argv[0].startswith("-")):
+    request = menu_request(argv, parser.command_names)
+    if request is not None:
+        path, plain = request
         try:
             from .main_tui import run_main_menu
-            return run_main_menu(menu_argv[0] if menu_argv else None, plain="--plain" in argv)
+            return run_main_menu(path, plain=plain)
         except KitError as exc:
             print(f"cp2kkit: {exc}", file=sys.stderr)
             return exc.code

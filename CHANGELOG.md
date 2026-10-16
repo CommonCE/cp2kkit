@@ -8,6 +8,33 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.2.5
+
+### Parser correctness and shared interface operations
+
+- BUG-1: replace the literal-backslash ENERGY suffix with a complete numeric-token
+  boundary. Accept trailing whitespace and whitespace-delimited annotations while
+  preserving original evidence lines/hashes. Adjacent garbage, incomplete exponents,
+  non-finite values and missing completion/convergence remain rejected or not passed.
+  Tests reproduced the old defect before the implementation fix.
+- ARC-4: share structure suffix/name aliases, format recognition and reader dispatch
+  between structure.py and menu discovery, including case-insensitive POSCAR/CONTCAR.
+  Recognition is not content validation; non-XYZ frame restrictions remain unchanged.
+- CLI-1: isolate menu_request and derive reserved command names from actual argparse
+  registrations. Retain bare/path/--plain behavior; add explicit -- PATH handling for
+  option-looking paths. Batch arguments/usage errors still belong to argparse;
+  interactive entrypoints still require both stdin and stdout TTY.
+- ARC-1: extract export_structure_files into export.py. CLI/menu call the same
+  operation and receive paths/warnings directly, without argv round trips or stderr
+  parsing. Preserve exact geometry/sidecar content, cell-loss permissions, exclusive
+  creation, collision exit codes and multi-file exception rollback.
+- Explicit requested version 0.2.5; schema remains 0.1.0. No scientific defaults,
+  U-value dictionary, new dependencies, hard-link fallback or calculation execution.
+  Remaining review items are planned in docs/roadmap.md, not claimed implemented.
+- Validation: 193 tests passed, none skipped; focused boundary/registry/routing/export
+  tests, full regression, compileall, diff, version and local-documentation links.
+  This is synthetic/software regression, not CP2K runtime/scientific certification.
+
 ## 0.2.4
 
 ### Scrolling interactive workflow

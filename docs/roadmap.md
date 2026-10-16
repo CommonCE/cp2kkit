@@ -1,37 +1,35 @@
 # Development status and next steps
 
-Current software: **0.2.4**, explicitly requested; schema: **0.1.0**.
-See [the changelog](../CHANGELOG.md). This round adds a scrolling grouped application
-menu and a single numbered input editor, optional Rich styling/plain fallback,
-structure summaries, result summaries, and consistent navigation. No alternate
-screen, screen clearing, continuous redraw, or full-screen framework is used.
-Applicable generation fields are visible together, with stable numbers instead
-of sequential steps/advanced pages. Pressure is CELL_OPT-only, padding requires
-effective NONE, OT hides smearing/empty orbitals, and diag hides outer SCF limits.
-Hidden fields leave number gaps and retain their values without implicit resets. The user
-requested these layout corrections without another version bump; 0.2.4 is retained.
-Source/frame moved to the header (s/f controls); output/project/version rows are
-removed. Corresponding main-menu IDs now follow the inspected Multiwfn source;
-100+ are explicit local extensions. In generation, 0 reviews/generates with
-confirmation and -10 returns. Other application menus keep their own navigation.
-Default input text, batch exit codes and protected writers remain unchanged.
-Slots 124/125 now implement explicit DFT+U and collinear magnetic guesses for target
-2026.2, including same-element opposite-spin KIND splitting. CLI cell/data controls
-remain available. Raw settings and optional electronic-extension metadata are
-additive under schema 0.1.0; U values and charge/multiplicity are never inferred.
+Current software: **0.2.5**, explicitly requested; schema: **0.1.0**.
+See [the changelog](../CHANGELOG.md). This round fixes BUG-1 ENERGY numeric-token
+boundaries, implements ARC-4 shared structure recognition, CLI-1 tested menu/batch
+routing, and ARC-1 shared protected structure export. Whitespace-delimited energy
+annotations are accepted without prefix-parsing adjacent garbage. Evidence/hashes,
+conservative quality rules, batch contracts and output protection are retained.
 
-Current validation: **176 tests passed, none skipped**; compileall, diff, CLI version,
-and local Markdown-link checks passed. Regression includes a real POSIX PTY menu,
-default/edited generation equivalence, conflicts/manual fixes, back/cancel/q/EOF/
-Ctrl+C, failed replacement, exclusive output/sidecar collisions, export/CUBE actions,
-plain/NO_COLOR/optional-dependency fallback, and narrow-terminal rendering.
-Optional Rich **15.0.0** was installed and import/render verified in the existing
-Python environment; the ui extra declares rich>=13.7. No CP2K/Multiwfn calculations,
-submission, package publication, commit, or push was performed. Runtime/scientific
-certification and real-file version coverage remain unverified.
+The scrolling grouped application menu and single numbered editor introduced in
+0.2.4 remain. No alternate screen, redraw or full-screen framework is used. Applicable
+fields have fixed numbers, and hidden values remain without implicit resets. Source/
+frame controls stay in the header; 0 reviews/generates with confirmation, -10 returns.
+Slots 124/125 retain explicit Ueff/L and collinear initial moments for target 2026.2,
+including split same-element KIND labels. U values, charge/multiplicity and scientific
+defaults are not inferred or changed. No U-value dictionary is implemented.
+
+Current validation: **193 tests passed, none skipped**; compileall, diff, CLI version,
+and local Markdown-link checks passed. Added 17 test methods cover ENERGY whitespace/
+annotations/malformed tokens, registry aliases, CLI routing, direct CLI/menu export
+byte equality, cell-loss permissions, collisions, failure and interrupt rollback.
+Existing PTY/navigation/generation/CUBE/plain/fallback regression remains passing.
+No dependencies were installed and no calculations, submissions or package publication
+were performed in this 0.2.5 work round. Runtime/scientific certification and real-file
+version coverage remain unverified.
 
 ## Recent historical validation
 
+- **0.2.4:** 176 tests passed, none skipped. Added scrolling menus, optional Rich
+  styling/plain fallback, conditional settings and explicit Ueff/initial magnetism.
+  Rich 15.0.0 import/render was verified in the existing environment; ui declares
+  rich>=13.7. No real CP2K execution/scientific certification was performed.
 - **0.2.3:** 138 tests passed, none skipped. Standardized maintained documentation,
   prompts and project text in English; preserved original quotations/hashes and
   consolidated the standalone MVP into this roadmap. No scientific/default changes.
@@ -82,6 +80,29 @@ A runnable preliminary implementation **does not equal complete production accep
 6. Assess streaming large output files and schema compatibility.
 7. Extend CP2K generation in stages toward full Multiwfn coverage, recording provenance
    and checking versions/parameter combinations.
+
+## Review follow-up backlog
+
+These are deferred review recommendations, not implemented features or fixed dates.
+In 0.2.5, BUG-1, ARC-4, CLI-1 and ARC-1 are completed with regression coverage.
+Keep future rounds small and independently testable; no mass renaming/refactoring.
+
+| Review ID | Deferred work | Constraints and acceptance boundary |
+|---|---|---|
+| ROB-1 | Improve unsupported-hard-link diagnostics and filesystem-specific tests | Current temporary files are already beside each target; failure cleans up safely and CLI returns I/O code 2. Prefer a clear supported-filesystem error first. Do not automatically copy to final paths without separately evaluating partial visibility, ownership-aware rollback and no-overwrite semantics. |
+| ARC-2 | Clarify field/navigation/editor module responsibilities | Keep public run_interactive compatibility while extracting useful shared pieces. Renaming alone is not a priority; ignored bytecode is not a tracked-source defect. Preserve all menu IDs/navigation. |
+| ARC-3 | Separate generator validation/resolution, rendering and manifest assembly | Keep generate_input's public signature and one authoritative CLI/TUI implementation. A validated intermediate state should not require text/manifest construction. Preserve physics, effective settings, text hashes, determinism and exclusive writers; compare old/new outputs before migration. |
+| PERF-1 | Stream large output/restart reads and discovery | Preserve full-byte SHA-256, strict UTF-8, evidence line numbers, segmentation and malformed/truncated-record handling. Discovery must scan the whole file for multiple project names, not inspect only the header. Retain read_text for full-text consumers. |
+| MNT-1 | Consider smaller CubeReader header/interpretation units when needed | Preserve bounded streaming, explicit unit/meaning assertions and source identity checks. Exhaustive semantics tests should precede extraction; no inference from magnitudes/charges. |
+| MNT-2 | Share only truly common numeric conversion primitives | structure_formats already reuses structure.floats. Preserve context-specific errors, integer rules, Fortran exponents, finite checks and CIF uncertainty handling; avoid a permissive universal parser. |
+| MNT-3 | Revisit structured settings/models only when semantic consumers require them | Intentionally defer dataclass/settings redesign. Keep original strings/evidence and null distinct from zero; do not normalize or merge physical settings implicitly. |
+| PKG-1 | Add lightweight CI, optional lint/type checks and packaging metadata/checks | Keep unittest/compileall, standard-library core and optional Rich/plotting isolation. Add only verified links/authorship; the owner decides licensing and unresolved upstream terms remain explicit. No package release is implied. |
+| TEST-1 | Expand bounded/property-style edge-case matrices incrementally | Use unittest loops/deterministic cases without new mandatory dependencies. Extend filesystem errors, parser segmentation and generator combinations; build on existing collision/race/inode-aware rollback tests rather than claiming these are absent. |
+
+Hard-link portability is a compatibility enhancement, not evidence that current
+rollback overwrites files. Refactoring is not automatically low-risk where physical
+settings, provenance, or write safety are involved. No plugin/configuration engine,
+mandatory UI dependency, relaxed quality rule or parallel CLI/TUI generator is planned.
 
 ## Input generation: incomplete by design
 

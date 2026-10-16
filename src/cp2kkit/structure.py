@@ -246,19 +246,36 @@ def read_restart(path):
     return Structure([a[0] for a in atoms], positions, lattice, pbc, source)
 
 
+# Format aliases are shared by reader dispatch and interactive file discovery.
+STRUCTURE_FORMATS = {'.xyz': 'xyz', '.extxyz': 'xyz', '.restart': 'restart',
+                     '.gjf': 'gjf', '.com': 'gjf', '.cif': 'cif',
+                     '.vasp': 'poscar', '.poscar': 'poscar'}
+STRUCTURE_NAMES = {'POSCAR': 'poscar', 'CONTCAR': 'poscar'}
+STRUCTURE_SUFFIXES = frozenset(STRUCTURE_FORMATS)
+
+
+def structure_format(path):
+    """Recognize supported names/suffixes only; this does not validate contents."""
+    path = Path(path)
+    return STRUCTURE_NAMES.get(path.name.upper(), STRUCTURE_FORMATS.get(path.suffix.lower()))
+
+
+def is_structure_path(path):
+    return structure_format(path) is not None
+
+
 def read_structure(path, frame=-1):
-    suffix = Path(path).suffix.lower()
-    if suffix in {".xyz", ".extxyz"}:
+    fmt = structure_format(path)
+    if fmt == 'xyz':
         return read_xyz(path, frame)
     from .structure_formats import read_cif, read_gjf, read_poscar
-    readers = {".restart": read_restart, ".gjf": read_gjf, ".com": read_gjf,
-               ".cif": read_cif, ".vasp": read_poscar}
-    reader = read_poscar if Path(path).name.upper() in {"POSCAR", "CONTCAR"} or suffix == ".poscar" else readers.get(suffix)
-    if reader:
+    readers = {'restart': read_restart, 'gjf': read_gjf, 'cif': read_cif, 'poscar': read_poscar}
+    if fmt in readers:
         if frame != -1:
             raise ParseError("--frame applies only to XYZ trajectories")
-        return reader(path)
-    raise ParseError("Supported structures: .xyz, .extxyz, .restart, .gjf, .com, .cif, POSCAR/CONTCAR, .vasp, .poscar")
+        return readers[fmt](path)
+    supported = ', '.join((*STRUCTURE_FORMATS, *STRUCTURE_NAMES))
+    raise ParseError(f"Supported structures: {supported}")
 
 
 def xyz_text(structure, extended=True):

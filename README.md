@@ -2,7 +2,7 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.2.4 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.2.5 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 - Analysis remains read-only: no submission/execution or modification of existing
@@ -15,13 +15,16 @@ release certified with actual CP2K runs.
 - All existing targets, including derived CSV/JSON/images, are protected from overwrite.
 - Energies can be extracted from failed jobs without becoming valid scientific results.
 
-## Current version: 0.2.4
+## Current version: 0.2.5
 
-The interactive interface now uses grouped, scrolling numbered menus and a
-single-menu input editor, with optional Rich styling, plain mode, real structure
-summaries, and explicit result statuses. Scientific defaults, batch formats/exit codes,
-and schema 0.1.0 are unchanged. Menu numbers/navigation have changed; see
-[the changelog](CHANGELOG.md) and the navigation below.
+This round fixes ENERGY token boundaries (trailing whitespace/annotations no longer
+hide valid energies), unifies structure-format recognition, tests CLI/menu routing,
+and shares protected structure export directly between CLI and menus. Existing
+scrolling menus, optional Rich/plain rendering, scientific defaults, batch formats/
+exit codes, and schema 0.1.0 are retained. Use `cp2kkit --plain -- -water.xyz` for
+an option-looking structure path; bare single unknown words still mean paths.
+See [the changelog](CHANGELOG.md), [architecture](docs/architecture.md), and
+[remaining review work](docs/roadmap.md#review-follow-up-backlog).
 A version number is not CP2K runtime certification.
 
 ## Quick start
@@ -182,7 +185,7 @@ Slots **124 / 125** now configure **DFT+U / magnetic initialization**, respectiv
 Cell overrides and data directories remain available through `--cell` / `--data-dir`.
 Complete CLI calls remain noninteractive, and machine-readable JSON/CSV is never
 rendered through Rich. Add `--plain` for unstyled interaction.
-Neither curses nor Multiwfn is a runtime dependency. Version stays 0.2.4 as requested.
+Neither curses nor Multiwfn is a runtime dependency. Version 0.2.5 retains this menu layout.
 See [input generation](docs/input-generation.md).
 
 Supported: ENERGY/ENERGY_FORCE/GEO_OPT/CELL_OPT, PBE/BLYP, MOLOPT-GTH,
@@ -257,6 +260,9 @@ The illustrative "2026.1" is not evidence of compatibility.
 Real fixtures and source-format checks remain a release gate.
 
 - Supports `ENERGY| Total FORCE_EVAL (...) energy [a.u.]`; energy stays in hartree.
+  A complete numeric token may be followed by whitespace or whitespace-delimited
+  annotations; adjacent garbage/incomplete exponents remain unsupported. Original
+  lines/hashes are preserved. Parsing an energy does not infer convergence.
 - `PROGRAM ENDED AT` proves a normal-end marker, not convergence by itself.
 - Positive quality rules cover ENERGY/ENERGY_FORCE/GEO_OPT/CELL_OPT only.
   MD/BAND/NEB records may parse but cannot be classified passed by these rules.
