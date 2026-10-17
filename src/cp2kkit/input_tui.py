@@ -13,7 +13,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from .errors import KitError
-from .inputgen import (BASES, CP2K_VERSIONS, FUNCTIONALS, PERIODICITIES, RUN_TYPES,
+from .basis_registry import basis_option, numbered_basis, parse_basis
+from .inputgen import (CP2K_VERSIONS, FUNCTIONALS, PERIODICITIES, RUN_TYPES,
                        InputSettings, generate_input)
 from .structure import read_structure
 from .presentation import Presenter
@@ -49,9 +50,15 @@ GROUPS = (
         Field("pressure", "CELL_OPT external pressure [bar]", "float"))),
     ("Method, basis and dispersion", (
         Field("functional", "Functional (GPW/GTH)", choices=FUNCTIONALS),
-        Field("basis", "Basis family (availability and fixed q checked per element; no implicit fallback)", choices=BASES),
+        Field("basis", "Orbital basis (immutable registry number or stable ID/name; 0 returns)", 'basis'),
         Field("dispersion", "Dispersion", choices=("none", "d3", "d3bj")),
-        Field("data_dir", "CP2K data directory (verify names and hashes)", optional=True),
+        Field("data_dir", "CP2K data directory (verify entries and hashes)", optional=True),
+        Field('basis_files', 'Explicit basis files (JSON list)', 'paths'),
+        Field('potential_files', 'Explicit potential files (JSON list)', 'paths'),
+        Field('custom_basis_file', 'Custom ORB file', optional=True),
+        Field('custom_basis_name', 'Custom real ORB alias', optional=True),
+        Field('custom_potential_file', 'Custom potential file', optional=True),
+        Field('custom_potential_name', 'Custom real potential alias', optional=True),
         Field('basis_overrides', 'Element basis overrides: Element=basis; separate entries with semicolons; off clears. No implicit SR/non-SR fallback.', 'basis_map'),
         Field('allow_pbe_potential', 'Explicitly approve GTH-PBE potentials when matched-functional entries are absent; this is an approximation', 'bool'),
         Field('libxc_available', 'Assert target CP2K was built with Libxc (required for RPBE; not detected by this tool)', 'bool'))),
@@ -107,6 +114,13 @@ def visible_fields(fields, values):
 
 def field_display(field, values):
     value = values[field.name]
+    if field.kind == 'basis':
+        try:
+            option = basis_option(value, require_selectable=False)
+        except KitError:
+            return f'{value} [invalid; explicit correction/migration required]'
+        status = '' if option.selectable else ' [UNAVAILABLE]'
+        return f'{option.number}: {option.name} [{option.id}]'+status
     if field.kind == 'basis_map':
         return format_basis_overrides(value)
     if field.kind == 'hubbard':
@@ -147,6 +161,14 @@ def display(value):
 
 def parse_value(field, raw):
     """Local lexical/range validation only; cross-field chemistry stays in inputgen."""
+    if field.kind == 'basis':
+        return numbered_basis(int(raw)) if raw.isdigit() else parse_basis(raw)
+    if field.kind == 'paths':
+        import json
+        value = json.loads(raw)
+        if not isinstance(value, list) or any(not isinstance(p, str) or not p for p in value):
+            raise ValueError('Expected a JSON list of nonempty file paths')
+        return tuple(value)
     if field.kind == 'basis_map':
         return parse_basis_overrides(raw)
     if field.kind == 'hubbard':
@@ -198,7 +220,12 @@ def command_arguments(path, frame, output, settings):
             f"--frame={frame}", f"--output={output}"]
     for name, value in asdict(settings).items():
         flag = "--" + name.replace("_", "-")
-        if name == 'basis_overrides':
+        if name == 'basis':
+            args.append(flag+'='+basis_option(value).id)
+        elif name in {'basis_files', 'potential_files'}:
+            for file in value:
+                args.append('--'+('basis-file' if name == 'basis_files' else 'potential-file')+'='+file)
+        elif name == 'basis_overrides':
             if value:
                 args.append(flag+'='+format_basis_overrides(value))
         elif name == 'dft_plus_u':
@@ -250,7 +277,10 @@ class Menu:
             raise Cancelled
         return raw
 
-    def edit(self, field, current):
+    def edit(self, field, current, values=None):
+        if field.kind == 'basis':
+            from .basis_ui import edit_basis
+            return edit_basis(self, current, values)
         self.show(field.label)
         for i, choice in enumerate(field.choices, 1):
             self.show(f"  {i}. {choice}")
@@ -282,7 +312,7 @@ class Menu:
                 continue
             field = fields[int(raw)-1]
             old = values[field.name]
-            values[field.name] = self.edit(field, old)
+            values[field.name] = self.edit(field, old, values)
             if values[field.name] != old:
                 values.get('_edited', set()).add(field.name)
                 if on_change is not None:
@@ -316,6 +346,7 @@ class Menu:
         self.show(f"Atoms: {len(structure.symbols)}; Explicit valence electrons: {manifest['valence_electron_count']}")
         self.show(f"Target version: {settings.cp2k_version}; Run type: {settings.run_type}; Method: GPW/{settings.functional}")
         self.show(f"XC backend: {manifest['method_profile']['xc_backend']}; target build verified: False")
+        self.show(f"Basis selection: {manifest['basis_selection']['number']} [{manifest['basis_selection']['id']}]; data: {manifest['basis_validation']['status']}; runtime validated: False")
         self.show(f"Basis files: {', '.join(manifest['method_profile']['basis_files'])}")
         if settings.basis_overrides:
             self.show(f"Element basis overrides: {format_basis_overrides(settings.basis_overrides)}")
@@ -324,7 +355,14 @@ class Menu:
         self.show(f"Coordinates translated: {manifest['coordinates_translated']}")
         for element, kind in manifest['kinds'].items():
             self.show(f"{element}: basis={kind['basis']}; pseudopotential={kind['potential']}")
+            self.show(f"  Selection: {kind['basis_number']} [{kind['basis_id']}]; ORB; {kind['data_validation']}")
+            self.show(f"  q: basis={kind['basis_q']}; potential={kind['potential_q']} [{kind['potential_q_source']}]; pairing={kind['protocol_pairing']}")
             self.show(f"  Basis file: {kind['basis_file']}; potential approximation: {kind['potential_approximation']}")
+            self.show(f"  Potential file: {kind['potential_file']}")
+            for role in ('basis', 'potential'):
+                source = kind[role+'_source']
+                if source:
+                    self.show(f"  {role} source: {source['path']}:{source['entry_line']}; sha256={source['sha256']}; data version={source['data_version'] or 'unknown'}")
             if kind.get('initial_magnetization') is not None:
                 self.show(f"  Initial MAGNETIZATION: {kind['initial_magnetization']}; element: {kind['element']}")
         self.show(f"Effective density output: electron={manifest['density_output']['electron_density']}, "

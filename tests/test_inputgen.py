@@ -9,6 +9,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from cp2kkit.cli import main
+from tests.synthetic_cp2k_data import basis_entry, potential_entry
 from cp2kkit.errors import KitError, OutputExists
 from cp2kkit.inputgen import BASES, CP2K_VERSIONS, MULTIWFN_CITATIONS, VALENCE, InputSettings, generate_input, write_input
 from cp2kkit.structure import Structure, read_restart, read_xyz
@@ -243,18 +244,18 @@ class InputGenerationTests(unittest.TestCase):
         self.assertEqual(m["generated_structure"]["positions"], self.water.positions)
 
     def test_local_data_headers_and_hashes(self):
-        # Minimal synthetic headers test validation, not usable basis coefficients.
+        # Invented structurally complete payloads, NOT scientific parameters.
         with tempfile.TemporaryDirectory() as tmp:
             d = Path(tmp)
-            (d / "BASIS_MOLOPT").write_text("H DZVP-MOLOPT-SR-GTH-q1\nO DZVP-MOLOPT-SR-GTH-q6\n")
-            (d / "GTH_POTENTIALS").write_text("H GTH-PBE-q1\nO GTH-PBE-q6\n")
+            (d / "BASIS_MOLOPT").write_text(basis_entry("H", "DZVP-MOLOPT-SR-GTH-q1") + basis_entry("O", "DZVP-MOLOPT-SR-GTH-q6"))
+            (d / "GTH_POTENTIALS").write_text(potential_entry("H", 1, "GTH-PBE-q1") + potential_entry("O", 6, "GTH-PBE-q6"))
             (d / "dftd3.dat").write_text("synthetic test only\n")
             text, m = generate_input(self.water, replace(self.settings, data_dir=tmp, dispersion="d3"))
             self.assertEqual(set(m["data_sources"]), {"basis", "potential", "dispersion"})
             self.assertIn(str(d / "GTH_POTENTIALS"), text)
             self.assertEqual(m["data_sources"]["basis"]["sha256"], hashlib.sha256((d / "BASIS_MOLOPT").read_bytes()).hexdigest())
-            (d / "BASIS_MOLOPT").write_text("# H DZVP-MOLOPT-SR-GTH-q1\nO DZVP-MOLOPT-SR-GTH-q6\n")
-            with self.assertRaisesRegex(KitError, "has no H"):
+            (d / "BASIS_MOLOPT").write_text("# H DZVP-MOLOPT-SR-GTH-q1\n" + basis_entry("O", "DZVP-MOLOPT-SR-GTH-q6"))
+            with self.assertRaisesRegex(KitError, "No matching ORB data.* H"):
                 generate_input(self.water, replace(self.settings, data_dir=tmp))
 
     def test_exclusive_output_and_rollback(self):

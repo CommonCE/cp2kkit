@@ -123,7 +123,7 @@ def run_editor(path, frame, output, settings, stdin=None, stdout=None, plain=Fal
         menu.show('Creates new files only; no calculations. Source supplies geometry, not charge/spin/method.')
         menu.show('Implemented main-menu IDs follow Multiwfn 2026.10.1; 100+ are local extensions. '
                   'Inapplicable fields are hidden, not reset.')
-        menu.show('Parameter Enter keeps; back abandons an edit; literal 0 is a value. '
+        menu.show('Parameter Enter keeps; back abandons an edit; literal 0 is a value (basis chooser: 0 returns). '
                   'Menu 0 generates after confirmation; -10/back/cancel returns; q exits.')
         while True:
             selectable = show_settings(menu, values)
@@ -144,8 +144,12 @@ def run_editor(path, frame, output, settings, stdin=None, stdout=None, plain=Fal
                         menu.show(f'Warning: Atom list unavailable: {exc}')
                     menu.show('An explicit magnetic request enables UKS. Charge/multiplicity stay unchanged. '
                               'Element seeds apply first; @atom seeds override them. This is an initial guess, not a moment constraint.')
-                values[field.name] = menu.edit(field, old)
-                if values[field.name] != old:
+                previous_sources = tuple(values[name] for name in ('data_dir', 'basis_files', 'potential_files',
+                                         'custom_basis_file', 'custom_basis_name', 'custom_potential_file', 'custom_potential_name'))
+                values[field.name] = menu.edit(field, old, values)
+                if values[field.name] != old or previous_sources != tuple(values[name] for name in (
+                        'data_dir', 'basis_files', 'potential_files', 'custom_basis_file', 'custom_basis_name',
+                        'custom_potential_file', 'custom_potential_name')):
                     values['_edited'].add(field.name)
                     compatibility(menu, values)
             elif raw in {'s', 'f'}:

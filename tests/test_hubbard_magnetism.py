@@ -17,6 +17,7 @@ from cp2kkit.inputgen import InputSettings, generate_input, write_input
 from cp2kkit.spin_settings import parse_dft_plus_u, parse_magnetism, format_dft_plus_u, format_magnetism
 from cp2kkit.structure import read_structure, read_restart
 from tests.test_input_tui import TTY
+from tests.synthetic_cp2k_data import basis_entry, potential_entry
 
 
 class HubbardMagnetismTests(unittest.TestCase):
@@ -150,8 +151,8 @@ class HubbardMagnetismTests(unittest.TestCase):
                 self.generate(**kwargs)
 
     def test_data_directory_checks_elements_not_generated_labels(self):
-        (self.dir/'BASIS_MOLOPT').write_text('Fe DZVP-MOLOPT-SR-GTH-q16\nO DZVP-MOLOPT-SR-GTH-q6\n')
-        (self.dir/'GTH_POTENTIALS').write_text('Fe GTH-PBE-q16\nO GTH-PBE-q6\n')
+        (self.dir/'BASIS_MOLOPT').write_text(basis_entry('Fe', 'DZVP-MOLOPT-SR-GTH-q16') + basis_entry('O', 'DZVP-MOLOPT-SR-GTH-q6'))
+        (self.dir/'GTH_POTENTIALS').write_text(potential_entry('Fe', 16, 'GTH-PBE-q16') + potential_entry('O', 6, 'GTH-PBE-q6'))
         _, manifest = self.generate(data_dir=str(self.dir), magnetism=parse_magnetism('@1=4; @2=-4'))
         self.assertIn('basis', manifest['data_sources'])
         self.assertEqual(manifest['kinds']['Fe_m1']['element'], 'Fe')

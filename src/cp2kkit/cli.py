@@ -10,7 +10,8 @@ from .discovery import discover, resolve_output
 from .errors import KitError
 from .export import export_structure_files, write_csv
 from .io import json_text, new_file
-from .inputgen import BASES, CP2K_VERSIONS, FUNCTIONALS, PERIODICITIES, RUN_TYPES, InputSettings, write_input
+from .basis_registry import DEFAULT_BASIS, parse_basis
+from .inputgen import CP2K_VERSIONS, FUNCTIONALS, PERIODICITIES, RUN_TYPES, InputSettings, write_input
 from .models import SCHEMA_VERSION
 from .parser import parse_output
 from .plot import plot_run
@@ -56,7 +57,14 @@ def build_parser():
     gen.add_argument("--project", help="Default: structure filename without its suffix")
     gen.add_argument("--run-type", type=str.upper, choices=RUN_TYPES, default="ENERGY")
     gen.add_argument("--functional", type=str.upper, choices=FUNCTIONALS, default="PBE")
-    gen.add_argument("--basis", choices=BASES, default="DZVP-MOLOPT-SR-GTH")
+    gen.add_argument("--basis", type=parse_basis, default=DEFAULT_BASIS,
+                     help="Stable ORB ID or legacy family name; numbers are interactive-only")
+    gen.add_argument("--basis-file", dest="basis_files", action="append", default=[], help="Explicit basis library; repeat to provide sources, differing duplicate aliases are rejected")
+    gen.add_argument("--potential-file", dest="potential_files", action="append", default=[], help="Explicit potential library; repeat to provide sources, no implicit merge")
+    gen.add_argument("--custom-basis-file", help="Selection custom-orbital/900: literal ORB library path")
+    gen.add_argument("--custom-basis-name", help="Selection custom-orbital/900: exact real alias, not a rename template")
+    gen.add_argument("--custom-potential-file", help="Optional custom potential library (also provide its name)")
+    gen.add_argument("--custom-potential-name", help="Exact custom potential alias; q is checked from occupations")
     gen.add_argument('--basis-overrides', type=parse_basis_overrides, default=(),
                      help='Target 2026.2: Element=basis entries separated by semicolons; explicit mixed basis, off clears')
     gen.add_argument('--allow-pbe-potential', action='store_true',

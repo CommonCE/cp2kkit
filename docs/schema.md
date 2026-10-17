@@ -116,7 +116,8 @@ Fields/units/schema 0.1.0 are unchanged.
 
 Schema stays 0.1.0; additions do not imply changes to default physical settings.
 
-- settings.basis_overrides: ordered canonical [element, family] pairs, [] by default.
+- settings.basis_overrides: ordered canonical [element, basis ID] pairs in registry v1
+  (legacy family names remain accepted on input), [] by default.
   Element names must be present and unique; the fixed valence q is not overridden.
 - settings.allow_pbe_potential / libxc_available: false by default. These are explicit
   user approval/assertion flags, not detected runtime facts or an automatic fallback.
@@ -136,14 +137,61 @@ Schema stays 0.1.0; additions do not imply changes to default physical settings.
   library and legacy roles. Each additional basis library adds basis:<filename>,
   with its own absolute path/raw-byte sha256/size_bytes. method_profile.basis_files
   lists the actual emitted paths (absolute with data_dir, basenames otherwise).
-  kinds.basis_file identifies the catalog library basename. Supplied file hashes
-  are separate from catalog reference hashes; no data_dir means no local verification.
+  kinds.basis_file identifies the emitted file (registry v1: resolved absolute path
+  for actual files, catalog basename for templates). Supplied hashes are separate
+  from catalog reference hashes; explicit files/environment directories can be
+  checked even without data_dir.
 - New functionals/families, UCL coverage extensions and nonempty element overrides
   require target 2026.2. Older target profiles still support the original requests.
   Failed approval/availability checks occur before protected output creation.
 - source/generated structure geometry and symbols are unchanged by these method
   requests. No inferred spin, q, missing basis substitution or source-file rewriting.
   Default generated physics is retained; software-version and additive metadata differ.
+
+## Generated input JSON: basis registry v1 (software remains 0.2.6)
+
+This follow-up retains schema 0.1.0 and all analysis/CSV contracts. Generator
+settings now serialize semantic basis IDs instead of family labels; both forms
+remain accepted on input. See [numbering and migration](basis-selection.md).
+Software 0.2.6 alone does not distinguish legacy positional menus from registry v1.
+
+- settings.basis: canonical stable string ID (default molopt-sr-dzvp).
+  settings.basis_overrides values use the same ID domain. No persisted menu positions.
+- settings.basis_files/potential_files: explicit source-path arrays, [] by default;
+  custom_basis_file/custom_basis_name/custom_potential_file/custom_potential_name:
+  nullable literal strings. Inactive custom settings are retained, not applied to
+  other families. These fields are data selectors, not new computational methods.
+- basis_selection: {id, number, registry_version: 1}. The number is informational,
+  not a substitute for settings.basis. Loading a registry-v1 sidecar with numeric
+  settings is rejected rather than migrated as legacy software 0.2.6.
+- kinds[label] additionally records basis_id/basis_number, basis_role=ORB,
+  basis_kind_type=pseudopotential, basis_protocol, nullable basis_q, potential_q
+  and potential_q_source (occupations or catalog), potential_file, basis_source,
+  potential_source and data_validation. All split KINDs inherit the element's
+  selected basis/potential/q without changing spin/U or atom order.
+- Actual basis_source/potential_source objects contain resolved path, requested_path
+  and requested_paths (including symlink spellings), raw sha256/size_bytes,
+  entry_line (1-based) and entry_sha256 (header-q/payload-token fingerprint).
+  Sources are null for catalog-only templates. data_version is identified only
+  through an exact pinned whole-file hash; otherwise null. reference_url is
+  present only for a recognized reference. Unrecognized unused headers are
+  preserved as unrecognized_headers [{line,text}], not repaired or certified.
+- protocol_pairing is reference_pair (recognized UZH reference bytes), catalog_pair
+  (both files unresolved), unverified_pair (UZH bytes not both recognized),
+  classic_family (intended classic profile), or custom_user_asserted. These are
+  not execution/convergence judgments; q agreement does not prove physical fitness.
+- basis_validation: status=data_checked or unverified_template, explicit selected-
+  entry scope, runtime_validated=false and runnable_verified=false. data_checked
+  requires both actual selected files and known matching q; it is not a check of
+  every block in those files, physical suitability or native CP2K acceptance.
+- Additional source keys still use basis:<basename>; basename collisions use
+  basis:<resolved-path> to preserve both identities. Only actually used basis
+  references are emitted, deduplicated by real path. Different potential files
+  cannot silently be merged into the one POTENTIAL_FILE_NAME keyword.
+
+Metadata and full summaries stay in JSON/review rather than extra input comments.
+The bundled catalog remains header metadata only, not installed data or parameters.
+No runtime validation is inferred from a filename, version, hash or successful export.
 
 ## Generated input JSON: optional electronic extensions
 

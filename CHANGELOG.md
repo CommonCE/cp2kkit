@@ -10,7 +10,42 @@ increments B once. Explicit user version requests take priority.
 
 ## 0.2.6
 
-### Explicit GGA and basis profiles
+### Permanent basis registry follow-up (version retained by explicit request)
+
+- Add explicit immutable number/string-ID registry v1, independent of display
+  order/filtering and real data aliases. Establish the numbering contract toward
+  1.0.0, not a 1.0.0 release. Separate ORB/AUX_FIT/RI_AUX roles; only ORB is selectable.
+  Reserve ranges, retain unavailable PBE0 IDs 30-32, and use custom ORB 900.
+- Keep classic 1-5 meanings from the requested contract; allocate 6-9 and 20-22
+  explicitly. Earlier menu list positions differ and are not silently reinterpreted.
+  Accept legacy family-name configs/CLI, persist stable IDs and provide explicit
+  legacy-version numeric migration. Registry-v1 metadata disambiguates the two
+  editors sharing software 0.2.6; current numeric configs are rejected.
+- Add audited SZV non-SR and paired UZH-PBE DZVP/TZVP/TZV2P, each UZH-PBE family
+  matching all 71 existing fixed-q presets. Use real PBE/GGA aliases and paired
+  potentials, not classic GTH_POTENTIALS renames. PBE0 headers do not enable hybrid
+  templates; preserve the anomalous source header and exclude NA placeholders.
+- Parse actual supplied basis/potential entries, aliases, q and numerical structure;
+  reject header-only/partial/non-finite/conflicting-q entries. Reuse read-only
+  hashing, directory discovery and protected writing; accept explicit files and
+  CP2K_DATA_DIR. Reject differing alias content and final-library shadowing rather
+  than guessing by file order. Emit deduplicated real paths; reject requests that
+  need multiple potential files instead of silently merging/replacing protocols.
+- Custom 900 accepts literal files/names, shares validation, records unknown basis
+  q as unknown/unverified, and does not certify role/physical pairing. Show grouped
+  scrolling choices and full pre-write KIND summaries. Record IDs/numbers, final
+  names, q, real/requested paths, entry/full hashes and identifiable versions.
+  No files yields unverified_template; data_checked never means runtime acceptance.
+- Keep default input physics, q, spin/U, cutoff/SCF and analysis JSON/CSV unchanged.
+  Schema remains 0.1.0; generator settings now serialize stable basis IDs and gain
+  documented registry/source/validation metadata. No new input comment inventory.
+- Validation: **254 tests passed, none skipped**, including 38 new registry methods;
+  compileall, diff, version and documentation-link/text checks passed. Read-only
+  real tagged data checks covered 213 UZH-PBE element/q pairs. Default synthetic-O
+  input bytes match commit 229d09d. No CP2K/Multiwfn execution, dependencies added,
+  submission, publication, commit or push. See [basis selection](docs/basis-selection.md).
+
+### Initial explicit GGA and basis profiles
 
 - Add native PBEsol/revPBE parametrized PBE and Libxc RPBE (GGA_X_RPBE + GGA_C_PBE).
   RPBE requires an explicit user assertion of target-build Libxc support; the tool
@@ -37,10 +72,11 @@ increments B once. Explicit user version requests take priority.
 - Reinspect Multiwfn outCP2Kinp XC/q-suffix/dispersion branches; record actual
   references/differences and unchanged custom authorization status. Read user
   modc.py only as a UZH migration reference; do not run/copy it or enable an unverified
-  rename-based conversion. UZH protocol support remains planned separately.
+  rename-based conversion. UZH protocol support was still planned at that stage;
+  the registry follow-up above implements only the audited PBE subset.
 - Explicit requested version 0.2.6. No Python dependencies added, calculation,
   package release or runtime/scientific certification implied.
-- Validation: 216 tests passed, none skipped, including 23 new method/profile test
+- Initial profile-round validation: 216 tests passed, none skipped, including 23 new method/profile test
   methods, current-q family coverage, approvals/build assertions, multi-file headers/
   hashes, wrong-library/q rejection, combined RPBE/+U/AFM/mixed bases, CLI replay,
   menu edit/clear/retained hidden flags and collision protection. Compileall, diff,

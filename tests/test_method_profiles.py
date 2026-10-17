@@ -11,6 +11,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from cp2kkit.cli import build_parser, main
+from tests.synthetic_cp2k_data import basis_entry, potential_entry
 from cp2kkit.data_catalog import CATALOG_SOURCES
 from cp2kkit.errors import KitError, OutputExists
 from cp2kkit.input_tui import GROUPS, command_arguments, run_interactive, visible_fields
@@ -57,10 +58,10 @@ class MethodProfileTests(unittest.TestCase):
                        basis_overrides=(('Fe', 'TZV2P-MOLOPT-SR-GTH'),), **kwargs)
 
     def data_files(self):
-        # Deliberately header-only synthetic libraries: names/hashes, NOT native basis validation.
-        (self.dir/'BASIS_MOLOPT').write_text('O TZV2P-MOLOPT-GTH-q6\n')
-        (self.dir/'BASIS_MOLOPT_UCL').write_text('Fe TZV2P-MOLOPT-SR-GTH-q16\n')
-        (self.dir/'GTH_POTENTIALS').write_text('O GTH-PBE-q6\nFe GTH-PBE-q16\n')
+        # Invented complete payloads: structural checks, NOT native/scientific validation.
+        (self.dir/'BASIS_MOLOPT').write_text(basis_entry('O', 'TZV2P-MOLOPT-GTH-q6'))
+        (self.dir/'BASIS_MOLOPT_UCL').write_text(basis_entry('Fe', 'TZV2P-MOLOPT-SR-GTH-q16'))
+        (self.dir/'GTH_POTENTIALS').write_text(potential_entry('O', 6, 'GTH-PBE-q6') + potential_entry('Fe', 16, 'GTH-PBE-q16'))
 
     def test_functional_names_and_distinct_xc_expansions(self):
         self.assertEqual(FUNCTIONALS, ('PBE', 'BLYP', 'PBESOL', 'REVPBE', 'RPBE'))
@@ -249,12 +250,12 @@ class MethodProfileTests(unittest.TestCase):
 
     def test_wrong_library_or_q_header_cannot_satisfy_selected_basis(self):
         self.data_files()
-        (self.dir/'BASIS_MOLOPT').write_text('O TZV2P-MOLOPT-GTH-q6\nFe TZV2P-MOLOPT-SR-GTH-q16\n')
-        (self.dir/'BASIS_MOLOPT_UCL').write_text('Fe TZV2P-MOLOPT-SR-GTH-q8\n')
-        with self.assertRaisesRegex(KitError, 'BASIS_MOLOPT_UCL has no Fe'):
+        (self.dir/'BASIS_MOLOPT').write_text(basis_entry('O', 'TZV2P-MOLOPT-GTH-q6') + basis_entry('Fe', 'TZV2P-MOLOPT-SR-GTH-q16'))
+        (self.dir/'BASIS_MOLOPT_UCL').write_text(basis_entry('Fe', 'TZV2P-MOLOPT-SR-GTH-q8'))
+        with self.assertRaisesRegex(KitError, 'No matching ORB data.* Fe'):
             generate_input(self.structure, self.mixed(data_dir=str(self.dir)))
         (self.dir/'BASIS_MOLOPT_UCL').unlink()  # Own synthetic artifact only.
-        with self.assertRaisesRegex(KitError, 'Cannot read'):
+        with self.assertRaisesRegex(KitError, 'Missing CP2K data files'):
             write_input(self.structure, self.mixed(data_dir=str(self.dir)), self.output)
         self.assertFalse(self.output.exists())
 

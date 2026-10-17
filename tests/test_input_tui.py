@@ -91,7 +91,9 @@ class MenuTests(unittest.TestCase):
                 self.assertNotIn(f'{number:3}. {LABELS[field.name]}:', rendered)
             else:
                 self.assertIn(f'{number:3}. {LABELS[field.name]}:', rendered)
-        self.assertEqual(len(NUMBERED_FIELDS), len(InputSettings.__dataclass_fields__)-4)
+        self.assertEqual({f.name for _, f in NUMBERED_FIELDS}, set(InputSettings.__dataclass_fields__) - {
+            'project', 'cp2k_version', 'cell', 'data_dir', 'basis_files', 'potential_files',
+            'custom_basis_file', 'custom_basis_name', 'custom_potential_file', 'custom_potential_name'})
         self.assertIn('generator default', log)
         self.assertFalse(self.output.exists())
 

@@ -17,7 +17,19 @@ release certified with actual CP2K runs.
 
 ## Current version: 0.2.6
 
-This round adds PBEsol, revPBE and Libxc RPBE profiles, TZVP/TZV2P short-range and
+Version remains **0.2.6** as explicitly requested. The basis follow-up adds a
+[permanent numbered registry](docs/basis-selection.md) with stable string IDs,
+classic/UCL and paired UZH-PBE choices, explicit custom ORB files, actual-entry
+alias/q checks, source ambiguity rejection and per-KIND provenance. PBE0 numbers
+are allocated but unavailable; no hybrid/all-electron/auxiliary template is added.
+Registry version 1 distinguishes the new contract from earlier positional menus;
+old family names remain accepted, old numbers need explicit migration. This is
+not a 1.0.0 release. With no actual data, output is an unverified template;
+installed-data checks and CP2K execution are separate. Default input physics stays
+unchanged. Analysis JSON/CSV and schema 0.1.0 are retained; generator settings now
+serialize stable basis IDs. See the guide for those metadata/migration changes.
+
+The initial 0.2.6 round added PBEsol, revPBE and Libxc RPBE profiles, TZVP/TZV2P short-range and
 TZV2PX MOLOPT families, and explicit element-specific mixed bases. Header catalogs
 pin CP2K v2026.2 source hashes and select actual basis files/potential q values.
 Unmatched-functional GTH-PBE approximations require explicit user approval; RPBE
@@ -88,7 +100,8 @@ Navigation:
 - Structure path/frame appear in the header; `s` changes the source and `f` changes
   the XYZ frame. Output path, project and target version are not settings-menu rows.
 - Parameter prompts: Enter keeps the value, `back` abandons that edit; literal
-  `0` is a value, not navigation. Optional `auto` restores source/default behavior.
+  `0` is a value, not navigation, except in the basis chooser where it returns.
+  Optional `auto` restores source/default behavior.
 - Use `r` to review, `p` to preview the full input/replay command, or `0`/`w` to
   review and write with explicit y/yes confirmation. Output defaults to the source
   stem plus `.inp` in the current directory; CLI overrides remain supported.
@@ -140,7 +153,7 @@ with the original cell, coordinates, provenance, and warnings.
 |---:|---|
 | 0 | Command completed; not a guarantee of calculation quality |
 | 2 | Argument, path, or filesystem problem |
-| 3 | Ambiguous project/output selection |
+| 3 | Ambiguous project/output/data-source selection |
 | 4 | Unsupported, damaged, or unparseable data |
 | 5 | Target exists; overwrite refused |
 | 6 | Missing optional plotting dependency |
@@ -186,7 +199,8 @@ omitted. Other implemented fields use `100+` extension IDs, not a hidden submenu
 Source/frame controls are in the header. Project and target-version overrides are
 CLI-only (`--project`, `--cp2k-version`); `-o` remains available to seed an output path.
 Slots **124 / 125** now configure **DFT+U / magnetic initialization**, respectively.
-Cell overrides and data directories remain available through `--cell` / `--data-dir`.
+Cell overrides and data directories remain available through `--cell` / `--data-dir`;
+the basis chooser also has data-source controls (`d`, `b`, `v`) without numbered main-menu rows.
 Complete CLI calls remain noninteractive, and machine-readable JSON/CSV is never
 rendered through Rich. Add `--plain` for unstyled interaction.
 Neither curses nor Multiwfn is a runtime dependency. Version 0.2.6 retains this menu layout.
@@ -211,7 +225,8 @@ PROJECT defaults to the source filename without suffix; grid defaults to 400/55 
 OT inner/outer limits are 25/20. With diag+smearing, empty orbitals default to
 `max(30, NINT(atom_count/2))`, with manual override.
 Plain XYZ requires explicit periodicity. Sources provide geometry, not calculation settings.
-`--data-dir` checks basis/potential names and records data-file hashes.
+`--data-dir` or explicit `--basis-file` / `--potential-file` checks selected entries,
+real names/aliases/q and records data-file hashes; see [basis selection](docs/basis-selection.md).
 **No CP2K runtime validation or full Multiwfn port is claimed.**
 Details/defaults/limitations are in the [generation guide](docs/input-generation.md).
 [Third-party notices](THIRD_PARTY_NOTICES.md) record Multiwfn sources, custom terms,
@@ -268,8 +283,9 @@ TZVP/TZV2P/TZV2PX cover 10. These are basis/PBE q matches, not unrestricted func
 or convergence guarantees. Actual basis libraries may include additional elements/
 q values that cp2kkit intentionally does not enable. The existing default valence
 policy is unchanged. No automatic q changes or SR/non-SR fallbacks are performed.
-`--data-dir` checks each selected file/header read-only and records hashes; without it,
-file availability is unverified. The Libxc flag is a user assertion, not build detection.
+The registry follow-up checks selected-entry payload structure as well as headers,
+using explicit files, `--data-dir`, or the actual CP2K_DATA_DIR environment directory.
+Without actual files, installed availability is unverified. The Libxc flag is a user assertion, not build detection.
 PBEsol/revPBE/RPBE D3 and D3(BJ) reference names were checked in tagged CP2K sources;
 no PBE dispersion parameters are substituted. See [the full guide](docs/input-generation.md#functional-and-basis-profiles-026).
 

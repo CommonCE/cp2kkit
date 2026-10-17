@@ -65,10 +65,20 @@ do not replace paper citations. Register additional method/upstream references p
 The generator checks keywords/nesting and basis/potential names using official
 input references and database headers; sources are in [input generation](docs/input-generation.md).
 src/cp2kkit/data_catalog.py derives header-only name/element/q/file metadata from
-CP2K v2026.2 BASIS_MOLOPT, BASIS_MOLOPT_UCL and GTH_POTENTIALS; versioned URLs/hashes
+CP2K v2026.2 BASIS_MOLOPT, BASIS_MOLOPT_UCL, GTH_POTENTIALS,
+BASIS_MOLOPT_UZH_2026.2 and POTENTIAL_UZH_2026.2; versioned URLs/hashes
 also identify inspected XC/D3/input definitions. No Fortran implementations, basis
 coefficients, potential parameters or dftd3.dat are distributed. These metadata do
 not establish whole-project license compatibility or native-runtime certification.
 The UCL library header credits Sanliang Ling and Ben Slater; MOLOPT references
 VandeVondele and Hutter, J. Chem. Phys. 127, 114105 (2007), DOI 10.1063/1.2770708. User-supplied --data-dir files are checked read-only and hashed;
 their actual use/distribution must follow the applicable terms.
+
+Registry-v1 numbers are the user's explicit contract, not a claim of complete
+Multiwfn choice-number equivalence. New registry/resolver/data-reader/basis-editor
+modules use local Python logic and CP2K data-format/header evidence; no additional
+Fortran or numerical basis/potential payload is bundled. UZH-PBE pairs were parsed
+read-only, not executed. PBE0 headers/NA placeholders and unknown source versions
+are not promoted to validated methods. See [basis selection](docs/basis-selection.md)
+and [provenance](third_party/multiwfn/PROVENANCE.md). No new authorization or
+whole-project licensing compatibility claim is made.

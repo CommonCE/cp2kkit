@@ -1,7 +1,28 @@
 # Development status and next steps
 
-Current software: **0.2.6**, explicitly requested; schema: **0.1.0**.
-See [the changelog](../CHANGELOG.md). This round adds native PBEsol/revPBE and Libxc
+Current software: **0.2.6**, explicitly retained by request; schema: **0.1.0**.
+The [registry-v1 basis follow-up](basis-selection.md) adds permanent allocated
+numbers, stable string settings/replay IDs, explicit legacy-position migration,
+SZV non-SR, paired UZH-PBE DZVP/TZVP/TZV2P, custom pseudopotential ORB 900,
+actual alias/payload/q/source checks, cross-KIND shadowing/ambiguity rejection and
+per-KIND origin/version metadata. PBE0 IDs 30-32 remain unavailable: no hybrid
+method template; reserved/auxiliary/all-electron families are not selectable.
+The 71-element fixed-valence policy, charge/spin/U, 400/55 Ry and protected writes
+are unchanged. No data yields an explicitly unverified template, not runnable
+certification. Software 0.2.6 alone does not distinguish legacy and registry menus;
+registry_version=1 does. Analysis/CSV contracts remain unchanged.
+
+Current validation: **254 tests passed, none skipped**, including 38 new registry
+methods; compileall, diff, CLI version and local documentation tests passed.
+Actual pinned CP2K v2026.2 data were parsed read-only for **213 UZH-PBE pairs**
+(3 families x 71 preset elements), with full source hashes and selected-entry/q
+checks. This is real-data parsing, **not CP2K execution**. A default synthetic-O
+input hash matches the earlier generator at commit 229d09d. No dependencies,
+calculations, submissions, package publication, commit or push were performed.
+
+### Initial 0.2.6 GGA/profile round (historical)
+
+See [the changelog](../CHANGELOG.md). That round added native PBEsol/revPBE and Libxc
 RPBE, TZVP/TZV2P short-range and TZV2PX MOLOPT families, and explicit element basis
 overrides. Tagged v2026.2 header catalogs select actual basis files and fixed-q
 potentials. Matched potentials are preferred; unmatched GTH-PBE approximations need
@@ -22,7 +43,7 @@ H/C/N/O. Mixed bases must be explicit; q values and source files are never rewri
 Multiple libraries are checked/hashed separately. Schema 0.1.0 gets additive method,
 file-identity and reference metadata; default PBE/DZVP-SR/400-55 Ry is unchanged.
 
-Current validation: **216 tests passed, none skipped**; compileall, diff, CLI version,
+Initial profile-round validation: **216 tests passed, none skipped**; compileall, diff, CLI version,
 and local Markdown-link checks passed. Added 23 profile test methods cover fixed-q
 family availability, XC definitions, approval/build assertions, actual potential
 identities, multi-file name/hash checks, malformed API maps, combined RPBE/+U/AFM/
@@ -117,8 +138,10 @@ mandatory UI dependency, relaxed quality rule or parallel CLI/TUI generator is p
 
 ## UZH protocol follow-up: modc.py reference
 
-UZH protocol pairs remain planned separately from the 0.2.6 UCL/legacy-MOLOPT
-profiles. User-provided `test-workspace/modc.py` was inspected read-only (SHA-256
+The original 0.2.6 planning below is retained for provenance. The registry-v1
+follow-up now implements paired UZH-PBE selections, audited over all 71 current
+preset elements; UZH-PBE0/hybrid templates remain unimplemented. See
+[basis selection](basis-selection.md) for current scope and permanent numbers. User-provided `test-workspace/modc.py` was inspected read-only (SHA-256
 `b37f4c2cb1b7051f6fd4d3a19cd00dbb511f9aca355e0fb936f3d033362e7dbd`),
 not executed, copied, modified or committed. No redistribution authorization for
 that user script is inferred. It demonstrates preserving q while selecting UZH
@@ -162,7 +185,8 @@ old default, or emitting target-version-unsupported keywords without checking.
    potential controls, richer +U projectors/occupations, CDFT, atom freezing,
    cell constraints, anisotropic pressure, and actual magnetic-state validation.
 3. **Methods/bases:** 0.2.6 adds PBEsol/revPBE/RPBE and explicit catalog-backed
-   MOLOPT/UCL mixed bases. Remaining: r2SCAN/meta-GGAs, verified UZH protocol pairs,
+   MOLOPT/UCL mixed bases; the registry follow-up adds UZH-PBE pairs and custom ORB.
+   Remaining: r2SCAN/meta-GGAs, native/scientific UZH validation, UZH-PBE0,
    hybrids/HF/ADMM/RI-HFX, GPW/GAPW, auxiliary/all-electron bases, additional families/
    q policies, correlated wavefunctions, semiempirical/force fields and SCF options.
 4. **Tasks:** frequencies/vibrations/Raman, MD, dimer TS, BAND/NEB, NMR, polarizability,

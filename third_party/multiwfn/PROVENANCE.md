@@ -217,6 +217,34 @@ line numbers are auxiliary. Do not invent upstream commits, inspection dates, or
   generation/round trips do not validate energies, forces/stress, magnetic states,
   convergence, projector-dependent U, or Libxc/runtime library availability.
 
+## Permanent ORB registry follow-up (software 0.2.6, registry v1)
+
+- Local: basis_registry.py, basis_resolution.py, cp2k_data.py, basis_ui.py and
+  existing method_profiles/inputgen/CLI/editor adapters. Explicit numbers and
+  stable IDs follow the user's requested contract, not an additional Multiwfn
+  menu/table port. Existing earlier references/citations/custom terms are retained;
+  no new Multiwfn source inspection or authorization is claimed for this follow-up.
+- Primary evidence: actual tagged CP2K v2026.2 BASIS_MOLOPT (including SZV non-SR),
+  BASIS_MOLOPT_UCL, BASIS_MOLOPT_UZH_2026.2 and POTENTIAL_UZH_2026.2. Versioned URLs
+  and raw hashes are recorded in data_catalog.py and [the basis guide](../../docs/basis-selection.md).
+  The UZH hashes match the established earlier read-only reference checks.
+- New implementation indexes real aliases/headers, checks selected numerical
+  payload structure and q, rejects ambiguous content/cross-KIND lookup shadowing,
+  and records requested/real paths without inferring versions from filenames.
+  The input_cp2k_dft.F reference confirms repeated basis files versus one potential
+  file. No coefficients, potential parameters, Fortran routines or user modc.py
+  code are copied/distributed. No in-place conversion or numerical resets.
+- Read-only actual-data checks: 213 UZH-PBE pairs across the existing 71-element
+  fixed-q policy, plus original SZV entries. PBE0 header presence is not method
+  support: literal malformed element header at UZH basis line 5614 is not repaired,
+  and PBE NA placeholders are not numerical potentials. Synthetic custom fixtures
+  are invented parser data, not production scientific parameters.
+- Version remains 0.2.6 by explicit request. Registry v1 separates new IDs from the
+  earlier 0.2.6 positional menu; older names stay accepted and numeric migration
+  is explicit. Validation is unit/interface/real-data parsing only, not native
+  CP2K execution, convergence, physical suitability or upstream menu equivalence.
+  No separate grant, clean-room, full-port or license-compatibility certification.
+
 ## Template for future features
 
 Copy this structure for each referenced feature and supply evidenced facts.

@@ -11,6 +11,7 @@ No CP2K execution or input preprocessor expansion is performed.
 """
 import hashlib
 import math
+import os
 import re
 from contextlib import ExitStack
 from dataclasses import asdict, dataclass, replace
@@ -25,6 +26,8 @@ from .structure import Structure, check_cell
 from .spin_settings import atomic_kinds, validate_requests
 from .method_profiles import BASES, FUNCTIONALS, resolve_method, xc_lines
 from .data_catalog import CATALOG_SOURCES
+from .basis_registry import DEFAULT_BASIS, basis_option, migrate_basis
+from .cp2k_data import cp2k_path
 
 MULTIWFN_CITATIONS = (
     "Tian Lu, Feiwu Chen, J. Comput. Chem. 33, 580-592 (2012). DOI: 10.1002/jcc.22885",
@@ -63,7 +66,7 @@ class InputSettings:
     project: str | None = None
     run_type: str = "ENERGY"
     functional: str = "PBE"
-    basis: str = "DZVP-MOLOPT-SR-GTH"
+    basis: str = DEFAULT_BASIS
     dispersion: str = "none"
     charge: int = 0
     multiplicity: int = 1
@@ -92,16 +95,40 @@ class InputSettings:
     basis_overrides: tuple[tuple[str, str], ...] = ()
     allow_pbe_potential: bool = False  # Explicit approval, not an automatic fallback.
     libxc_available: bool = False  # User assertion about target build, never probed.
+    basis_files: tuple[str, ...] = ()  # Explicit source disambiguation, no search fallback.
+    potential_files: tuple[str, ...] = ()
+    custom_basis_file: str | None = None
+    custom_basis_name: str | None = None
+    custom_potential_file: str | None = None
+    custom_potential_name: str | None = None
+
+    @classmethod
+    def from_config(cls, values, source_version=None):
+        """Load settings or a generator sidecar; numeric legacy choices need a version."""
+        values = dict(values)
+        if 'settings' in values:
+            if values.get('basis_selection', {}).get('registry_version') is not None:
+                if values['basis_selection']['registry_version'] != 1:
+                    raise KitError('Unsupported basis registry version; no numeric interpretation is inferred')
+                # Software 0.2.6 includes both the legacy and registry-v1 editor.
+                # Registry-v1 configs must contain string IDs, not legacy positions.
+                source_version = None
+            else:
+                source_version = source_version or values.get('generator', {}).get('version')
+            values = dict(values['settings'])
+        values['basis'] = migrate_basis(values.get('basis', DEFAULT_BASIS), source_version)
+        if values.get('basis_overrides'):
+            values['basis_overrides'] = tuple((el, migrate_basis(basis, source_version))
+                                              for el, basis in values['basis_overrides'])
+        for name in ('cell', 'kpoints', 'cube_stride', 'basis_files', 'potential_files'):
+            if values.get(name) is not None:
+                values[name] = tuple(values[name])
+        return cls(**values)
 
 
 def positive(value, name):
     if not math.isfinite(value) or value <= 0:
         raise KitError(f"{name} must be finite and positive")
-
-
-def data_header_exists(text, element, name):
-    return any(len(p) > 1 and p[0] == element and name in p[1:]
-               for line in text.splitlines() if (p := line.split()) and not line.lstrip().startswith("#"))
 
 
 def scientific_number(value):
@@ -128,6 +155,7 @@ def generate_input(structure: Structure, settings: InputSettings):
             raise KitError("Automatic project name requires a source path; specify project explicitly")
         project = Path(structure.source['path']).stem
     s = replace(settings,
+                basis=basis_option(settings.basis).id,
                 project=project,
                 max_scf=settings.max_scf if settings.max_scf is not None else (25 if settings.scf == 'ot' else 128),
                 added_mos=settings.added_mos if settings.added_mos is not None else
@@ -137,7 +165,7 @@ def generate_input(structure: Structure, settings: InputSettings):
     if not isinstance(s.project, str) or not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*", s.project):
         raise KitError("Project must be a safe name (letters, digits, _, ., -); no paths or directives")
     for value, choices, name in ((s.run_type, RUN_TYPES, "run type"), (s.functional, FUNCTIONALS, "functional"),
-                                 (s.basis, BASES, "basis"), (s.dispersion, ("none", "d3", "d3bj"), "dispersion"),
+                                 (s.dispersion, ("none", "d3", "d3bj"), "dispersion"),
                                  (s.scf, ("ot", "diag"), "SCF"), (s.optimizer, ("BFGS", "LBFGS", "CG"), "optimizer")):
         if value not in choices:
             raise KitError(f"Unsupported {name}: {value}")
@@ -174,13 +202,13 @@ def generate_input(structure: Structure, settings: InputSettings):
     unsupported = set(elements) - VALENCE.keys()
     if unsupported:
         raise KitError("No verified basis/potential preset for: " + ", ".join(sorted(unsupported)))
-    method_profile, basis_overrides, element_records, method_warnings = resolve_method(s, elements, VALENCE)
-    s = replace(s, basis_overrides=basis_overrides)
     hubbard, magnetism = validate_requests(s.dft_plus_u, s.magnetism, structure.symbols, VALENCE)
     s = replace(s, dft_plus_u=hubbard, magnetism=magnetism)
     if (hubbard or magnetism is not None) and s.cp2k_version != '2026.2':
         raise KitError('DFT+U and explicit magnetic settings are currently keyword-checked only for CP2K 2026.2')
     atom_labels, kind_specs = atomic_kinds(structure.symbols, magnetism)
+    method_profile, basis_overrides, element_records, method_warnings = resolve_method(s, elements, VALENCE, kind_specs)
+    s = replace(s, basis_overrides=basis_overrides)
     electrons = sum(VALENCE[symbol] for symbol in structure.symbols) - s.charge
     unpaired = s.multiplicity - 1
     if electrons <= 0 or unpaired > electrons or (electrons - unpaired) % 2:
@@ -271,33 +299,32 @@ def generate_input(structure: Structure, settings: InputSettings):
                 kind['dft_plus_u'] = {'L': angular, 'U_minus_J': energy, 'unit': 'eV', 'method': 'MULLIKEN'}
         kinds[label] = kind
     data_sources = {}
-    basis_names = sorted({record['basis_file'] for record in element_records.values()})
-    basis_files = list(basis_names)
-    files = {'potential': 'GTH_POTENTIALS', 'dispersion': 'dftd3.dat'}
-    if s.data_dir is not None:
-        requests = [('basis' if i == 0 else 'basis:'+name, name, 'basis')
-                    for i, name in enumerate(basis_names)]
-        requests += [('potential', files['potential'], 'potential')]
-        if s.dispersion != 'none':
-            requests.append(('dispersion', files['dispersion'], 'dispersion'))
-        for key, name, role in requests:
-            path = str((Path(s.data_dir)/name).resolve())
-            if any(c in path for c in ('"', '\n', '\r', '#', '!', '@', '$')):
-                raise KitError('CP2K data paths contain unsupported special characters')
-            text, source = read_text(path)
-            data_sources[key] = source
-            if role != 'dispersion':
-                for el, record in element_records.items():
-                    if role == 'basis' and record['basis_file'] != name:
-                        continue
-                    if not data_header_exists(text, el, record[role]):
-                        raise KitError(f'{name} has no {el} {record[role]}')
-            if role == 'basis':
-                basis_files[basis_names.index(name)] = path
-            else:
-                files[role] = path
-    else:
-        warnings.append("Data files resolved through CP2K_DATA_DIR at runtime; supply --data-dir to verify names and record file hashes.")
+    basis_files = sorted({record['basis_file'] for record in element_records.values()})
+    potentials = sorted({record['potential_file'] for record in element_records.values()})
+    if len(potentials) != 1:
+        raise KitError('Mixed potential source files cannot be represented by the single POTENTIAL_FILE_NAME: '
+                       + ', '.join(potentials) + '. Choose one explicit, physically appropriate source; no automatic protocol replacement/merge is performed.')
+    files = {'potential': potentials[0], 'dispersion': 'dftd3.dat'}
+    for i, file in enumerate(basis_files):
+        record = next(r for r in element_records.values() if r['basis_file'] == file)
+        if record['basis_source']:
+            key = 'basis' if i == 0 else 'basis:'+Path(file).name
+            if key in data_sources:
+                key = 'basis:'+file  # Same basename in different explicitly selected directories.
+            data_sources[key] = record['basis_source']
+    potential_source = next(iter(element_records.values()))['potential_source']
+    if potential_source:
+        data_sources['potential'] = potential_source
+    data_root = s.data_dir if s.data_dir is not None else os.environ.get('CP2K_DATA_DIR')
+    if data_root is not None and s.dispersion != 'none':
+        files['dispersion'] = str((Path(data_root)/'dftd3.dat').resolve())
+        cp2k_path(files['dispersion'])
+        _, data_sources['dispersion'] = read_text(files['dispersion'])
+    elif s.dispersion != 'none':
+        warnings.append('Dispersion data dftd3.dat have not been checked; the file is resolved by CP2K at runtime.')
+    data_checked = all(r['data_validation'] == 'data_checked' for r in element_records.values())
+    if not data_checked:
+        warnings.append('UNVERIFIED TEMPLATE: actual basis/potential files or basis q matching have not all been checked. Supply --data-dir or explicit files; catalog evidence is not an installed-data or runtime validation.')
     def num(v):
         return format(v, ".17g")
     lines = ["# Generated by cp2kkit; subset developed with reference to Multiwfn cp2kmate.f90",
@@ -378,7 +405,12 @@ def generate_input(structure: Structure, settings: InputSettings):
                 "references": {"Multiwfn": list(MULTIWFN_CITATIONS),
                                "terms_url": "http://sobereva.com/multiwfn/download.html",
                                "notice": "THIRD_PARTY_NOTICES.md"},
-                "settings": asdict(s), "effective_eps_scf": eps, "poisson_solver": solver,
+                "settings": asdict(s),
+                'basis_selection': {'id': s.basis, 'number': basis_option(s.basis).number, 'registry_version': 1},
+                'basis_validation': {'status': 'data_checked' if data_checked else 'unverified_template',
+                                     'scope': 'selected-entry structure, aliases, q and source bytes only',
+                                     'runtime_validated': False, 'runnable_verified': False},
+                "effective_eps_scf": eps, "poisson_solver": solver,
                 "density_output": {"enabled": bool(density_enabled),
                                    "electron_density": bool(density_enabled),
                                    "spin_density": bool(density_enabled and uks),

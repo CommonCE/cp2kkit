@@ -30,7 +30,11 @@ cli.py
  |-- input_editor.py (single numbered settings menu, drafts, review; same generator/writer)
  |-- presentation.py (scrolling text, optional Rich; no batch rendering)
  |-- inputgen.py --- structure.py / spin_settings.py / method_profiles.py / models.py / io.py
- |-- method_profiles.py -- data_catalog.py / structure.py (explicit XC, q/file matching, approvals)
+ |-- method_profiles.py -- basis_resolution.py / data_catalog.py (XC, approvals, per-element resolution)
+ |-- basis_registry.py (immutable allocated numbers/string IDs, roles/status, explicit legacy migration)
+ |-- basis_resolution.py -- basis_registry.py / cp2k_data.py / data_catalog.py (ORB/potential protocol checks)
+ |-- cp2k_data.py -- io.py / structure.py (actual aliases, selected payload/q checks, paths/hashes/ambiguity)
+ |-- basis_ui.py -- basis_registry.py / cp2k_data.py (one grouped scrolling basis-value list)
  |-- data_catalog.py (header-only names/q/files and pinned official source hashes)
  |-- spin_settings.py (explicit Ueff/L parsing, collinear atom seeds, stable KIND splitting)
  `-- cube.py ------- models.py / io.py / structure.py (units; streaming checks/differences)
@@ -106,6 +110,19 @@ and unsupported combinations are rejected. Element presets explicitly match
 basis/potential valence counts; optional local data checks verify names/hashes.
 No calculation or Multiwfn/adjacent-source dependency.
 
+The registry-v1 follow-up remains software 0.2.6 by explicit user request. Basis
+numbers are permanent allocated IDs, not tuple positions; stable strings are
+persisted in settings/replay. Legacy names are normalized at boundaries, numeric
+migration needs explicit legacy version information, and registry-v1 configs never
+infer old positions from software 0.2.6 alone. Actual files override header catalogs;
+missing/ambiguous/q-incompatible entries are rejected without physical repairs.
+All emitted libraries are checked for cross-KIND alias shadowing. One potential
+file must represent all KINDs; no automatic library merge/replacement is performed.
+[The basis guide](basis-selection.md) specifies source precedence, UZH-PBE pairs,
+custom 900, unknown-q/templates and unavailable/retired/reserved roles. Auxiliary
+roles are modeled separately but not selectable. Selected-entry data checks and
+recognized reference pairs are separate from native acceptance and scientific fitness.
+
 The line-oriented input editor maintains drafts, performs local type/range checks,
 and rechecks changes through the shared generator without repairing physical conflicts.
 Applicable fields are directly selectable in one list. FIELD_IDS records inspected
@@ -128,8 +145,8 @@ leading hyphens; invalid mixed arguments still go through argparse usage errors.
 Both streams must still be TTY. --plain/NO_COLOR
 disable styling. EOF/q exits the session; Ctrl+C cancels an operation (exits at main).
 Default input text and protected writers are unchanged. Slots 124/125 now request
-explicit Ueff/L and collinear magnetic initialization; --cell/--data-dir remain
-CLI-only. spin_settings validates and maps element/atom selectors without changing
+explicit Ueff/L and collinear magnetic initialization; --cell remains CLI-only,
+while data sources are also editable inside the basis chooser without main-setting numbers. spin_settings validates and maps element/atom selectors without changing
 charge/multiplicity or source geometry. Split KIND labels retain ELEMENT-specific
 basis/potential/U. Only target 2026.2 is checked for these opt-in features. The 0.2.6 GGA/basis profiles
 also require target 2026.2. Menu 128 configures explicit element basis overrides;

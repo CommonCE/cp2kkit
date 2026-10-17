@@ -1,7 +1,10 @@
 # CP2K input generation
 
 This guide describes cp2kkit **0.2.6**. Older defaults and migration notes are in
-[the changelog](../CHANGELOG.md).
+[the changelog](../CHANGELOG.md). This feature stays at **0.2.6** by explicit request.
+The [registry-v1 basis guide](basis-selection.md) defines permanent numbering toward
+1.0.0, data requirements, UZH protocols, custom 900 and explicit migration from
+legacy list positions; it does not claim a 1.0.0 release or native validation.
 
 `generate-input` is an explicit write entry point added beyond the read-only MVP;
 it neither submits nor runs calculations. It is a Python GPW subset developed
@@ -92,7 +95,9 @@ new profiles are explicit opt-ins, not changes to the default scientific setting
 
 Only corresponding implemented main-menu IDs are reused; this is not full upstream
 menu/choice/default equivalence. In particular, OT outer-limit editing is not the
-upstream outer-SCF enable/disable toggle. No unimplemented placeholders are shown.
+upstream outer-SCF enable/disable toggle. The main settings omit unimplemented
+controls; the basis-value list explicitly marks unavailable PBE0 entries and
+reserved ranges, neither of which can be selected.
 
 - Structure path and frame appear above the list, without setting numbers or seed
   annotations. `s` loads/replaces the structure; `f` selects the XYZ frame.
@@ -109,7 +114,9 @@ upstream outer-SCF enable/disable toggle. No unimplemented placeholders are show
   diag hides outer SCF limits. All values are retained when fields disappear.
 - Parameter Enter keeps; `back` abandons that edit. **Literal zero remains a value**,
   including charge, ADDED_MOS and Boolean off. Optional `auto` restores defaults.
-  Enumerations accept names/numbers; triples are space-separated.
+  Enumerations accept names/numbers; triples are space-separated. In the basis
+  chooser only, **0 returns**. Its immutable registry numbers are independent of
+  list order/filtering; CLI/config/replay use stable string IDs.
 - **Input-generation navigation changed:** `0` now reviews/generates, matching
   Multiwfn. Use `-10`/`back`/`cancel` to return without generation.
   The application main menu still uses `0` to exit; ordinary submenus retain their
@@ -305,8 +312,9 @@ cp2kkit generate-input FeO.extxyz -o mixed.inp --basis TZV2P-MOLOPT-GTH \
 Only actually needed basis libraries are emitted, in deterministic order, using
 repeatable BASIS_SET_FILE_NAME. With `--data-dir`, each selected file/header is
 checked separately and raw bytes are hashed. An entry in the wrong library or with
-a different q cannot satisfy a selection. User data files verify existing profiles,
-not automatically add arbitrary functional/basis/potential choices.
+a different q cannot satisfy a selection. Registry-v1 actual files are authoritative for an enabled family at the fixed q;
+explicit files may supply entries beyond pinned catalog coverage. They do not add
+new method templates or change q. Use custom 900 for a literal custom ORB alias.
 NGRIDS is 5 if any effective KIND basis is non-SR, otherwise 4. CUTOFF/REL_CUTOFF
 remain 400/55 Ry by default, not property-converged values. Larger Gaussian bases,
 grid convergence and overlap conditioning are separate checks.
@@ -328,8 +336,10 @@ DOI [10.1063/1.2770708](https://doi.org/10.1063/1.2770708).
 Header checks/synthetic round trips are not native CP2K acceptance, converged
 energies/forces/stress, recommended bases/U, or validation of an adsorption model.
 
-r2SCAN/meta-GGAs, hybrids/HF/ADMM, UZH protocol pairs, arbitrary q changes and
-additional basis families remain roadmap items, not enabled options.
+The registry follow-up enables paired UZH-PBE DZVP/TZVP/TZV2P for target 2026.2
+and explicit custom pseudopotential ORB files. r2SCAN/meta-GGAs, hybrids/HF/ADMM,
+UZH-PBE0 templates, arbitrary q changes, auxiliary/all-electron and reserved
+families remain unimplemented; see [basis selection](basis-selection.md).
 
 ## DFT+U and magnetic initialization (124 / 125)
 
@@ -420,10 +430,13 @@ SCF threshold, each element's basis/potential/electron count, source path/hash/f
 generated geometry, translation, and warnings. `runtime_version=null` and
 `runtime_validated=false`: a target version is not an executed version.
 
-`--data-dir` checks element/name headers in local BASIS_MOLOPT/GTH_POTENTIALS and
-records hashes; D3 also records dftd3.dat. It does not certify coefficients/parameters.
-Otherwise runtime CP2K_DATA_DIR resolves basenames; the actual installation has
-not been verified. Record the executed CP2K binary version in subsequent calculations.
+Registry-v1 checks actual selected-entry basis/GTH payload structure, aliases and
+q from explicit files, `--data-dir`, or the CP2K_DATA_DIR environment directory,
+recording full-byte hashes and resolved paths. D3 also records dftd3.dat when a
+local data directory is used. Unknown source versions remain null, not inferred
+from filenames. With no actual files the result is an unverified template; even
+`data_checked` is not whole-library validity, verified physical pairing or native
+CP2K acceptance. Record the executed binary/version in subsequent authorized runs.
 
 Synthetic regression, section balance, and geometry round-trips are tested.
 CP2K has not been launched; actual native syntax/runtime certification remains open.
