@@ -11,7 +11,7 @@ import re
 
 from .errors import AmbiguousProject, KitError, ParseError
 from .io import read_text
-from .structure import ELEMENTS
+from .structure import ELEMENTS, ELEMENT_ORDER
 
 Q = re.compile(r'-q([0-9]+)$', re.I)
 NUMERIC = re.compile(r'[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eEdD][+-]?[0-9]+)?')
@@ -31,6 +31,21 @@ def cp2k_path(value):
     if any(ord(c) < 32 or ord(c) == 127 or c in '"\\@$' for c in value):
         raise KitError(f'Unsupported character in CP2K data path: {value!r}')
     return '"'+value+'"' if any(c.isspace() or c in '#!' for c in value) else value
+
+
+def cp2k_long_path(value):
+    """Serialize a whole-line (lchar_t) filename, not a quoted char_t token.
+
+    In the inspected CP2K parser a quote-only first chunk can become a blank
+    prefix when lchar_t chunks are joined. Literal internal spaces need no
+    quotes; reject comment markers instead of emitting an ambiguous path.
+    """
+    value = str(value)
+    cp2k_path(value)  # Shared control-character / preprocessor-injection checks.
+    if not value or value != value.strip() or any(c in value for c in '#!'):
+        raise KitError('Whole-line CP2K data paths must be nonempty, have no leading/trailing '
+                       'whitespace or #/! comment markers; choose an unambiguous data path')
+    return value
 
 
 @dataclass(frozen=True)
@@ -54,7 +69,7 @@ class Entry:
             raise ParseError(f'Conflicting q aliases: {self.source["path"]}:{self.line}')
         return next(iter(values), None)
 
-    def validate(self):
+    def validate(self, *, all_electron=False):
         where = f'{self.source["path"]}:{self.line} ({self.element} {self.names[0]})'
         rows = self.body
         try:
@@ -88,6 +103,8 @@ class Entry:
                     index += 1+count
                 if index != len(rows):
                     raise ValueError('truncated or trailing basis payload')
+                if all_electron and self.header_q is not None:
+                    raise ValueError('all-electron orbital entries must not carry pseudopotential q aliases')
                 return self.header_q
             occupations = [int(v) for v in rows[0]]
             if not occupations or min(occupations) < 0 or sum(occupations) < 1:
@@ -95,8 +112,17 @@ class Entry:
             q = sum(occupations)
             if self.header_q is not None and q != self.header_q:
                 raise ValueError(f'potential occupations q{q} disagree with header q{self.header_q}')
-            if any(n.upper() in {'ALL', 'ALLELECTRON'} for n in self.names):
+            nuclear = any(n.upper() in {'ALL', 'ALLELECTRON'} for n in self.names)
+            if nuclear and not all_electron:
                 raise ValueError('all-electron potential is outside the GPW pseudopotential template')
+            if all_electron:
+                if not nuclear:
+                    raise ValueError('GAPW all-electron selection requires a real ALL/ALLELECTRON nuclear potential')
+                if (self.header_q is not None or q != ELEMENT_ORDER.index(self.element)+1
+                        or len(rows) != 2 or len(rows[1]) != 2
+                        or int(rows[1][1]) != 0 or numbers[1][0] <= 0):
+                    raise ValueError('invalid ALL nuclear potential or occupations disagree with atomic number')
+                return q
             local = rows[1]
             nlocal = int(local[1])
             if numbers[1][0] <= 0 or nlocal < 0 or len(local) != 2+nlocal or len(rows[2]) != 1:
@@ -129,10 +155,15 @@ def read_library(path, role):
     source['requested_path'] = str(Path(path).absolute())
     source['data_version'] = None  # Only a pinned full-byte hash can identify a reference version.
     from .data_catalog import CATALOG_SOURCES
-    for pinned in CATALOG_SOURCES:
+    from .all_electron_catalog import AE_SOURCES
+    for pinned in (*CATALOG_SOURCES, *AE_SOURCES):
         if source['sha256'] == pinned['sha256']:
-            source['data_version'] = 'CP2K v2026.2 reference bytes'
-            source['reference_url'] = pinned['url']
+            source['data_version'] = pinned.get('data_version', 'CP2K v2026.2 reference bytes')
+            if pinned.get('url'):
+                source['reference_url'] = pinned['url']
+            else:
+                source['reference_path'] = pinned['path']
+                source['source_revision'] = pinned['source_revision']
             break
     entries, header, body = [], None, []
     for lineno, line in enumerate(text.splitlines(), 1):
@@ -180,7 +211,7 @@ class Libraries:
             entries.extend(self.cache[key][0])
         return entries
 
-    def select(self, paths, role, element, names, q, *, match_q_family=False):
+    def select(self, paths, role, element, names, q, *, match_q_family=False, all_electron=False):
         def matches(aliases):
             if set(aliases).intersection(names):
                 return True
@@ -193,7 +224,7 @@ class Libraries:
             if entry.header_q is not None and entry.header_q != q:
                 observed.add(entry.header_q)
                 continue  # An unused q variant/NA placeholder is not the selected entry.
-            actual_q = entry.validate()
+            actual_q = entry.validate(all_electron=all_electron)
             observed.add(actual_q)
             if (actual_q is None or actual_q == q) and set(entry.names).intersection(names):
                 valid.append((entry, actual_q))

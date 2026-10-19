@@ -1,4 +1,4 @@
-# Orbital basis registry (0.2.6, registry v1)
+# Orbital basis registry (0.2.7, registry v1)
 
 The registry establishes the numbering contract **toward 1.0.0**; it does not
 release 1.0.0 or certify calculations. The main editor still has one scrolling
@@ -36,7 +36,17 @@ names remain accepted on input. The default remains DZVP-MOLOPT-SR-GTH.
 | 31 | uzh-pbe0-tzvp | TZVP-MOLOPT-PBE0-GTH, unavailable |
 | 32 | uzh-pbe0-tzv2p | TZV2P-MOLOPT-PBE0-GTH, unavailable |
 | 33-39 | Unallocated | Reserved, not selectable |
-| 40-59 | Unallocated | Traditional GTH, reserved |
+| 40-49 | Unallocated | Traditional GTH, reserved |
+| 50 | ae-6-31g-star | 6-31G* |
+| 51 | ae-6-311g-starstar | 6-311G** |
+| 52 | ae-def2-tzvp | Ahlrichs-def2-TZVP |
+| 53 | ae-def2-qzvp | Ahlrichs-def2-QZVP |
+| 54 | ae-pob-tzvp | pob-TZVP |
+| 55 | ae-pob-dzvp-rev2 | pob-DZVP-rev2 |
+| 56 | ae-pob-tzvp-rev2 | pob-TZVP-rev2 |
+| 57 | ae-uzh-svp | SVP-MOLOPT-PBE-ae |
+| 58 | ae-uzh-tzvpp | TZVPP-MOLOPT-PBE-ae |
+| 59 | ae-uzh-qzvpp | QZVPP-MOLOPT-PBE-ae |
 | 60-79 | Unallocated | ccGRB / cc, reserved |
 | 80-99 | Unallocated | Other pseudopotential bases, reserved |
 | 100-199 | Unallocated | All-electron bases, reserved |
@@ -45,7 +55,83 @@ names remain accepted on input. The default remains DZVP-MOLOPT-SR-GTH.
 Numbers outside these entries are not selectable. Disabled PBE0 entries are
 shown with an explicit UNAVAILABLE reason, not advertised as working templates.
 ORB, AUX_FIT and RI_AUX are distinct roles in the model; only ORB is selectable.
-No auxiliary basis, hybrid/HF/ADMM, RI or all-electron method template is added.
+No auxiliary basis, hybrid/HF/ADMM or RI method template is added. AE 50-59
+uses the separate GAPW model described below, not the fixed-q GPW policy.
+
+## All-electron automatic setup (0.2.7)
+
+Choose an AE basis once; the shared generator derives **GAPW + ALL**, real orbital
+names without fabricated `-qN`, and electron count **sum(Z)-charge**. Preview and
+JSON list the derived settings. Global/element basis choices must resolve to one
+electron model; AE basis families may be mixed explicitly with other AE families.
+There is no automatic charge, multiplicity, magnetic-state or functional repair.
+
+The default `gapw_profile=auto` (menu **131**) now uses numerical profile **v3**:
+
+| Location | Effective setup |
+|---|---|
+| QS | GAPW; omit EPSFIT/EPSRHO0/EPSSVD and use CP2K defaults |
+| MGRID | NGRIDS 5 for all PP/AE bases; preserve CUTOFF/REL_CUTOFF (default 400/55 Ry) |
+| Each KIND | Omit LEBEDEV_GRID/RADIAL_GRID and use CP2K defaults |
+| OT | Retain FULL_ALL; IRAC if any effective AE basis is pob, otherwise STRICT |
+
+By explicit request, all five extra QS/KIND settings have been removed from the
+generated input in both profiles, not merely hidden in native mode. In metadata
+qs/kind are empty; cp2k_default_controls lists the omitted settings without
+claiming their effective runtime values or convergence. Old v1/v2 inputs are not
+rewritten. `native` now differs only by omitting the automatic OT algorithm;
+explicit --ot-algorithm still wins. GAPW/ALL/electron counting remain automatic.
+
+EPSFIT controls hard/soft Gaussian splitting, EPSRHO0 the compensation contribution
+range, and EPSSVD projector-matrix SVD tolerance. LEBEDEV_GRID/RADIAL_GRID control
+atom-centered angular/radial integration, distinct from MGRID. Omission follows
+the inspected ordinary Multiwfn AE output style, but does not certify the defaults
+for any property. Converge basis, uniform/atomic grids and hard/soft tolerances as
+needed; automatic setup is not automatic convergence.
+
+Main-menu **110 ALGORITHM** is visible only for OT. Choose IRAC or STRICT by
+name/number; Enter keeps, `back` abandons, `auto` restores the basis-aware default.
+An explicit `--ot-algorithm STRICT` or IRAC overrides either AE profile. Diag hides
+and retains the request without emitting it into OT or replacing diagonalization's
+STANDARD algorithm. Old PP auto physics remains unchanged (native STRICT);
+NGRIDS is now universally 5 and library filename quotes are intentionally removed.
+
+```bash
+# Starting templates only, not converged physical models; writes new files only.
+cp2kkit generate-input water.xyz -o water-ae.inp --periodic NONE \
+  --basis ae-pob-tzvp --data-dir /path/to/cp2k/data
+cp2kkit generate-input water.xyz -o water-ae-strict.inp --periodic NONE \
+  --basis ae-pob-tzvp --ot-algorithm STRICT
+```
+
+| Number(s) | Audited AE coverage | Actual basis file |
+|---|---|---|
+| 50 | H-Zn (30) | EMSL_BASIS_SETS |
+| 51 | H-Ca and Ga-Kr (26); no Sc-Zn | EMSL_BASIS_SETS |
+| 52-53 | H-Kr (36 each) | EMSL_BASIS_SETS |
+| 54-56 | H-Br excluding He/Ne/Ar (32 each) | BASIS_pob |
+| 57-59 | H-Kr (36 each), PBE only | BASIS_MOLOPT_UZH_2026.2; real GGA-ae aliases accepted |
+
+Actual files cannot expand the AE whitelist automatically: a no-q name can still
+belong to an ECP branch. In particular, the inspected pob-TZVP-rev2 library requires
+ECPs for Rb-Po. All nuclear potentials must have real ALL/ALLELECTRON entries with
+valid selected payloads and occupations equal to Z; pseudopotentials are rejected.
+All AE families use POTENTIAL, not an inferred functional-specific GTH library.
+Pure ALL does not need GTH-PBE approximation approval; RPBE still needs Libxc.
+Custom 900 retains its existing pseudopotential-only meaning.
+
+First AE scope is Gamma ENERGY/ENERGY_FORCE/GEO_OPT at target 2026.2; mixed AE/PP,
+heavy ECP/relativistic branches, CELL_OPT/non-Gamma, AE +U and GAPW density cubes
+are rejected, not silently reset. These are **cp2kkit scope limits**, not blanket
+claims about CP2K capabilities. Collinear explicit magnetic seeds/split KINDs
+retain atom order and inherit the same per-element AE basis/atomic grids.
+
+Header-only audit and exact source hashes are in `all_electron_catalog.py`.
+Reference root was `/home/xwp/soft/cp2k-2026.2`, REVISION `git:c92cc08`; a directory
+name is not verified upstream-tag or binary identity. Pinned local source/doc
+hashes are distinct from existing official tagged PP references. No coefficients
+or nuclear parameters are bundled. Actual files give selected-entry checks only;
+no files give an unverified template. No CP2K execution was performed.
 
 ## Data and coverage
 
@@ -173,7 +259,8 @@ assert old.basis == 'molopt-dzvp'       # New registry 7, NOT new registry 3.
 settings = InputSettings.from_config({'basis': 'TZVP-MOLOPT-GTH'})
 ```
 
-This feature stays in software **0.2.6** at the user's request. Registry version
+The initial registry feature stayed in software **0.2.6** at the user's request.
+The additive 0.2.7 AE choices retain registry version
 **1**, not software 0.2.6 alone, identifies the new contract. Registry-v1 sidecars
 must contain string IDs; numeric values are rejected even with a legacy version hint.
 Explicit numeric migration supports inspected legacy 0.2.4/0.2.5/0.2.6 tables; absent or
@@ -188,7 +275,7 @@ identified only by exact pinned reference bytes, **not a filename or symlink nam
 otherwise it is null/unknown. Provenance stays in JSON/review, not verbose input comments.
 
 `basis_validation.status` is `data_checked` only when both selected files and q
-matching have been checked, otherwise `unverified_template`. This covers selected
+matching (or the separate AE nuclear-charge check below) have been checked, otherwise `unverified_template`. This covers selected
 entry structure/alias/q/bytes only, not whole-library validity or physical pairing.
 `protocol_pairing` distinguishes a recognized UZH reference pair, unknown UZH
 pairing, classic-family selection and custom user assertions. Runtime/build and

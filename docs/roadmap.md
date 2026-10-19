@@ -1,6 +1,41 @@
 # Development status and next steps
 
-Current software: **0.2.6**, explicitly retained by request; schema: **0.1.0**.
+Current software: **0.2.7** (retained by explicit request, including the D3 filename fix); schema: **0.1.0**.
+D3/D3(BJ) PARAMETER_FILE_NAME now uses literal whole-line serialization instead
+of quoted-token output; the input-writing follow-up extends it to basis/potential
+filenames. Default output is input-only, JSON is opt-in (132/--write-json).
+Existing regular .inp may be atomically replaced; sources/data/symlinks, optional
+JSON and all other results remain protected. This fixes
+the statically identified blank-prefix path, without claiming native execution.
+Current validation: **315 tests passed, none skipped**, including 22 AE/OT tests,
+five filename regressions, 17 input-writing tests and 17 restart/motion tests;
+compileall, CLI version, documentation links/text and diff checks passed. All 10
+local reference hashes matched in the preceding audit. Default PP physics still
+keeps the old method/charge/spin/cutoffs, with an explicitly changed NGRIDS=5;
+bytes differ by grid count, basis/potential filename quote removal and inactive
+restart hints replacing explicit SCF_GUESS ATOMIC. The isolated-O regression
+restores only those known text changes for the historical SHA-256 comparison.
+Optimizations now use BFGS/LBFGS TRUST_RADIUS 0.2 angstrom (133), selectable
+PDB/XYZ/EXTXYZ trajectories (-5, XYZ default), and MOTION restart backups=0
+without disabling restart writing. EXTXYZ is checked only for target 2026.2;
+CG hides/retains the radius but never emits it. PROJECT-based restart hints use
+.wfn for Gamma, .kp otherwise. Multiwfn's explicit NGRIDS 5 branch applies only
+to ibas 3/4/5; the local universal five-grid policy remains a separate user request.
+No CP2K/Multiwfn execution, new dependencies, publication, commit or push.
+AE choices 50-59 derive GAPW/ALL, core-inclusive electron counts, a disclosed
+basis-aware pob IRAC. Numerical profile v3 leaves GAPW split tolerances and
+atomic grids to CP2K defaults (no five extra lines); NGRIDS=5 is universal for
+PP/AE and SR/non-SR bases. Old profile inputs are not rewritten. OT-only main-menu 110
+selects IRAC/STRICT (explicit overrides win); AE-only 131 selects auto/native.
+No physical-state repair or native-execution/convergence certification.
+Read-only local-data checks cover 332 AE basis/nuclear-potential pairs; local
+REVISION git:c92cc08 is not assumed equivalent to upstream v2026.2.
+Remaining AE work includes heavy-element/ECP/relativistic protocols, mixed AE/PP,
+GAPW density reconstruction/charge analysis, +U and cell/stress/k-point validation.
+
+### Registry follow-up (historical 0.2.6)
+
+Software 0.2.6 was explicitly retained for that round; schema was 0.1.0.
 The [registry-v1 basis follow-up](basis-selection.md) adds permanent allocated
 numbers, stable string settings/replay IDs, explicit legacy-position migration,
 SZV non-SR, paired UZH-PBE DZVP/TZVP/TZV2P, custom pseudopotential ORB 900,

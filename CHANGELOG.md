@@ -8,6 +8,117 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.2.7
+
+### Restart and optimization-output follow-up (version retained)
+
+- Replace active SCF_GUESS ATOMIC with commented SCF_GUESS RESTART and
+  WFN_RESTART_FILE_NAME hints. Names follow PROJECT, .wfn for Gamma/.kp otherwise;
+  no restart is read or enabled by generation.
+- Emit BFGS/LBFGS TRUST_RADIUS [angstrom] 0.2 for GEO_OPT/CELL_OPT; expose
+  --trust-radius / main-menu 133. CG hides/retains but does not emit the value.
+- Add optimization trajectory format PDB/XYZ/EXTXYZ via --trajectory-format and
+  main-menu -5, default XYZ. EXTXYZ is checked only for target 2026.2.
+  Add MOTION/PRINT/TRAJECTORY and MOTION/PRINT/RESTART BACKUP_COPIES 0.
+  Explain cell/precision loss and that zero backups does not disable restart writing.
+- Record inactive restart_template and effective motion_output in the manifest;
+  preserve hidden settings through config, menu and replay. Keep schema 0.1.0.
+- Inspect Multiwfn's NGRIDS logic: only ibas 3/4/5 explicitly emit 5.
+  Retain the user's separate universal NGRIDS=5 policy and omitted GAPW controls.
+- Add 17 focused regression methods; native execution remains unverified.
+
+### Universal five-grid/default-GAPW follow-up (version retained)
+
+- Default NGRIDS to 5 for every basis, including pseudopotential SR. Use one
+  shared constant for rendering and metadata; do not infer grid count from names.
+- Stop emitting EPSFIT, EPSRHO0, EPSSVD, LEBEDEV_GRID and RADIAL_GRID in both AE
+  profiles. Remove the 110/80 override; CP2K defaults now apply. Retain GAPW/ALL,
+  core-inclusive electron counts and basis-aware/manual OT algorithm selection.
+- Numerical profile_version=3; qs/kind metadata maps are empty and
+  cp2k_default_controls records omitted settings, not guessed runtime values.
+  CLI/menu descriptions and docs match the reduced profile. No old input rewrite
+  or claim that default numerical controls are converged for any property.
+- Validation: 298 tests passed with no skips, including all enabled builtin bases
+  at NGRIDS=5 and every AE family/profile omitting the five controls. Historical
+  regression restores only grid count/library quotes before checking old bytes.
+
+### Earlier 0.2.7 implementation stages (historical)
+
+### All-electron five-grid follow-up (version retained)
+
+- Change AE NGRIDS from 4 to 5 in both auto/native profiles by explicit user
+  request. Increment numerical profile_version to 2 for traceability; software
+  remains 0.2.7. Rendering/review/JSON agree; PP SR/non-SR policy and requested
+  CUTOFF/REL_CUTOFF remain unchanged. No old inputs are rewritten.
+- Explain the local auto-profile QS split tolerances and KIND atom-centered grids:
+  Multiwfn does not explicitly output these five parameters in ordinary AE setup.
+  Their existing values are retained, not removed by inference from a question;
+  native omits them. No accuracy/convergence or native-execution claim.
+
+### Input-writing follow-up (version retained by explicit request)
+
+- Emit BASIS_SET_FILE_NAME and POTENTIAL_FILE_NAME without quotes, using the
+  shared whole-line filename serializer (literal internal spaces preserved;
+  ambiguous comment/injection characters rejected). Physical defaults unchanged;
+  default input bytes/hashes intentionally differ by library filename quoting.
+- Default to input-only output. Add --write-json / main-menu 132 (off by default)
+  for optional provenance JSON. generate_input still returns its manifest in memory;
+  write_input's second return value is null when JSON is disabled.
+- Permit replacement of existing regular .inp targets only, with staged atomic
+  publication and menu confirmation. Refuse source/data aliases, symlinks,
+  directories and existing non-.inp results. Optional JSON remains exclusive;
+  its collision/serialization/publication failure preserves previous input.
+  With JSON off, existing sidecars remain untouched and are warned potentially stale.
+- Analysis/export/cube/plot writers and expensive calculation results remain
+  protected. No CP2K execution or new dependencies.
+- Validation: 295 tests passed with no skips, including 16 focused input-writing
+  cases; compileall/version/docs/diff checks passed. Legacy input regression
+  confirms only library filename quote removal changes the default text.
+
+### D3 filename fix (version retained by explicit request)
+
+- Fix generated D3/D3(BJ) `PARAMETER_FILE_NAME`: serialize a literal unquoted
+  whole-line value rather than a quoted ordinary string. The inspected CP2K
+  lchar_t parser can turn the first quote chunk into a blank prefix, triggering
+  `The file name < ... dftd3.dat> has leading blanks.` in cp_files.F.
+- Keep literal internal spaces and absolute paths. Reject leading/trailing
+  whitespace, comment markers and injection characters rather than stripping or
+  renaming user paths. The subsequent input-writing follow-up extends this
+  whole-line serializer to BASIS_SET_FILE_NAME/POTENTIAL_FILE_NAME too.
+- Preserve all methods/physics, analysis/schema/exit contracts and protected
+  outputs. This D3 fix did not itself rewrite existing inputs. Add five synthetic path regressions;
+  no CP2K execution or all-version parser compatibility certification.
+- Validation: 279 tests passed with no skips; compileall, CLI version, local
+  documentation links/text and diff checks passed.
+
+### All-electron and OT additions
+
+- Add immutable all-electron ORB choices 50-59: Pople, def2, pob and UZH-PBE-ae.
+  Preserve all previously allocated numbers/IDs; split unused reservation 40-59.
+- Selecting AE automatically derives GAPW, ALL nuclear potentials, real basis files
+  and sum(Z)-charge electron counts. Validate actual ALL occupations/payloads and
+  distinguish nuclear charge from pseudopotential q/valence metadata.
+- Add versioned `gapw_profile=auto`: five grids (numerical profile v2), explicit native split tolerances,
+  angular/radial grids 110/80, FULL_ALL and pob IRAC (otherwise STRICT for OT).
+  `native` omits added numerical conveniences, not required GAPW/ALL semantics.
+  Preserve user charge/spin, XC/dispersion, cutoff/rel_cutoff, SCF and periodicity;
+  review/JSON/warnings disclose derived settings and unverified convergence.
+- Add main-menu **110 ALGORITHM**, OT-only IRAC/STRICT with optional auto reset;
+  explicit choices override the AE profile. Hide but retain for diagonalization.
+  CLI `--ot-algorithm` and replay/config use the same setting and validation.
+- Enable audited H-Kr subsets only: 332 basis/nuclear-potential pairs read from
+  the supplied local CP2K tree (REVISION git:c92cc08; upstream equivalence not
+  inferred from directory name). No coefficients/potential parameters bundled.
+- First AE scope: Gamma ENERGY/ENERGY_FORCE/GEO_OPT; no mixed AE/PP, heavy ECP
+  branches, AE +U, CELL_OPT/non-Gamma or GAPW density cubes. These are generator
+  restrictions, not assertions that CP2K generally lacks these capabilities.
+- Default PP input text/physics and protected writes remain unchanged. Generator
+  JSON gains electron-model/nuclear-charge/profile fields and two settings;
+  schema stays 0.1.0, analysis/CSV unchanged. No CP2K runtime certification.
+- Validation: 274 unit/interface tests passed (20 AE/OT methods), no skips;
+  compileall/version/docs/diff checks and 10 local reference hashes checked.
+  Default PP water input bytes match the preceding committed generator.
+
 ## 0.2.6
 
 ### Permanent basis registry follow-up (version retained by explicit request)

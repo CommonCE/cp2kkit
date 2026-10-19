@@ -1,4 +1,6 @@
-"""Conservative GPW input generation inspired by Multiwfn outCP2Kinp.
+"""Conservative GPW and all-electron GAPW input generation.
+
+The original GPW subset was inspired by Multiwfn outCP2Kinp.
 
 This is a deliberately limited Python implementation, not a full port or a
 claim of clean-room development. Reference: Multiwfn 2026.10.1,
@@ -13,21 +15,25 @@ import hashlib
 import math
 import os
 import re
+import stat
+import tempfile
 from contextlib import ExitStack
 from dataclasses import asdict, dataclass, replace
 from decimal import Decimal
 from pathlib import Path
 
 from . import __version__
-from .errors import KitError
+from .errors import KitError, OutputExists
 from .io import json_text, new_file, read_text
 from .models import SCHEMA_VERSION
 from .structure import Structure, check_cell
 from .spin_settings import atomic_kinds, validate_requests
-from .method_profiles import BASES, FUNCTIONALS, resolve_method, xc_lines
+from .method_profiles import BASES, FUNCTIONALS, electron_model, resolve_method, xc_lines
+from .all_electron_catalog import AE_SOURCES
+from .gapw import DEFAULT_NGRIDS, GAPW_PROFILES, resolve_gapw
 from .data_catalog import CATALOG_SOURCES
 from .basis_registry import DEFAULT_BASIS, basis_option, migrate_basis
-from .cp2k_data import cp2k_path
+from .cp2k_data import cp2k_long_path
 
 MULTIWFN_CITATIONS = (
     "Tian Lu, Feiwu Chen, J. Comput. Chem. 33, 580-592 (2012). DOI: 10.1002/jcc.22885",
@@ -59,6 +65,7 @@ VALENCE = dict(zip(_SR_ELEMENTS, _SR_VALENCES))
 DIFFUSE_ELEMENTS = set("H C N O F Si P S Cl".split())
 PBE_ONLY_ELEMENTS = set("Nb Tc Cd Sn Hf Ta Re Os Ir Pt Hg Tl Po At Rn".split())
 PERIODICITIES = ("NONE", "X", "Y", "Z", "XY", "XZ", "YZ", "XYZ")
+TRAJECTORY_FORMATS = ("PDB", "XYZ", "EXTXYZ")
 
 
 @dataclass(frozen=True)
@@ -101,6 +108,11 @@ class InputSettings:
     custom_basis_name: str | None = None
     custom_potential_file: str | None = None
     custom_potential_name: str | None = None
+    gapw_profile: str = 'auto'  # AE numerical conveniences; native opts out.
+    ot_algorithm: str | None = None  # auto: GAPW pob IRAC, otherwise native STRICT
+    write_json: bool = False  # Optional provenance sidecar; existing JSON is never overwritten.
+    trust_radius: float = 0.2  # angstrom; GEO_OPT/CELL_OPT BFGS/LBFGS only
+    trajectory_format: str = 'XYZ'  # MOTION position trajectory, optimization only
 
     @classmethod
     def from_config(cls, values, source_version=None):
@@ -149,6 +161,8 @@ def geometry_number(value):
 
 def generate_input(structure: Structure, settings: InputSettings):
     """Return (complete input text, deterministic provenance/settings manifest)."""
+    if type(settings.write_json) is not bool:
+        raise KitError('write_json must be Boolean')
     project = settings.project
     if project is None:
         if not structure.source.get('path'):
@@ -166,6 +180,9 @@ def generate_input(structure: Structure, settings: InputSettings):
         raise KitError("Project must be a safe name (letters, digits, _, ., -); no paths or directives")
     for value, choices, name in ((s.run_type, RUN_TYPES, "run type"), (s.functional, FUNCTIONALS, "functional"),
                                  (s.dispersion, ("none", "d3", "d3bj"), "dispersion"),
+                                 (s.gapw_profile, GAPW_PROFILES, "GAPW profile"),
+                                 (s.trajectory_format, TRAJECTORY_FORMATS, "trajectory format"),
+                                 (s.ot_algorithm, (None, "IRAC", "STRICT"), "OT algorithm"),
                                  (s.scf, ("ot", "diag"), "SCF"), (s.optimizer, ("BFGS", "LBFGS", "CG"), "optimizer")):
         if value not in choices:
             raise KitError(f"Unsupported {name}: {value}")
@@ -177,6 +194,17 @@ def generate_input(structure: Structure, settings: InputSettings):
             raise KitError(f"Invalid integer {name}: {value}")
     for value, name in ((s.cutoff, "cutoff"), (s.rel_cutoff, "rel_cutoff"), (s.vacuum, "vacuum")):
         positive(value, name)
+    if type(s.trust_radius) not in (int, float):
+        raise KitError('trust_radius must be a finite positive number in angstrom')
+    try:
+        trust_radius = float(s.trust_radius)
+    except OverflowError as exc:
+        raise KitError('trust_radius must be a finite positive number in angstrom') from exc
+    positive(trust_radius, 'trust_radius [angstrom]')
+    s = replace(s, trust_radius=trust_radius)
+    optimizing = s.run_type in {'GEO_OPT', 'CELL_OPT'}
+    if optimizing and s.trajectory_format == 'EXTXYZ' and s.cp2k_version != '2026.2':
+        raise KitError('EXTXYZ trajectory output is keyword-checked only for target CP2K 2026.2')
     if not math.isfinite(s.pressure):
         raise KitError("Pressure must be finite (bar)")
     eps = s.eps_scf if s.eps_scf is not None else (5e-6 if s.run_type == "ENERGY" else 1e-6)
@@ -199,20 +227,23 @@ def generate_input(structure: Structure, settings: InputSettings):
     if any(len(row) != 3 or not all(math.isfinite(v) for v in row) for row in structure.positions):
         raise KitError("Coordinates must have three finite angstrom values per atom")
     elements = sorted(set(structure.symbols))
-    unsupported = set(elements) - VALENCE.keys()
-    if unsupported:
-        raise KitError("No verified basis/potential preset for: " + ", ".join(sorted(unsupported)))
-    hubbard, magnetism = validate_requests(s.dft_plus_u, s.magnetism, structure.symbols, VALENCE)
+    all_electron, electron_counts = electron_model(s, elements, VALENCE)
+    qs_method = 'GAPW' if all_electron else 'GPW'
+    hubbard, magnetism = validate_requests(s.dft_plus_u, s.magnetism, structure.symbols, electron_counts)
     s = replace(s, dft_plus_u=hubbard, magnetism=magnetism)
     if (hubbard or magnetism is not None) and s.cp2k_version != '2026.2':
         raise KitError('DFT+U and explicit magnetic settings are currently keyword-checked only for CP2K 2026.2')
     atom_labels, kind_specs = atomic_kinds(structure.symbols, magnetism)
-    method_profile, basis_overrides, element_records, method_warnings = resolve_method(s, elements, VALENCE, kind_specs)
+    method_profile, basis_overrides, element_records, method_warnings = resolve_method(s, elements, electron_counts, kind_specs)
     s = replace(s, basis_overrides=basis_overrides)
-    electrons = sum(VALENCE[symbol] for symbol in structure.symbols) - s.charge
+    gapw = resolve_gapw(s, element_records) if all_electron else None
+    ot_algorithm = (gapw['ot_algorithm'] if gapw else s.ot_algorithm) if s.scf == 'ot' else None
+    ngrids = DEFAULT_NGRIDS
+    electrons = sum(electron_counts[symbol] for symbol in structure.symbols) - s.charge
     unpaired = s.multiplicity - 1
     if electrons <= 0 or unpaired > electrons or (electrons - unpaired) % 2:
-        raise KitError(f"Charge/multiplicity inconsistent with {electrons} explicit valence electrons")
+        model = 'all-electron electrons' if all_electron else 'explicit valence electrons'
+        raise KitError(f"Charge/multiplicity inconsistent with {electrons} {model}")
     periodic = s.periodic
     if periodic is None and structure.pbc is not None:
         if len(structure.pbc) != 3 or any(type(v) is not bool for v in structure.pbc):
@@ -262,7 +293,15 @@ def generate_input(structure: Structure, settings: InputSettings):
     warnings = ["Generated template is not CP2K-runtime validated; converge basis, cutoff and kpoints for the target property.",
                 "Only geometry/cell/PBC are read from the source; charge, spin, method and per-kind settings are NOT inherited."]
     warnings.extend(method_warnings)
-    if any('-SR-' not in record['basis'] for record in element_records.values()):
+    if optimizing:
+        warnings.append('MOTION/PRINT/RESTART BACKUP_COPIES 0 disables restart backup copies, not restart writing; archive restart files before running in a reused directory.')
+        if s.trajectory_format == 'XYZ' and periodic != 'NONE':
+            warnings.append('XYZ trajectories do not retain changing cell vectors; choose EXTXYZ or PDB when cell information is needed. PDB has limited coordinate precision.')
+    if gapw:
+        summary = '; '.join(f"{item['setting']}={item['value']}" for item in gapw['automatic_settings'])
+        warnings.append(f"All-electron setup {gapw['profile']} v{gapw['profile_version']}: {summary}. "
+                        'Charge/spin, functional, dispersion, cutoff/rel_cutoff and periodicity are preserved; numerical convergence is unverified.')
+    if not all_electron and any('-SR-' not in record['basis'] for record in element_records.values()):
         warnings.append('Non-SR MOLOPT functions may increase cost/overlap ill-conditioning; converge basis and grid independently. Increasing CUTOFF does not complete the Gaussian basis.')
     if periodic == "NONE":
         warnings.append("WAVELET requires electronic density to vanish at cell faces; verify box size and molecular placement.")
@@ -318,13 +357,14 @@ def generate_input(structure: Structure, settings: InputSettings):
     data_root = s.data_dir if s.data_dir is not None else os.environ.get('CP2K_DATA_DIR')
     if data_root is not None and s.dispersion != 'none':
         files['dispersion'] = str((Path(data_root)/'dftd3.dat').resolve())
-        cp2k_path(files['dispersion'])
+        cp2k_long_path(files['dispersion'])
         _, data_sources['dispersion'] = read_text(files['dispersion'])
     elif s.dispersion != 'none':
         warnings.append('Dispersion data dftd3.dat have not been checked; the file is resolved by CP2K at runtime.')
     data_checked = all(r['data_validation'] == 'data_checked' for r in element_records.values())
     if not data_checked:
-        warnings.append('UNVERIFIED TEMPLATE: actual basis/potential files or basis q matching have not all been checked. Supply --data-dir or explicit files; catalog evidence is not an installed-data or runtime validation.')
+        reason = 'actual all-electron basis/nuclear potential files' if all_electron else 'actual basis/potential files or basis q matching'
+        warnings.append(f'UNVERIFIED TEMPLATE: {reason} have not all been checked. Supply --data-dir or explicit files; catalog evidence is not an installed-data or runtime validation.')
     def num(v):
         return format(v, ".17g")
     lines = ["# Generated by cp2kkit; subset developed with reference to Multiwfn cp2kmate.f90",
@@ -334,19 +374,23 @@ def generate_input(structure: Structure, settings: InputSettings):
              "&FORCE_EVAL", "  METHOD Quickstep"]
     if s.run_type == "CELL_OPT":
         lines.append("  STRESS_TENSOR ANALYTICAL")
-    lines += ['  &DFT', *(f'    BASIS_SET_FILE_NAME "{file}"' for file in basis_files),
-              f'    POTENTIAL_FILE_NAME "{files["potential"]}"', f"    CHARGE {s.charge}",
+    restart_filename = s.project+'-RESTART'+('.wfn' if s.kpoints == (1, 1, 1) else '.kp')
+    lines += ['  &DFT', *(f'    BASIS_SET_FILE_NAME {cp2k_long_path(file)}' for file in basis_files),
+              f'    POTENTIAL_FILE_NAME {cp2k_long_path(files["potential"])}', f"    CHARGE {s.charge}",
               f"    MULTIPLICITY {s.multiplicity}", f"    UKS {'T' if uks else 'F'}",
-              "    &QS", "      METHOD GPW", f"      EPS_DEFAULT {scientific_number(1e-11 if s.run_type == 'ENERGY' else 1e-12)}", "    &END QS",
+              f"#   WFN_RESTART_FILE_NAME {restart_filename}",
+              "    &QS", f"      METHOD {qs_method}", f"      EPS_DEFAULT {scientific_number(1e-11 if s.run_type == 'ENERGY' else 1e-12)}",
+              *(f"      {key} {scientific_number(value)}" for key, value in (gapw['qs'] if gapw else {}).items()), "    &END QS",
               "    &MGRID", f"      CUTOFF [Ry] {num(s.cutoff)}", f"      REL_CUTOFF [Ry] {num(s.rel_cutoff)}",
-              f"      NGRIDS {5 if any('-SR-' not in r['basis'] for r in element_records.values()) else 4}", "    &END MGRID",
+              f"      NGRIDS {ngrids}", "    &END MGRID",
               "    &POISSON", f"      PERIODIC {periodic}", f"      POISSON_SOLVER {solver}", "    &END POISSON",
-              "    &SCF", "      SCF_GUESS ATOMIC", f"      EPS_SCF {scientific_number(eps)}", f"      MAX_SCF {s.max_scf}"]
+              "    &SCF", "#     SCF_GUESS RESTART #Use WFN_RESTART_FILE_NAME as the initial guess; uncomment both restart lines", f"      EPS_SCF {scientific_number(eps)}", f"      MAX_SCF {s.max_scf}"]
     if hubbard:
         # PLUS_U_METHOD belongs in DFT, not SCF; insert before &QS.
         lines.insert(lines.index('    &QS'), '    PLUS_U_METHOD MULLIKEN')
     if s.scf == "ot":
-        lines += ["      &OT", "        PRECONDITIONER FULL_ALL", "        MINIMIZER DIIS", "      &END OT",
+        lines += ["      &OT", "        PRECONDITIONER FULL_ALL", "        MINIMIZER DIIS",
+                  *([f"        ALGORITHM {ot_algorithm}"] if ot_algorithm else []), "      &END OT",
                   "      &OUTER_SCF", f"        EPS_SCF {scientific_number(eps)}", f"        MAX_SCF {s.max_outer_scf}", "      &END OUTER_SCF"]
     else:
         added_mos = ' '.join([str(s.added_mos)] * (2 if uks else 1))
@@ -358,7 +402,7 @@ def generate_input(structure: Structure, settings: InputSettings):
     if s.dispersion != "none":
         lines += ["      &VDW_POTENTIAL", "        POTENTIAL_TYPE PAIR_POTENTIAL", "        &PAIR_POTENTIAL",
                   f"          TYPE {'DFTD3' if s.dispersion == 'd3' else 'DFTD3(BJ)'}",
-                  f'          PARAMETER_FILE_NAME "{files["dispersion"]}"', f"          REFERENCE_FUNCTIONAL {s.functional}",
+                  f'          PARAMETER_FILE_NAME {cp2k_long_path(files["dispersion"])}', f"          REFERENCE_FUNCTIONAL {s.functional}",
                   "        &END PAIR_POTENTIAL", "      &END VDW_POTENTIAL"]
     lines += ["    &END XC"]
     if s.kpoints != (1, 1, 1):
@@ -379,7 +423,8 @@ def generate_input(structure: Structure, settings: InputSettings):
     for label, kind in kinds.items():
         el = kind.get('element', label)
         lines += [f"    &KIND {label}", f"      ELEMENT {el}", f"      BASIS_SET {kind['basis']}",
-                  f"      POTENTIAL {kind['potential']}"]
+                  f"      POTENTIAL {kind['potential']}",
+                  *(f"      {key} {value}" for key, value in (gapw['kind'] if gapw else {}).items())]
         if kind.get('initial_magnetization') is not None:
             lines.append(f"      MAGNETIZATION {num(kind['initial_magnetization'])}")
         if el in u_by_element:
@@ -395,7 +440,12 @@ def generate_input(structure: Structure, settings: InputSettings):
             lines.append("    TYPE MINIMIZATION")
         else:
             lines += [f"    EXTERNAL_PRESSURE [bar] {num(s.pressure)}", "    PRESSURE_TOLERANCE [bar] 100"]
-        lines += [f"  &END {s.run_type}", "&END MOTION"]
+        if s.optimizer in {'BFGS', 'LBFGS'}:
+            lines += [f"    &{s.optimizer}", f"      TRUST_RADIUS [angstrom] {s.trust_radius}", f"    &END {s.optimizer}"]
+        lines += [f"  &END {s.run_type}", "  &PRINT", "    &TRAJECTORY",
+                  f"      FORMAT {s.trajectory_format}", "    &END TRAJECTORY", "    &RESTART",
+                  "      BACKUP_COPIES 0 #Maximum number of backup copies; 0 disables backups, not restart writing",
+                  "    &END RESTART", "  &END PRINT", "&END MOTION"]
     text = "\n".join(lines) + "\n"
     effective = Structure(structure.symbols.copy(), positions, [row.copy() for row in cell],
                           [axis in periodic for axis in "XYZ"], structure.source, structure.frame)
@@ -408,9 +458,18 @@ def generate_input(structure: Structure, settings: InputSettings):
                 "settings": asdict(s),
                 'basis_selection': {'id': s.basis, 'number': basis_option(s.basis).number, 'registry_version': 1},
                 'basis_validation': {'status': 'data_checked' if data_checked else 'unverified_template',
-                                     'scope': 'selected-entry structure, aliases, q and source bytes only',
+                                     'scope': 'selected-entry structure, aliases, nuclear charges and source bytes only' if all_electron
+                                              else 'selected-entry structure, aliases, q and source bytes only',
                                      'runtime_validated': False, 'runnable_verified': False},
                 "effective_eps_scf": eps, "poisson_solver": solver,
+                "restart_template": {"filename": restart_filename, "scf_guess": "RESTART",
+                                     "enabled": False, "filename_commented": True, "guess_commented": True,
+                                     "naming_basis": "PROJECT and Gamma/non-Gamma default restart naming",
+                                     "runtime_verified": False},
+                "motion_output": {"enabled": optimizing,
+                                  "trajectory_format": s.trajectory_format if optimizing else None,
+                                  "restart_backup_copies": 0 if optimizing else None,
+                                  "trust_radius_angstrom": s.trust_radius if optimizing and s.optimizer in {'BFGS', 'LBFGS'} else None},
                 "density_output": {"enabled": bool(density_enabled),
                                    "electron_density": bool(density_enabled),
                                    "spin_density": bool(density_enabled and uks),
@@ -418,7 +477,7 @@ def generate_input(structure: Structure, settings: InputSettings):
                                    "each": density_each if density_enabled else None,
                                    "add_last": "NUMERIC" if density_enabled else None,
                                    "append": False, "filename_override": None,
-                                   "density_meaning": "GPW pseudopotential valence electron density",
+                                   "density_meaning": None if all_electron else "GPW pseudopotential valence electron density",
                                    "spin_convention": "alpha minus beta", "spatial_unit": "bohr",
                                    "scalar_unit": "e/bohr^3", "stride_unit": "grid index increment",
                                    "reference_version": "CP2K " + s.cp2k_version, "syntax_reference_checked": True,
@@ -429,19 +488,24 @@ def generate_input(structure: Structure, settings: InputSettings):
                                    "manual_source": None if s.cp2k_version == "2024.3" else
                                        f"https://manual.cp2k.org/cp2k-{s.cp2k_version.replace('.', '_')}-branch/CP2K_INPUT/FORCE_EVAL/DFT/PRINT/E_DENSITY_CUBE.html"},
                 "units": {"coordinates": "angstrom", "cell": "angstrom", "vacuum": "angstrom",
-                          "cutoff": "Ry", "rel_cutoff": "Ry", "smearing": "K", "pressure": "bar",
+                          "cutoff": "Ry", "rel_cutoff": "Ry", "trust_radius": "angstrom", "smearing": "K", "pressure": "bar",
                           "max_dr": "bohr", "rms_dr": "bohr", "max_force": "hartree/bohr", "rms_force": "hartree/bohr"},
-                "valence_electron_count": electrons, "kinds": kinds, "data_sources": data_sources,
+                "valence_electron_count": None if all_electron else electrons,
+                'explicit_electron_count': electrons,
+                'electron_count_model': 'all_electron' if all_electron else 'pseudopotential_valence',
+                "kinds": kinds, "data_sources": data_sources,
                 "source_structure": structure.to_dict(), "generated_structure": effective.to_dict(),
                 "coordinates_translated": translated, "warnings": warnings,
                 "input_text": text, "input_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
     manifest['method_profile'] = {
-        'functional': s.functional, 'xc_backend': 'Libxc' if method_profile.libxc else 'CP2K-native',
+        'functional': s.functional, 'qs_method': qs_method, 'gapw': gapw,
+        'ot_algorithm': (ot_algorithm or 'STRICT') if s.scf == 'ot' else None, 'ngrids': ngrids,
+        'xc_backend': 'Libxc' if method_profile.libxc else 'CP2K-native',
         'libxc_required': method_profile.libxc, 'libxc_user_asserted': s.libxc_available,
         'build_verified': False, 'dispersion_reference': s.functional if s.dispersion != 'none' else None,
         'basis_files': basis_files, 'potential_file': files['potential'],
-        'catalog_reference_version': '2026.2',
-        'catalog_sources': [dict(source) for source in CATALOG_SOURCES], 'runtime_validated': False,
+        'catalog_reference_version': None if all_electron else '2026.2',
+        'catalog_sources': [dict(source) for source in (AE_SOURCES if all_electron else CATALOG_SOURCES)], 'runtime_validated': False,
         'potential_approximations': [el for el, r in element_records.items() if r['potential_approximation']]}
     if hubbard or magnetism is not None:
         manifest['electronic_extensions'] = {
@@ -457,12 +521,61 @@ def generate_input(structure: Structure, settings: InputSettings):
 
 
 def write_input(structure, settings, output):
+    """Stage before publication; only regular .inp targets may be replaced.
+
+    No source/data file, symlink or non-.inp existing output is replaceable.
+    Optional JSON keeps exclusive creation. A pre-publication failure leaves
+    the old input intact; normal staging failures clean only our own files.
+    """
     text, manifest = generate_input(structure, settings)
     output = Path(output)
-    sidecar = Path(str(output) + ".json")
-    with ExitStack() as stack:
-        inp = stack.enter_context(new_file(output))
-        log = stack.enter_context(new_file(sidecar))
-        inp.write(text)
-        log.write(json_text(manifest))
-    return output, sidecar, manifest["warnings"]
+    sidecar = Path(str(output)+".json") if settings.write_json else None
+    if output.is_symlink():
+        raise OutputExists(f'Refusing to overwrite a symbolic link: {output}')
+    sources = [structure.source, *manifest['data_sources'].values()]
+    for source in sources:
+        if isinstance(source, dict) and source.get('path'):
+            path = Path(source['path'])
+            if (output.resolve() == path.resolve()
+                    or output.exists() and path.exists() and output.samefile(path)):
+                raise KitError(f'Refusing to replace a source/data file: {output}')
+
+    def replaceable():
+        if not os.path.lexists(output):
+            return False
+        mode = output.lstat().st_mode
+        if output.suffix.lower() != '.inp' or not stat.S_ISREG(mode):
+            raise OutputExists(f'Refusing to overwrite non-.inp or non-regular target: {output}')
+        return True
+
+    replaceable()
+    warnings = list(manifest['warnings'])
+    if sidecar is None and os.path.lexists(Path(str(output)+'.json')):
+        warnings.append('Existing JSON sidecar was not updated or deleted; it may describe an earlier input.')
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', newline='',
+                                         dir=output.parent, prefix=f'.{output.name}.',
+                                         suffix='.tmp', delete=False) as inp:
+            temporary = Path(inp.name)
+            inp.write(text)
+            inp.flush()
+            os.fsync(inp.fileno())
+        with ExitStack() as stack:
+            if sidecar is not None:
+                log = stack.enter_context(new_file(sidecar))
+                log.write(json_text(manifest))
+                log.flush()
+                os.fsync(log.fileno())
+                log.close()  # Finish all JSON writes before replacing input.
+            if replaceable():
+                os.replace(temporary, output)
+            else:
+                try:
+                    os.link(temporary, output)  # Exclusive for new names, including non-.inp.
+                except FileExistsError as exc:
+                    raise OutputExists(f'Output appeared during publication; retry: {output}') from exc
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    return output, sidecar, warnings

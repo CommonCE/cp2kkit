@@ -193,6 +193,51 @@ Metadata and full summaries stay in JSON/review rather than extra input comments
 The bundled catalog remains header metadata only, not installed data or parameters.
 No runtime validation is inferred from a filename, version, hash or successful export.
 
+## Generated input output policy (0.2.7 follow-up)
+
+JSON is opt-in, not a default file: settings.write_json=false by default;
+--write-json or menu 132 enables it. generate_input still returns (text, manifest)
+in memory. write_input returns (input_path, sidecar_path_or_null, warnings).
+Existing regular .inp may be replaced; optional JSON remains exclusive and its
+failure/collision must leave an existing input unchanged. Existing JSON is never
+removed or updated when the option is off (stale-sidecar warning is returned).
+Other workflows and schema/analysis/CSV contracts are unchanged. Filenames for
+basis, potential and D3 libraries are serialized unquoted as whole-line values;
+input_sha256 and input_text reflect that deliberate formatting change, with
+scientific settings unchanged. Source/data/symlink protections still apply.
+
+## Generated input JSON: all-electron and OT additions (0.2.7)
+
+Analysis/CSV and schema 0.1.0 are unchanged. Settings add `ot_algorithm` (null for
+auto, otherwise IRAC/STRICT) and `gapw_profile` (auto/native, effective for AE).
+Old configs without these fields use defaults. Registry v1 is extended additively
+with 50-59; no previously allocated number/ID changes meaning.
+
+- `explicit_electron_count`: charge-adjusted electrons in the selected model.
+- `electron_count_model`: pseudopotential_valence or all_electron.
+- `valence_electron_count`: unchanged integer for PP; null for AE, not a misleading
+  full-electron count under a valence label.
+- AE KINDs: nuclear_charge=Z, nuclear_charge_source=nuclear_occupations or
+  atomic_number_catalog, explicit_electrons=Z; basis_q, potential_q,
+  potential_q_source, potential_functional and valence_electrons are null.
+  protocol_pairing=all_electron_nuclear_charge; potential_approximation=false.
+- `method_profile.qs_method`: GPW/GAPW; `ngrids`: effective count;
+  `ot_algorithm`: effective IRAC/STRICT for OT, null for diag. Hidden raw settings
+  are retained but must not be confused with effective settings.
+- `method_profile.gapw`: null for PP, or versioned profile/qs/kind/ot_algorithm/
+  ngrids/automatic_settings/preserved/convergence_verified=false. Derived entries
+  record setting/value/reason; explicit OT overrides carry source=user. Numerical
+  profile v3 has empty qs/kind maps: cp2k_default_controls lists omitted EPSFIT,
+  EPSRHO0, EPSSVD, LEBEDEV_GRID, RADIAL_GRID without guessing runtime values.
+  method_profile.ngrids is now 5 for every PP/AE basis, including SR.
+- AE catalog_reference_version is null: catalog_sources identifies exact local
+  paths/hashes/REVISION and does not infer upstream equivalence. Actual source
+  records may identify recognized local bytes with reference_path/source_revision;
+  official reference_url remains reserved for recognized tagged bytes.
+- AE data_checked requires both actual selected entries, valid no-q orbital
+  payloads and ALL nuclear occupations equal to Z. It is not proof of orbital
+  fitness, native execution or convergence. All runtime/runnable flags stay false.
+
 ## Generated input JSON: optional electronic extensions
 
 Schema remains 0.1.0; the following fields are additive. Older inputs without new
@@ -221,6 +266,29 @@ also records `dft_plus_u` (empty array by default) and `magnetism` (null by defa
 - Total charge/multiplicity are never derived from initial local moments. An explicit
   UKS singlet is distinct from default RKS; density_output.spin_density and the
   generated two-spin ADDED_MOS follow effective UKS rather than multiplicity alone.
+
+## Generated input JSON: restart and motion output (software 0.2.7)
+
+Schema remains 0.1.0. These additive fields are available in the in-memory
+manifest/review and optional JSON; the default writer still creates input only.
+
+- settings.trust_radius: positive finite number, default 0.2; units.trust_radius
+  is angstrom. settings.trajectory_format is PDB/XYZ/EXTXYZ, default XYZ.
+  Hidden values remain raw requests, not evidence of active output.
+- restart_template: filename follows PROJECT with -RESTART.wfn for Gamma or
+  -RESTART.kp for non-Gamma. scf_guess=RESTART describes the commented hint;
+  enabled=false, filename_commented=true, guess_commented=true. No active
+  SCF_GUESS is emitted; CP2K's default applies until edited by the user.
+  naming_basis describes default restart naming, runtime_verified=false.
+  This is not evidence that the file exists or is compatible with the calculation.
+- motion_output.enabled: true for GEO_OPT/CELL_OPT, false otherwise.
+  trajectory_format and restart_backup_copies=0 describe emitted MOTION/PRINT
+  controls; both are null outside optimization.
+  trust_radius_angstrom is the effective BFGS/LBFGS radius, null for CG and
+  non-optimization tasks, even when settings.trust_radius retains a value.
+- No trajectory cadence or filename override is imposed. MOTION restart backup
+  policy is separate from the unchanged SCF wavefunction backup defaults.
+  Static keyword/naming checks are not native acceptance or convergence proof.
 
 ## Cube check JSON
 

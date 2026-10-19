@@ -2,7 +2,7 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.2.6 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.2.7 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 - Analysis remains read-only: no submission/execution or modification of existing
@@ -12,16 +12,45 @@ release certified with actual CP2K runs.
 - The core uses Python's standard library; Rich styling and Matplotlib are optional.
 - Outputs include schema, units, SHA-256, line numbers, and original text.
   Missing values are not zero.
-- All existing targets, including derived CSV/JSON/images, are protected from overwrite.
+- Analysis/CSV/JSON/images remain overwrite-protected. Input generation may replace
+  an existing regular `.inp`; sources, data files and symlinks remain protected.
 - Energies can be extracted from failed jobs without becoming valid scientific results.
 
-## Current version: 0.2.6
+## Current version: 0.2.7
 
-Version remains **0.2.6** as explicitly requested. The basis follow-up adds a
+Version **0.2.7** now writes only the input by default and allows replacing an
+existing regular `.inp`. Use `--write-json` or menu **132** for optional provenance
+JSON (still exclusive). Existing JSON is never deleted/updated implicitly.
+Basis/potential filenames, like D3 filenames, are emitted without quotes.
+
+Version **0.2.7** fixes D3/D3(BJ) PARAMETER_FILE_NAME serialization: emit the
+whole-line filename without quotes, avoiding a blank-prefix parser failure in
+the inspected CP2K implementation. No physical parameters change. See the
+[filename notes](docs/input-generation.md#d3-parameter-filenames-027).
+
+Version **0.2.7** adds all-electron orbital choices **50-59** with automatic
+GAPW/ALL, core-inclusive electron counts and pob OT/IRAC setup. NGRIDS defaults
+to 5 for all bases; GAPW split tolerances and atomic grids are left to CP2K defaults.
+Main-menu **110 ALGORITHM** appears only for OT: choose IRAC/STRICT, or `auto`
+for the basis-aware default; explicit selection wins. CLI: `--ot-algorithm IRAC`.
+The automatic AE setup is a starting profile, not convergence certification;
+`--gapw-profile native` omits its automatic OT algorithm selection.
+Charge/spin, functional, dispersion, cutoff and periodicity are not repaired.
+See [the AE guide](docs/basis-selection.md#all-electron-automatic-setup-027).
+
+The retained 0.2.7 follow-up writes commented restart hints instead of forcing
+SCF_GUESS ATOMIC; names follow PROJECT (.wfn for Gamma, .kp otherwise).
+Optimizations use explicit BFGS/LBFGS TRUST_RADIUS 0.2 angstrom (menu **133**,
+`--trust-radius`), and **-5** / `--trajectory-format pdb|xyz|extxyz` selects
+MOTION position output (XYZ default; EXTXYZ checked for target 2026.2).
+MOTION restart backup copies are set to 0; restart writing remains enabled,
+so archive old results before running. See [restart/output details](docs/input-generation.md#restart-hints-and-optimization-output-027-follow-up).
+
+The preceding 0.2.6 basis follow-up added a
 [permanent numbered registry](docs/basis-selection.md) with stable string IDs,
 classic/UCL and paired UZH-PBE choices, explicit custom ORB files, actual-entry
 alias/q checks, source ambiguity rejection and per-KIND provenance. PBE0 numbers
-are allocated but unavailable; no hybrid/all-electron/auxiliary template is added.
+are allocated but unavailable; hybrid/auxiliary templates remain unavailable.
 Registry version 1 distinguishes the new contract from earlier positional menus;
 old family names remain accepted, old numbers need explicit migration. This is
 not a 1.0.0 release. With no actual data, output is an unverified template;
@@ -105,7 +134,8 @@ Navigation:
 - Use `r` to review, `p` to preview the full input/replay command, or `0`/`w` to
   review and write with explicit y/yes confirmation. Output defaults to the source
   stem plus `.inp` in the current directory; CLI overrides remain supported.
-  Existing targets are refused; a recovery prompt accepts a new path, never overwrites.
+  Existing regular `.inp` targets may be replaced after confirmation. JSON/non-input
+  collisions remain protected; a recovery prompt accepts another path.
 - Ctrl+C cancels an operation back to main; at main it exits. EOF exits cleanly.
   Completed files are retained; unfinished writes use the existing rollback.
 - Result summaries show Success/Warning/Error and full generated paths.
@@ -203,7 +233,7 @@ Cell overrides and data directories remain available through `--cell` / `--data-
 the basis chooser also has data-source controls (`d`, `b`, `v`) without numbered main-menu rows.
 Complete CLI calls remain noninteractive, and machine-readable JSON/CSV is never
 rendered through Rich. Add `--plain` for unstyled interaction.
-Neither curses nor Multiwfn is a runtime dependency. Version 0.2.6 retains this menu layout.
+Neither curses nor Multiwfn is a runtime dependency. Version 0.2.7 retains this menu layout and adds OT-only 110 ALGORITHM.
 See [input generation](docs/input-generation.md).
 
 Supported: ENERGY/ENERGY_FORCE/GEO_OPT/CELL_OPT, PBE/BLYP/PBEsol/revPBE/RPBE, MOLOPT-GTH,
@@ -219,7 +249,9 @@ is inferred/adjusted. For example, `Fe:2:4.0` and `Fe=4; @2=-4` illustrate synta
 **not recommended parameters or a validated magnetic ground state**.
 The matching CLI flags are `--dft-plus-u` and `--magnetism` (quote semicolon lists).
 Without these explicit requests, generated CP2K input text/default physics stays unchanged.
-Input and `<output>.json` are both overwrite-protected.
+By default only the input is written; existing regular `.inp` can be replaced.
+`--write-json` / menu 132 adds an exclusively created `<output>.json`. If that
+JSON already exists, generation fails before changing the input.
 Structures include XYZ/extXYZ, restart, Cartesian GJF/COM, CIF, and VASP5 POSCAR/CONTCAR.
 PROJECT defaults to the source filename without suffix; grid defaults to 400/55 Ry;
 OT inner/outer limits are 25/20. With diag+smearing, empty orbitals default to

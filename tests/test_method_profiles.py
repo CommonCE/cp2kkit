@@ -36,7 +36,7 @@ class MethodProfileTests(unittest.TestCase):
         self.structure = read_structure(self.path)
         self.water = Structure(['O', 'H', 'H'], [[0., 0., 0.], [0., 1., 0.], [1., 0., 0.]],
                                None, [False]*3, {'path': 'synthetic-water.xyz'})
-        self.settings = InputSettings(periodic='NONE')
+        self.settings = InputSettings(periodic='NONE', write_json=True)
         self.output = self.dir/'new.inp'
 
     def generate(self, structure=None, **kwargs):
@@ -139,9 +139,9 @@ class MethodProfileTests(unittest.TestCase):
         for basis in ('TZVP-MOLOPT-SR-GTH', 'TZV2P-MOLOPT-SR-GTH'):
             with self.subTest(basis=basis):
                 text, manifest = self.generate(fe, basis=basis)
-                self.assertIn('BASIS_SET_FILE_NAME "BASIS_MOLOPT_UCL"', text)
+                self.assertIn('BASIS_SET_FILE_NAME BASIS_MOLOPT_UCL', text)
                 self.assertIn('BASIS_SET '+basis+'-q16', text)
-                self.assertIn('NGRIDS 4', text)
+                self.assertIn('NGRIDS 5', text)
                 self.assertEqual(manifest['valence_electron_count'], 16)
 
     def test_sr_missing_light_elements_and_mg_q_mismatch_never_fallback(self):

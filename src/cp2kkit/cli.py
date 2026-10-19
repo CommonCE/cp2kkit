@@ -11,7 +11,7 @@ from .errors import KitError
 from .export import export_structure_files, write_csv
 from .io import json_text, new_file
 from .basis_registry import DEFAULT_BASIS, parse_basis
-from .inputgen import CP2K_VERSIONS, FUNCTIONALS, PERIODICITIES, RUN_TYPES, InputSettings, write_input
+from .inputgen import CP2K_VERSIONS, FUNCTIONALS, PERIODICITIES, RUN_TYPES, TRAJECTORY_FORMATS, InputSettings, write_input
 from .models import SCHEMA_VERSION
 from .parser import parse_output
 from .plot import plot_run
@@ -48,17 +48,20 @@ def build_parser():
     structure.add_argument("--format", choices=["extxyz", "xyz"], default="extxyz")
     structure.add_argument("--frame", type=int, default=-1, help="XYZ frame index, default last; negative indices allowed")
     structure.add_argument("--allow-cell-loss", action="store_true", help="Explicitly allow plain XYZ to omit a known cell")
-    gen = sub.add_parser("generate-input", help="Generate a conservative GPW CP2K input and provenance JSON")
+    gen = sub.add_parser("generate-input", help="Generate a conservative GPW/GAPW CP2K input and provenance JSON")
     gen.add_argument("path", nargs="?", help="XYZ/extXYZ/restart/GJF/CIF/POSCAR structure; prompted in TUI mode")
-    gen.add_argument("-o", "--output", help="New input path; required unless using TUI")
+    gen.add_argument("-o", "--output", help="Input path; existing regular .inp may be replaced; required unless using TUI")
     gen.add_argument("--interactive", "--tui", action="store_true", help="Edit all CLI-seeded settings in one scrolling numbered menu")
     gen.add_argument("--plain", action="store_true", default=argparse.SUPPRESS, help="Disable interactive styling")
     gen.add_argument("--frame", type=int, default=-1)
+    gen.add_argument("--write-json", action="store_true", help="Also write exclusive provenance JSON; default writes only input. Existing .inp may be replaced, JSON may not.")
     gen.add_argument("--project", help="Default: structure filename without its suffix")
     gen.add_argument("--run-type", type=str.upper, choices=RUN_TYPES, default="ENERGY")
     gen.add_argument("--functional", type=str.upper, choices=FUNCTIONALS, default="PBE")
     gen.add_argument("--basis", type=parse_basis, default=DEFAULT_BASIS,
                      help="Stable ORB ID or legacy family name; numbers are interactive-only")
+    gen.add_argument("--gapw-profile", choices=("auto", "native"), default="auto",
+                     help="AE only: auto chooses pob IRAC/other STRICT; native leaves OT algorithm to CP2K unless explicitly selected. GAPW tolerances/atomic grids stay native.")
     gen.add_argument("--basis-file", dest="basis_files", action="append", default=[], help="Explicit basis library; repeat to provide sources, differing duplicate aliases are rejected")
     gen.add_argument("--potential-file", dest="potential_files", action="append", default=[], help="Explicit potential library; repeat to provide sources, no implicit merge")
     gen.add_argument("--custom-basis-file", help="Selection custom-orbital/900: literal ORB library path")
@@ -83,11 +86,16 @@ def build_parser():
     gen.add_argument("--rel-cutoff", type=float, default=55.0, help="Ry")
     gen.add_argument("--eps-scf", type=float)
     gen.add_argument("--max-scf", type=int, help="Default: OT inner 25; diagonalization 128")
+    gen.add_argument("--ot-algorithm", type=str.upper, choices=("IRAC", "STRICT"),
+                     help="OT only: explicit algorithm; auto if omitted (GAPW pob IRAC, otherwise STRICT)")
     gen.add_argument("--max-outer-scf", type=int, default=20, help="OT outer SCF limit")
     gen.add_argument("--kpoints", type=int, nargs=3, default=(1, 1, 1), metavar=("NX", "NY", "NZ"))
     gen.add_argument("--smearing", type=float, help="Fermi-Dirac electronic temperature (K); requires diag")
     gen.add_argument("--added-mos", type=int, help="Auto: max(30, NINT(atom_count/2)) with diag+smearing, otherwise 0")
     gen.add_argument("--optimizer", type=str.upper, choices=["BFGS", "LBFGS", "CG"], default="BFGS")
+    gen.add_argument("--trust-radius", type=float, default=0.2, help="Angstrom; BFGS/LBFGS optimization only")
+    gen.add_argument("--trajectory-format", type=str.upper, choices=TRAJECTORY_FORMATS, default="XYZ",
+                     help="Optimization position trajectory; EXTXYZ is checked for target 2026.2")
     gen.add_argument("--max-iter", type=int, default=400)
     gen.add_argument("--pressure", type=float, default=1.01325, help="CELL_OPT external pressure (bar)")
     gen.add_argument('--dft-plus-u', type=parse_dft_plus_u, default=(),
@@ -179,7 +187,7 @@ def execute(args):
         output, sidecar, warnings = write_input(structure, InputSettings(**values), args.output)
         for warning in warnings:
             print(f"WARNING: {warning}", file=sys.stderr)
-        print(f"Wrote {output} and {sidecar}", file=sys.stderr)
+        print(f"Wrote {output}"+(f" and {sidecar}" if sidecar is not None else ""), file=sys.stderr)
         return 0
     if args.command == "discover":
         emit({"schema_version": SCHEMA_VERSION, "projects": [p.to_dict() for p in discover(args.path)]}, args.output)

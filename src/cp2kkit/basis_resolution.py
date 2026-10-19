@@ -5,16 +5,19 @@ from pathlib import Path
 from .basis_registry import OPTIONS
 from .cp2k_data import Libraries, cp2k_path, safe_token
 from .data_catalog import BASIS_ROWS, UZH_POTENTIAL_ROWS, catalog_rows as rows
+from .all_electron_catalog import AE_BASIS_ROWS
 from .errors import KitError
 
 
 def catalog_files(option, element, q):
-    return [file for file, families in BASIS_ROWS.items()
+    catalog = AE_BASIS_ROWS if option.kind_type == 'all-electron' else BASIS_ROWS
+    return [file for file, families in catalog.items()
             if file in option.sources and q in rows(families.get(option.family, '')).get(element, ())]
 
 
-def alternatives(element, q, functional):
+def alternatives(element, q, functional, kind_type='pseudopotential'):
     return [f'{o.number}:{o.id}' for o in OPTIONS if o.selectable and functional in o.functionals
+            and o.kind_type == kind_type
             and o.protocol != 'custom' and catalog_files(o, element, q)]
 
 
@@ -53,7 +56,8 @@ class BasisResolver:
         paths = tuple(sorted({r['basis_file'] for r in records.values() if r['basis_source']}))
         for element, record in records.items():
             if record['basis_source']:
-                self.libraries.select(paths, 'ORB', element, (record['basis'],), record['valence_electrons'])
+                self.libraries.select(paths, 'ORB', element, (record['basis'],), record['explicit_electrons'],
+                                      all_electron=record['basis_kind_type'] == 'all-electron')
 
     def potential_available(self, option, element, q, functional, catalog):
         paths = self.paths(self.settings.potential_files, option.potential_sources)
@@ -73,6 +77,8 @@ class BasisResolver:
         if s.functional not in option.functionals:
             raise KitError(f'{option.number}:{option.id} requires {option.functionals}, not {s.functional}; '
                            'the functional is not changed automatically')
+        if option.kind_type == 'all-electron':
+            return self.resolve_all_electron(option, element, q)
         custom = option.protocol == 'custom'
         if custom:
             if not s.custom_basis_file or not s.custom_basis_name:
@@ -150,4 +156,43 @@ class BasisResolver:
                 'basis_protocol': option.protocol, 'protocol_pairing': pairing, 'basis_q': bq,
                 'basis_source': source_b, 'potential_source': source_p, 'data_validation': status,
                 'potential_functional': potential_functional,
-                'potential_approximation': potential_functional != s.functional, 'valence_electrons': q}, warnings
+                'potential_approximation': potential_functional != s.functional, 'valence_electrons': q,
+                'explicit_electrons': q}, warnings
+
+    def resolve_all_electron(self, option, element, nuclear_charge):
+        # A real no-q label alone cannot establish AE suitability (e.g. heavy
+        # def2/pob entries may require ECPs). Keep the audited element whitelist.
+        files = catalog_files(option, element, nuclear_charge)
+        if not files:
+            raise KitError(f'No audited all-electron coverage for {element} in {option.name}; '
+                           'heavy-element/ECP or arbitrary coverage expansion is not enabled')
+        bpaths = self.paths(self.settings.basis_files, option.sources)
+        source_b = source_p = None
+        names = (option.family, *option.aliases)
+        if bpaths:
+            entry, basis, _ = self.libraries.select(bpaths, 'ORB', element, names, nuclear_charge, all_electron=True)
+            source_b = dict(entry.source, entry_line=entry.line, entry_sha256=entry.signature)
+            bfile = source_b['path']
+        else:
+            basis, bfile = option.family, files[0]
+        ppaths = self.paths(self.settings.potential_files, option.potential_sources)
+        if ppaths:
+            entry, potential, charge = self.libraries.select(ppaths, 'POTENTIAL', element,
+                                                            ('ALL', 'ALLELECTRON'), nuclear_charge, all_electron=True)
+            if charge != nuclear_charge:
+                raise KitError(f'ALL nuclear charge disagrees with atomic number for {element}')
+            source_p = dict(entry.source, entry_line=entry.line, entry_sha256=entry.signature)
+            pfile = source_p['path']
+        else:
+            potential, pfile = 'ALL', option.potential_sources[0]
+        cp2k_path(bfile)
+        cp2k_path(pfile)
+        status = 'data_checked' if source_b and source_p else 'unverified_template'
+        return {'basis': basis, 'basis_file': bfile, 'potential': potential, 'potential_file': pfile,
+                'basis_id': option.id, 'basis_number': option.number, 'basis_role': option.role.value,
+                'basis_kind_type': 'all-electron', 'potential_q': None, 'potential_q_source': None,
+                'nuclear_charge_source': 'nuclear_occupations' if source_p else 'atomic_number_catalog',
+                'basis_protocol': 'all-electron', 'protocol_pairing': 'all_electron_nuclear_charge',
+                'basis_q': None, 'nuclear_charge': nuclear_charge, 'explicit_electrons': nuclear_charge,
+                'basis_source': source_b, 'potential_source': source_p, 'data_validation': status,
+                'potential_functional': None, 'potential_approximation': False, 'valence_electrons': None}, []

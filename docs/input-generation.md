@@ -1,13 +1,14 @@
 # CP2K input generation
 
-This guide describes cp2kkit **0.2.6**. Older defaults and migration notes are in
-[the changelog](../CHANGELOG.md). This feature stays at **0.2.6** by explicit request.
+This guide describes cp2kkit **0.2.7**. Older defaults and migration notes are in
+[the changelog](../CHANGELOG.md). AE automatic setup is described in
+[the basis guide](basis-selection.md#all-electron-automatic-setup-027).
 The [registry-v1 basis guide](basis-selection.md) defines permanent numbering toward
 1.0.0, data requirements, UZH protocols, custom 900 and explicit migration from
 legacy list positions; it does not claim a 1.0.0 release or native validation.
 
 `generate-input` is an explicit write entry point added beyond the read-only MVP;
-it neither submits nor runs calculations. It is a Python GPW subset developed
+it neither submits nor runs calculations. It is a Python GPW/GAPW subset developed
 with reference to Multiwfn's `outCP2Kinp`, not a complete Fortran port or strict
 clean-room implementation. Sources, custom terms, and the two required papers are
 in [third-party notices](../THIRD_PARTY_NOTICES.md), [terms](../third_party/multiwfn/TERMS.md),
@@ -40,7 +41,7 @@ cp2kkit generate-input water.xyz -o water-opt.inp --periodic NONE \
 
 # Preserve source cell/PBC, not the original method/charge/spin.
 cp2kkit generate-input solid.extxyz -o solid.inp --run-type CELL_OPT \
-  --scf diag --kpoints 3 3 3 --smearing 300 --added-mos 30
+  --scf diag --kpoints 3 3 3 --smearing 300 --added-mos 30 --trajectory-format EXTXYZ
 
 # Override orthorhombic lengths in angstrom; charge +1 and doublet.
 cp2kkit generate-input radical.xyz -o radical.inp --periodic NONE \
@@ -53,9 +54,96 @@ cp2kkit generate-input water.xyz -o checked.inp --periodic NONE \
 cp2kkit generate-input --help
 ```
 
-Outputs are `<output>` and `<output>.json`. If either exists, refuse overwrite
-(exit 5); a sidecar collision rolls back the newly created input. There is no
-`--force`. Parent directories must already exist.
+Default output is `<output>` only; JSON is opt-in with `--write-json` or menu
+**132**. The in-memory review/manifest remains available even with JSON off.
+Existing regular `.inp` (case-insensitive suffix) may be replaced; other existing
+outputs, directories, symlinks, original structure and selected data files are
+protected. There is no `--force`. Parent directories must already exist.
+
+Input text is staged beside the target, flushed and atomically published. Failed
+validation/staging/optional JSON serialization or collision leaves the old input
+intact. Optional `<output>.json` remains exclusive (exit 5 if it exists); it is
+never overwritten. With JSON off, existing sidecars are left untouched and warned
+as potentially stale. This changes input-generation defaults only, not analysis,
+structure-export or cube/plot output protections. No multi-file power-loss atomicity
+is promised.
+
+## Restart hints and optimization output (0.2.7 follow-up)
+
+The generator no longer forces `SCF_GUESS ATOMIC`. Instead it writes inactive
+restart hints in DFT and DFT/SCF, respectively:
+
+```text
+#   WFN_RESTART_FILE_NAME water-RESTART.wfn
+#     SCF_GUESS RESTART #Use WFN_RESTART_FILE_NAME as the initial guess; uncomment both restart lines
+```
+
+The name follows the actual **PROJECT**, not a separately selected input-output
+basename. Gamma uses `PROJECT-RESTART.wfn`; non-Gamma k-points use
+`PROJECT-RESTART.kp`, matching the inspected CP2K writers and Multiwfn templates.
+With both lines commented, no restart is requested and the CP2K guess default
+applies (ATOMIC in the inspected local source). To restart, check that the file
+exists and is compatible with the system, electron model, basis and spin settings,
+then uncomment both lines. No restart is searched, read or modified by generation.
+The naming rule assumes the generated single FORCE_EVAL/default restart print names;
+it is not evidence that a wavefunction file exists or was written successfully.
+
+GEO_OPT and CELL_OPT now write `TRUST_RADIUS [angstrom] 0.2` in the selected
+`&BFGS` or `&LBFGS` subsection. Use `--trust-radius 0.15` or main-menu
+**133** to change this positive finite radius. CG does not use this setting;
+its hidden value is retained. This is an explicit starting value referenced to
+Multiwfn, not a claim of optimality or CP2K's default: the inspected local BFGS
+default is 0.25 angstrom and LBFGS defaults to a disabled radius.
+
+Main-menu **-5** / `--trajectory-format pdb|xyz|extxyz` selects optimization
+position output (case-insensitive in CLI/menu; stored as PDB/XYZ/EXTXYZ). The
+default is XYZ for both tasks; unlike Multiwfn's task-switching reset, changing
+to CELL_OPT does not silently select PDB. XYZ loses cell information, PDB has
+limited coordinate precision, and EXTXYZ is checked only for target 2026.2.
+Prefer EXTXYZ when preserving changing cell vectors matters. Unsupported older
+target + active EXTXYZ output is rejected, without changing the selection.
+
+Both optimization tasks append:
+
+```text
+  &PRINT
+    &TRAJECTORY
+      FORMAT XYZ
+    &END TRAJECTORY
+    &RESTART
+      BACKUP_COPIES 0 #Maximum number of backup copies; 0 disables backups, not restart writing
+    &END RESTART
+  &END PRINT
+```
+
+This is inside MOTION, after GEO_OPT/CELL_OPT. Backup count 0 disables backup
+copies of the **MOTION restart**, not restart writing and not SCF wavefunction
+backups. Archive existing results before executing in a reused directory; cp2kkit
+does not execute the input or change any existing restart/wavefunction file.
+No custom trajectory cadence or filename is imposed. ENERGY/ENERGY_FORCE omit
+MOTION; hidden format/radius preferences remain in settings and replay commands.
+
+The inspected Multiwfn source explicitly emits NGRIDS 5 only for its non-SR
+MOLOPT basis numbers 3/4/5; other basis branches omit the keyword. cp2kkit's
+**universal NGRIDS 5** remains the user's separate explicit policy, not an
+assertion of exact Multiwfn grid-default equivalence. Static source checks and
+synthetic tests are not native CP2K acceptance or convergence evidence.
+
+## D3 parameter filenames (0.2.7)
+
+Use `PARAMETER_FILE_NAME dftd3.dat`, without wrapping this whole-line filename
+in quotes. The inspected local CP2K lchar_t parsing/chunk-joining path can produce
+leading blanks for a quoted filename even when the text inside the quotes has
+none. This is not an SCF, OT or AE convergence issue. Default and explicit data-dir
+filenames use a dedicated whole-line serializer. The inspected BASIS_SET_FILE_NAME
+and POTENTIAL_FILE_NAME definitions are also whole-line strings, so both now use
+the same unquoted serializer. Literal internal spaces are kept;
+leading/trailing whitespace and #/! comment markers are rejected, not silently
+removed. Choose an unambiguous data location for rejected filenames. Existing
+calculation results remain protected; generated regular .inp replacement is allowed
+only under the policy above. Do not reuse an old calculation's result directory
+without reviewing restart/checkpoint behavior.
+Static source and synthetic regression checks are not native execution evidence.
 
 ## Single numbered input-generation menu
 
@@ -71,14 +159,15 @@ All applicable settings appear together in one scrolling numbered menu, using
 Multiwfn-style direct selection. There are no sequential steps, hidden advanced
 pages, or group-selection submenus. Corresponding main-menu IDs follow the inspected
 Multiwfn 2026.10.1 source; unsupported entries are omitted, not reassigned.
-This changes presentation only; the same `InputSettings`, generator and protected
-writer remain in use. Version **0.2.6** retains the menu introduced in 0.2.4;
-new profiles are explicit opt-ins, not changes to the default scientific settings.
+The same `InputSettings`, generator and staged writer serve CLI and menus. Version **0.2.7** retains the menu introduced in 0.2.4;
+its explicitly requested follow-ups change defaults as documented above, without
+automatically repairing charge, spin, method or periodicity.
 
 | ID | Setting/action | Numbering origin |
 |---|---|---|
 | -10 | Return/cancel generation | Multiwfn main menu |
 | -7 | Periodicity | Multiwfn main menu |
+| -5 | Optimization trajectory format: PDB / XYZ / EXTXYZ | Multiwfn trajectory ID; local format/applicability subset |
 | -3 | Electron-density cube | Multiwfn cube entry; supported density subset only |
 | -1 | Task | Multiwfn main menu |
 | 0 | Review and generate, with explicit y/yes confirmation | Multiwfn generate ID; extra safety confirmation |
@@ -87,6 +176,10 @@ new profiles are explicit opt-ins, not changes to the default scientific setting
 | 10 / 12 | Optimizer / CELL_OPT pressure | Multiwfn main menu |
 | 101 / 102 | Charge / multiplicity | Local extensions (upstream Other settings 1/2) |
 | 105 / 106 | CUTOFF / REL_CUTOFF | Local extensions (upstream Other settings 5 combines both) |
+| 110 | OT ALGORITHM: IRAC/STRICT; auto restores basis-aware default | Local extension, OT only |
+| 131 | All-electron automatic setup: auto/native | Local extension, AE only |
+| 132 | Write provenance JSON: off by default | Local extension |
+| 133 | TRUST_RADIUS [angstrom], default 0.2 | Local extension; optimization BFGS/LBFGS only |
 | 107 / 112 | Isolated padding / ADDED_MOS | Local extensions (upstream Other settings 7/12) |
 | 120 / 121 / 122 | EPS_SCF / inner-diag limit / outer limit | Local extensions |
 | 123 / 124 / 125 | Optimization steps / DFT+U / magnetic initialization | Local extensions |
@@ -109,9 +202,11 @@ reserved ranges, neither of which can be selected.
   These values and absolute output paths remain in review/manifest for traceability.
 - Select any displayed number directly; a prompt shows its choices. Numbers remain
   fixed across task/SCF/PBC changes. Hidden fields cannot be selected.
-  Pressure appears only for CELL_OPT; optimizer/step limits only for optimization.
+  Pressure appears only for CELL_OPT; optimizer/step limits and trajectory format
+  only for optimization. TRUST_RADIUS appears only for optimization BFGS/LBFGS.
   Isolated padding requires effective NONE, not Unknown. OT hides smearing/ADDED_MOS;
-  diag hides outer SCF limits. All values are retained when fields disappear.
+  diag hides outer SCF limits and 110 ALGORITHM. Enter keeps the algorithm;
+  `back` abandons the edit, `auto` restores the basis-aware default. All values are retained when fields disappear.
 - Parameter Enter keeps; `back` abandons that edit. **Literal zero remains a value**,
   including charge, ADDED_MOS and Boolean off. Optional `auto` restores defaults.
   Enumerations accept names/numbers; triples are space-separated. In the basis
@@ -126,7 +221,9 @@ reserved ranges, neither of which can be selected.
 - `0` or its alias `w` reviews and asks for explicit `y`/`yes` before writing.
   Enter defaults to no. Collision/I/O errors offer a new-path retry prompt
   (Enter/back returns to settings), without adding a persistent output-path option.
-  No overwrite button exists. The protected writer revalidates and rolls back.
+  The confirmation warns that existing regular `.inp` may be replaced; there is
+  no separate overwrite prompt. The shared writer revalidates and stages before
+  replacement. JSON/non-input collisions offer another target.
 - Bare interactive generation opens the same menu; use `s` to load a source.
   A missing source gives a recoverable validation message.
 
@@ -143,8 +240,8 @@ Optional Rich (`.[ui]`) has a standard-library fallback; `--plain` and the prese
 of `NO_COLOR` disable styling. Text folds on narrow terminals without clearing,
 alternate screen, or continuous redraw. Both stdin and stdout must be TTY.
 Redirected/piped sessions fail promptly with batch alternatives rather than waiting.
-Complete batch calls, schema 0.1.0, scientific defaults, and protected writing are
-unchanged; identical structure/settings produce identical text/manifest.
+Batch remains noninteractive; schema stays 0.1.0. Explicit default changes are\ndocumented in the restart/output and grid sections above.
+Input-only output and regular .inp replacement are the explicit new write policy; identical structure/settings produce identical text/manifest.
 
 ## Scope and defaults
 
@@ -160,10 +257,10 @@ unchanged; identical structure/settings produce identical text/manifest.
 | SCF | OT+FULL_ALL/DIIS+outer SCF (default), or diagonalization+Broyden mixing |
 | EPS_SCF | ENERGY 5e-6, other tasks 1e-6; override allowed |
 | SCF limits | OT inner/outer 25/20; diag 128; `--max-scf`/`--max-outer-scf` overrides |
-| Grid | CUTOFF 400 Ry/REL_CUTOFF 55 Ry; NGRIDS 5 for non-SR, 4 for SR |
+| Grid | CUTOFF 400 Ry/REL_CUTOFF 55 Ry; NGRIDS 5 for all PP/AE bases; no explicit GAPW split-tolerance or atomic-grid overrides |
 | k-points | Gamma default; non-Gamma requires XYZ+diag |
 | Smearing/empty orbitals | Optional Fermi-Dirac K, requires diag; auto `max(30, NINT(atom_count/2))` with smearing, otherwise 0; OT rejects smearing/nonzero empty orbitals |
-| Optimization | BFGS (default), LBFGS, CG; max 400 steps |
+| Optimization | BFGS (default), LBFGS, CG; max 400 steps; BFGS/LBFGS TRUST_RADIUS 0.2 angstrom |\n| Restart hints | Commented PROJECT-RESTART.wfn / .kp and SCF_GUESS RESTART; no active guess override |\n| Motion output | Optimization only: XYZ (default), PDB, EXTXYZ (target 2026.2); MOTION restart BACKUP_COPIES 0 |
 | CELL_OPT | Requires XYZ/lower-triangular cell; analytical stress; default pressure 1.01325 bar |
 | Target version | 2026.2 default; common density syntax profiles 2024.1/2/3, 2025.1/2, 2026.1/2; not runtime certification |
 | Density cubes | Optional electron/applicable UKS spin density; stride default 1 1 1; final-step policy in [cube guide](cube.md) |
@@ -315,7 +412,7 @@ checked separately and raw bytes are hashed. An entry in the wrong library or wi
 a different q cannot satisfy a selection. Registry-v1 actual files are authoritative for an enabled family at the fixed q;
 explicit files may supply entries beyond pinned catalog coverage. They do not add
 new method templates or change q. Use custom 900 for a literal custom ORB alias.
-NGRIDS is 5 if any effective KIND basis is non-SR, otherwise 4. CUTOFF/REL_CUTOFF
+NGRIDS now defaults to 5 for every effective basis, SR/non-SR and PP/AE alike. CUTOFF/REL_CUTOFF
 remain 400/55 Ry by default, not property-converged values. Larger Gaussian bases,
 grid convergence and overlap conditioning are separate checks.
 
@@ -338,7 +435,7 @@ energies/forces/stress, recommended bases/U, or validation of an adsorption mode
 
 The registry follow-up enables paired UZH-PBE DZVP/TZVP/TZV2P for target 2026.2
 and explicit custom pseudopotential ORB files. r2SCAN/meta-GGAs, hybrids/HF/ADMM,
-UZH-PBE0 templates, arbitrary q changes, auxiliary/all-electron and reserved
+UZH-PBE0 templates, arbitrary q changes, auxiliary and reserved
 families remain unimplemented; see [basis selection](basis-selection.md).
 
 ## DFT+U and magnetic initialization (124 / 125)

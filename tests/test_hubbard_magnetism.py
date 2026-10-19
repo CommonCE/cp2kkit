@@ -28,7 +28,7 @@ class HubbardMagnetismTests(unittest.TestCase):
         self.source = self.dir/'fe2o2.xyz'
         self.source.write_text('4\nsynthetic\nFe 0 0 0\nFe 2 0 0\nO 0 2 0\nO 2 2 0\n')
         self.structure = read_structure(self.source)
-        self.settings = InputSettings(periodic='NONE')
+        self.settings = InputSettings(periodic='NONE', write_json=True)
         self.out = self.dir/'new.inp'
 
     def generate(self, **kwargs):
@@ -199,10 +199,14 @@ class HubbardMagnetismTests(unittest.TestCase):
             self.session('125\nFe=4; @2=-4\ncancel\n')
             writer.assert_not_called()
 
-    def test_magnetic_output_collisions_are_protected(self):
-        for target in (self.out, Path(str(self.out)+'.json')):
-            target.write_text('existing')
-            with self.assertRaises(KitError):
-                write_input(self.structure, replace(self.settings, magnetism=()), self.out)
-            self.assertEqual(target.read_text(), 'existing')
-            target.unlink()
+    def test_magnetic_input_replacement_and_json_collision_protection(self):
+        self.out.write_text('existing input')
+        write_input(self.structure, replace(self.settings, magnetism=()), self.out)
+        self.assertIn('UKS T', self.out.read_text())
+        old_input = self.out.read_bytes()
+        sidecar = Path(str(self.out)+'.json')
+        old_json = sidecar.read_bytes()
+        with self.assertRaises(KitError):
+            write_input(self.structure, replace(self.settings, magnetism=(('Fe', 4.),)), self.out)
+        self.assertEqual(self.out.read_bytes(), old_input)
+        self.assertEqual(sidecar.read_bytes(), old_json)

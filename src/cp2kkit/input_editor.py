@@ -14,29 +14,33 @@ FIELDS = {field.name: field for _, fields in GROUPS for field in fields}
 # Only corresponding implemented fields get upstream main-menu IDs. 100+ are
 # explicit local extensions, not flattened/reassigned upstream submenu numbers.
 FIELD_IDS = (
-    (-7, 'periodic'), (-3, 'electron_density'), (-1, 'run_type'),
+    (-7, 'periodic'), (-5, 'trajectory_format'), (-3, 'electron_density'), (-1, 'run_type'),
     (1, 'functional'), (2, 'basis'), (3, 'dispersion'), (4, 'scf'),
     (6, 'smearing'), (8, 'kpoints'), (10, 'optimizer'), (12, 'pressure'),
     (101, 'charge'), (102, 'multiplicity'), (105, 'cutoff'), (106, 'rel_cutoff'),
-    (107, 'vacuum'), (112, 'added_mos'), (120, 'eps_scf'), (121, 'max_scf'),
+    (107, 'vacuum'), (110, 'ot_algorithm'), (112, 'added_mos'), (120, 'eps_scf'), (121, 'max_scf'),
     (122, 'max_outer_scf'), (123, 'max_iter'), (124, 'dft_plus_u'), (125, 'magnetism'),
     (126, 'spin_density'), (127, 'cube_stride'), (128, 'basis_overrides'),
-    (129, 'allow_pbe_potential'), (130, 'libxc_available'),
+    (129, 'allow_pbe_potential'), (130, 'libxc_available'), (131, 'gapw_profile'), (132, 'write_json'), (133, 'trust_radius'),
 )
 NUMBERED_FIELDS = tuple((number, FIELDS[name]) for number, name in FIELD_IDS)
 LABELS = {
     'periodic': 'Periodicity', 'electron_density': 'Electron density cube',
-    'run_type': 'Run type', 'functional': 'Functional (GPW/GTH)', 'basis': 'Basis set',
+    'run_type': 'Run type', 'functional': 'Functional (GPW/GTH or GAPW/ALL)', 'basis': 'Basis set',
     'dispersion': 'Dispersion', 'scf': 'SCF algorithm', 'smearing': 'Smearing [K]',
     'kpoints': 'k-points NX NY NZ', 'optimizer': 'Optimizer', 'pressure': 'CELL_OPT pressure [bar]',
     'charge': 'Total charge [e]', 'multiplicity': 'Spin multiplicity', 'cutoff': 'CUTOFF [Ry]',
     'rel_cutoff': 'REL_CUTOFF [Ry]', 'vacuum': 'Isolated box padding [angstrom]',
+    'ot_algorithm': 'ALGORITHM',
     'added_mos': 'ADDED_MOS', 'eps_scf': 'EPS_SCF', 'max_scf': 'Maximum inner/diag SCF steps',
     'max_outer_scf': 'Maximum outer SCF steps', 'max_iter': 'Maximum optimization steps',
     'dft_plus_u': 'DFT+U [eV]', 'magnetism': 'Magnetic initialization',
     'spin_density': 'Spin density', 'cube_stride': 'Cube stride NX NY NZ',
     'basis_overrides': 'Element basis overrides', 'allow_pbe_potential': 'Allow GTH-PBE approximation',
     'libxc_available': 'Target CP2K has Libxc (user assertion)',
+    'gapw_profile': 'All-electron automatic setup',
+    'write_json': 'Write provenance JSON',
+    'trajectory_format': 'Trajectory format', 'trust_radius': 'TRUST_RADIUS [angstrom]',
 }
 
 
@@ -161,12 +165,12 @@ def run_editor(path, frame, output, settings, stdin=None, stdout=None, plain=Fal
                 if raw in {'r', 'p'}:
                     menu.ask('Enter to return to all settings; q exits: ')
                     continue
-                answer = menu.ask('Write these two new files? [y/N]; back returns; cancel cancels; q exits: ').lower()
+                answer = menu.ask('Write input (existing .inp may be replaced)'+(' and new JSON' if values['write_json'] else '')+'? [y/N]; back returns; cancel cancels; q exits: ').lower()
                 if answer not in {'y', 'yes'}:
                     menu.show('Not confirmed; no files written. Returning to all settings.')
                     continue
                 try:
-                    # Re-read/revalidate; the shared exclusive writer protects both files and rolls back.
+                    # Re-read/revalidate; the shared writer stages before input replacement.
                     result = write_input(read_structure(values['path'], values['frame']),
                                          settings_from(values), values['output'])
                 except (KitError, OSError) as exc:
@@ -181,10 +185,10 @@ def run_editor(path, frame, output, settings, stdin=None, stdout=None, plain=Fal
                         except ValueError as error:
                             menu.show(f'Error: {error}. Target unchanged.')
                     continue
-                menu.show('Success: Input and provenance sidecar generated; no calculation was run.')
-                for target in result[:2]:
+                menu.show('Success: Input'+(' and provenance sidecar' if result[1] is not None else '')+' generated; no calculation was run.')
+                for target in (p for p in result[:2] if p is not None):
                     menu.show(f'Generated path: {Path(target).resolve()}')
-                menu.show(f"Task: {values['run_type']}; GPW/{values['functional']}; "
+                menu.show(f"Task: {values['run_type']}; functional: {values['functional']}; "
                           f"basis: {values['basis']}; dispersion: {values['dispersion']}")
                 for warning in result[2]:
                     menu.show(f'Warning: {warning}')

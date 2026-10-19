@@ -21,7 +21,7 @@ Read the materials relevant to the task:
 - Git status, relevant source, tests, and fixture provenance; identify existing user changes.
 
 The original analysis MVP baseline and later input-generation requirements are
-preserved in `docs/roadmap.md`. The current generator is an incomplete GPW subset.
+preserved in `docs/roadmap.md`. The current generator is an incomplete GPW/GAPW subset.
 Full coverage of Multiwfn's CP2K input generator is a long-term goal, not a completed
 port or evidence of validation with the actual software.
 
@@ -50,9 +50,12 @@ port or evidence of validation with the actual software.
 ## 3. Non-destructive operation and evidence
 
 - Analysis is read-only; generation creates new files only and never submits or runs CP2K.
-- Do not overwrite/delete existing inputs, restart files, outputs, wavefunctions,
-  cubes, checkpoints, or other expensive results.
-- Reuse `io.new_file` and its exclusive-create/cleanup semantics. Test collisions
+- Do not overwrite/delete sources, data libraries, restart files, outputs,
+  wavefunctions, cubes, checkpoints, or other expensive results. Explicit 0.2.7
+  permission: input generation alone may replace a regular .inp target (not a
+  source/data file or symlink), using staged publication. JSON is opt-in and exclusive.
+- Reuse `io.new_file` for exclusive outputs; preserve the shared generator's
+  narrowly scoped staged .inp writer. Test collisions
   and rollback for multi-file outputs.
 - Do not silently select ambiguous projects or concatenate restarts.
   Sort candidates deterministically; do not guess from modification time.
@@ -81,6 +84,11 @@ port or evidence of validation with the actual software.
 - Synthetic fixtures are not calculations; their version strings do not certify CP2K support.
 - Missing completion/convergence evidence cannot become passed. Normal termination
   or a single energy value is not proof of complete convergence.
+- Retained 0.2.7 defaults: universal NGRIDS 5; commented PROJECT-based .wfn/.kp
+  restart hints; BFGS/LBFGS optimization TRUST_RADIUS 0.2 angstrom; XYZ position
+  trajectories and MOTION restart BACKUP_COPIES 0. Keep inactive hints/hidden raw
+  settings distinct from emitted controls. Never treat disabled backups as
+  disabled restart writing or permission to touch existing wavefunctions.
 - Do not start expensive calculations. Actual CP2K validation requires explicit
   authorization and a new run directory.
 - For failed-job diagnosis, load `qchem-error-diagnosis`, collect software/version

@@ -21,7 +21,7 @@ class InputGenerationTests(unittest.TestCase):
     def setUp(self):
         self.water = Structure(["O", "H", "H"], [[0., 0., 0.], [0.76, 0., 0.58], [-0.76, 0., 0.58]],
                                None, None, {"path": "synthetic"})
-        self.settings = InputSettings(periodic="NONE")
+        self.settings = InputSettings(periodic="NONE", write_json=True)
 
     def test_defaults_and_provenance(self):
         text, manifest = generate_input(self.water, self.settings)
@@ -278,7 +278,7 @@ class InputGenerationTests(unittest.TestCase):
     def test_cli(self):
         with tempfile.TemporaryDirectory() as tmp, redirect_stderr(io.StringIO()):
             out = Path(tmp) / "h2.inp"
-            argv = ["generate-input", str(FIXTURES / "trajectory.xyz"), "--periodic", "none", "-o", str(out)]
+            argv = ["generate-input", "--write-json", str(FIXTURES / "trajectory.xyz"), "--periodic", "none", "-o", str(out)]
             self.assertEqual(main(argv), 0)
             self.assertEqual(main(argv), 5)
             self.assertEqual(json.loads(Path(str(out) + ".json").read_text())["source_structure"]["frame"], 1)
@@ -349,7 +349,7 @@ class InputGenerationTests(unittest.TestCase):
     def test_density_cli(self):
         with tempfile.TemporaryDirectory() as tmp, redirect_stderr(io.StringIO()):
             out = Path(tmp)/'h2.inp'
-            args = ['generate-input', str(FIXTURES/'trajectory.xyz'), '--periodic','none','-o',str(out),
+            args = ['generate-input', '--write-json', str(FIXTURES/'trajectory.xyz'), '--periodic','none','-o',str(out),
                     '--electron-density','--cube-stride','1','2','3','--cp2k-version','2024.1']
             self.assertEqual(main(args),0)
             manifest = json.loads(Path(str(out)+'.json').read_text())

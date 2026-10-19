@@ -3,6 +3,7 @@ import hashlib
 import io
 import json
 import os
+import re
 from dataclasses import asdict, replace
 from pathlib import Path
 import tempfile
@@ -32,7 +33,7 @@ class BasisRegistryTests(unittest.TestCase):
         self.addCleanup(env.stop)
         os.environ.pop('CP2K_DATA_DIR', None)
         self.atom = Structure(['O'], [[0., 0., 0.]], None, None, {'path': 'synthetic.xyz'})
-        self.settings = InputSettings(periodic='NONE')
+        self.settings = InputSettings(periodic='NONE', write_json=True)
 
     def file(self, name, text):
         path = self.root/name
@@ -57,6 +58,9 @@ class BasisRegistryTests(unittest.TestCase):
                     5:'molopt-tzv2px', 6:'molopt-szv', 7:'molopt-dzvp', 8:'molopt-sr-tzvp',
                     9:'molopt-sr-tzv2p', 20:'uzh-pbe-dzvp', 21:'uzh-pbe-tzvp', 22:'uzh-pbe-tzv2p',
                     30:'uzh-pbe0-dzvp', 31:'uzh-pbe0-tzvp', 32:'uzh-pbe0-tzv2p', 900:'custom-orbital'}
+        expected.update({50:'ae-6-31g-star',51:'ae-6-311g-starstar',52:'ae-def2-tzvp',53:'ae-def2-qzvp',
+                         54:'ae-pob-tzvp',55:'ae-pob-dzvp-rev2',56:'ae-pob-tzvp-rev2',
+                         57:'ae-uzh-svp',58:'ae-uzh-tzvpp',59:'ae-uzh-qzvpp'})
         self.assertEqual({o.number:o.id for o in OPTIONS}, expected)
         self.assertEqual([BY_NUMBER[n].name for n in range(1, 6)],
                          ['SZV-MOLOPT-SR-GTH', 'DZVP-MOLOPT-SR-GTH', 'TZVP-MOLOPT-GTH',
@@ -70,7 +74,7 @@ class BasisRegistryTests(unittest.TestCase):
             BY_NUMBER[1] = OPTIONS[1]
 
     def test_reserved_unavailable_and_unallocated_cannot_be_selected(self):
-        for number in (0, 10, 19, 23, 29, 30, 31, 32, 33, 39, 40, 59, 60, 79, 80, 99, 100, 199, 200, 901):
+        for number in (0, 10, 19, 23, 29, 30, 31, 32, 33, 39, 40, 49, 60, 79, 80, 99, 100, 199, 200, 901):
             with self.subTest(number=number), self.assertRaises(ValueError):
                 numbered_basis(number)
         with self.assertRaisesRegex(KitError, 'hybrid/HF/ADMM'):
@@ -392,11 +396,19 @@ class BasisRegistryTests(unittest.TestCase):
         _, manifest = self.generate(basis='custom-orbital',custom_basis_file=b,custom_basis_name='real-q6')
         self.assertEqual(manifest['kinds']['O']['basis_q'],6)
 
-    def test_default_input_bytes_are_unchanged_from_026_generator(self):
+    def test_default_differs_only_in_grid_quotes_and_restart_comments_from_026(self):
         # Independently generated from git HEAD 229d09d in a temporary source tree;
         # invented isolated O geometry, not a CP2K calculation or recommendation.
         text, _ = self.generate()
-        self.assertEqual(hashlib.sha256(text.encode()).hexdigest(),
+        self.assertNotIn('BASIS_SET_FILE_NAME "', text)
+        self.assertNotIn('POTENTIAL_FILE_NAME "', text)
+        legacy_text = re.sub(r'(?m)^(\s*(?:BASIS_SET_FILE_NAME|POTENTIAL_FILE_NAME)) (.+)$',
+                             r'\1 "\2"', text)
+        self.assertIn('NGRIDS 5', text)
+        legacy_text = legacy_text.replace('NGRIDS 5', 'NGRIDS 4')
+        legacy_text = re.sub(r'(?m)^#   WFN_RESTART_FILE_NAME[^\n]*\n', '', legacy_text)
+        legacy_text = re.sub(r'(?m)^#     SCF_GUESS RESTART[^\n]*$', '      SCF_GUESS ATOMIC', legacy_text)
+        self.assertEqual(hashlib.sha256(legacy_text.encode()).hexdigest(),
                          '26af096bc28739351a0d34635c5612969c6a248c3c6fcfe91786fb323b0a2308')
 
     def test_uzh_pbe_catalog_covers_all_existing_fixed_valences(self):

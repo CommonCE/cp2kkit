@@ -38,7 +38,7 @@ class MenuTests(unittest.TestCase):
         self.path = self.dir/'water.xyz'
         self.path.write_text('3\nsynthetic water\nO 0 0 0\nH .76 0 .58\nH -.76 0 .58\n')
         self.output = self.dir/'water.inp'
-        self.settings = InputSettings(periodic='NONE')
+        self.settings = InputSettings(periodic='NONE', write_json=True)
 
     def session(self, lines, **kwargs):
         log = TTY()
@@ -87,7 +87,7 @@ class MenuTests(unittest.TestCase):
         self.assertNotIn('Common/advanced options', log)
         rendered = log.split('Select a displayed number')[0]
         for number, field in NUMBERED_FIELDS:
-            if field.name in {'pressure', 'smearing', 'added_mos', 'optimizer', 'max_iter', 'allow_pbe_potential', 'libxc_available'}:
+            if field.name in {'pressure', 'smearing', 'added_mos', 'optimizer', 'max_iter', 'allow_pbe_potential', 'libxc_available', 'gapw_profile', 'trust_radius', 'trajectory_format'}:
                 self.assertNotIn(f'{number:3}. {LABELS[field.name]}:', rendered)
             else:
                 self.assertIn(f'{number:3}. {LABELS[field.name]}:', rendered)
@@ -113,7 +113,7 @@ class MenuTests(unittest.TestCase):
         self.assertEqual(self.manifest()['settings']['multiplicity'], 2)
 
     def test_unknown_periodicity_stays_unknown_until_selected(self):
-        self.settings = InputSettings()
+        self.settings = InputSettings(write_json=True)
         _, log = self.session('w\n-7\nNONE\n'+WRITE)
         self.assertIn('Periodicity is unknown', log)
         self.assertEqual(self.manifest()['settings']['periodic'], 'NONE')
@@ -160,7 +160,7 @@ class MenuTests(unittest.TestCase):
         displays = log.split('=== CP2K input generation: all settings ===')[1:]
         self.assertEqual(len(displays), 3)
         for index, display in enumerate(displays):
-            hidden = ({12, 6, 112, 10, 123}, {6, 112}, {122})[index] | {129, 130}
+            hidden = ({12, 6, 112, 10, 123, -5, 133}, {6, 112}, {110, 122})[index] | {129, 130, 131}
             for number, field in NUMBERED_FIELDS:
                 text = f'{number:3}. {LABELS[field.name]}:'
                 if number in hidden:
@@ -173,7 +173,7 @@ class MenuTests(unittest.TestCase):
             for periodic in (None, 'NONE', 'XYZ', 'XY'):
                 for scf in ('ot', 'diag'):
                     with self.subTest(task=task, periodic=periodic, scf=scf):
-                        self.settings = InputSettings(run_type=task, periodic=periodic, scf=scf)
+                        self.settings = InputSettings(run_type=task, periodic=periodic, scf=scf, write_json=True)
                         _, log = self.session('-10\n')
                         self.assertEqual('12. CELL_OPT pressure' in log, task == 'CELL_OPT')
                         self.assertEqual('107. Isolated box padding' in log, periodic == 'NONE')
@@ -223,7 +223,8 @@ class MenuTests(unittest.TestCase):
         self.assertIn('Cancelled', log)
         self.assertEqual(list(self.dir.iterdir()), [self.path])
 
-    def test_collision_recoverable_by_changing_path(self):
+    def test_json_or_non_inp_collision_recoverable_by_changing_path(self):
+        self.output = self.dir/'protected.out'
         for target in (self.output, Path(str(self.output)+'.json')):
             with self.subTest(target=target):
                 target.write_text('existing user data')
@@ -274,14 +275,14 @@ class MenuTests(unittest.TestCase):
     def test_upstream_main_menu_ids_and_explicit_local_extensions(self):
         from cp2kkit.input_editor import FIELD_IDS
         self.assertEqual(dict(FIELD_IDS), {
-            -7: 'periodic', -3: 'electron_density', -1: 'run_type',
+            -7: 'periodic', -5: 'trajectory_format', -3: 'electron_density', -1: 'run_type',
             1: 'functional', 2: 'basis', 3: 'dispersion', 4: 'scf', 6: 'smearing',
             8: 'kpoints', 10: 'optimizer', 12: 'pressure',
             101: 'charge', 102: 'multiplicity', 105: 'cutoff', 106: 'rel_cutoff',
-            107: 'vacuum', 112: 'added_mos', 120: 'eps_scf', 121: 'max_scf',
+            107: 'vacuum', 110: 'ot_algorithm', 112: 'added_mos', 120: 'eps_scf', 121: 'max_scf',
             122: 'max_outer_scf', 123: 'max_iter', 124: 'dft_plus_u', 125: 'magnetism',
             126: 'spin_density', 127: 'cube_stride', 128: 'basis_overrides',
-            129: 'allow_pbe_potential', 130: 'libxc_available'})
+            129: 'allow_pbe_potential', 130: 'libxc_available', 131: 'gapw_profile', 132: 'write_json', 133: 'trust_radius'})
         _, log = self.session('0\n\n-10\n')
         self.assertIn('Not confirmed', log)
         self.assertFalse(self.output.exists())
@@ -432,7 +433,7 @@ class CLIInteractiveTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             for i, plain in enumerate((['--plain', 'generate-input'], ['generate-input', '--plain'])):
                 out = Path(tmp)/f'seed{i}.inp'
-                code, log, error = self.call([*plain, str(FIXTURES/'trajectory.xyz'), '--tui', '-o', str(out),
+                code, log, error = self.call([*plain, str(FIXTURES/'trajectory.xyz'), '--write-json', '--tui', '-o', str(out),
                                              '--periodic', 'NONE', '--run-type', 'GEO_OPT',
                                              '--project', 'custom', '--cp2k-version', '2024.1'], WRITE)
                 self.assertEqual(code, 0, error)
@@ -453,7 +454,7 @@ class CLIInteractiveTests(unittest.TestCase):
             previous = Path.cwd()
             try:
                 os.chdir(tmp)
-                code, _, error = self.call(['generate-input', '--plain'], lines)
+                code, _, error = self.call(['generate-input', '--plain', '--write-json'], lines)
             finally:
                 os.chdir(previous)
             self.assertEqual(code, 0, error)
@@ -557,7 +558,7 @@ class PresentationTests(unittest.TestCase):
             log = TTY()
             from cp2kkit.input_tui import Menu
             from dataclasses import asdict
-            values = {**asdict(InputSettings(periodic='NONE')), 'path': str(FIXTURES/'trajectory.xyz'),
+            values = {**asdict(InputSettings(periodic='NONE', write_json=True)), 'path': str(FIXTURES/'trajectory.xyz'),
                       'frame': -1, 'output': '/tmp/very-long-output-name-that-wraps-over-the-terminal.inp'}
             Menu(TTY(), log, plain=True).review(values)
             self.assertTrue(all(len(line) <= 40 for line in log.getvalue().splitlines()))

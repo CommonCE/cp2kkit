@@ -5,6 +5,18 @@ It is not a license for the whole project, grants no rights beyond upstream
 authorization, and does not establish license compatibility.
 Register provenance for future implementations, rather than merely adding software names.
 
+## Local CP2K all-electron reference audit (0.2.7)
+
+`all_electron_catalog.py` records header-only family/element coverage and exact
+local file hashes from the supplied CP2K tree, REVISION git:c92cc08. Its identity
+is not inferred to be an official release or binary from the directory name.
+No coefficients, nuclear potential parameters or upstream Fortran are bundled.
+GAPW atomic grids/default tolerances, OT keyword definitions, restart naming,\noptimizer radii and MOTION output controls were inspected;
+see [the basis guide](docs/basis-selection.md#all-electron-automatic-setup-027)
+and [feature provenance](third_party/multiwfn/PROVENANCE.md).
+Existing CP2K references and upstream method/basis citations still apply; this
+notice does not assign a whole-project license or certify compatibility.
+
 ## Multiwfn
 
 ### Upstream information

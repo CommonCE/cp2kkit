@@ -1,5 +1,5 @@
 """Scrolling basis-value editor; fixed public numbers, no category submenu."""
-from .basis_registry import OPTIONS, basis_option, numbered_basis, parse_basis
+from .basis_registry import OPTIONS, RESERVED_RANGES, basis_option, numbered_basis, parse_basis
 from .cp2k_data import cp2k_path, read_library, safe_token
 from .errors import KitError
 
@@ -24,7 +24,8 @@ def edit_basis(menu, current, values=None):
             menu.show(f'  {option.number}. {option.name} [{option.id}]{status}')
             if option.selectable and option.protocol != 'custom':
                 menu.show('     Sources: '+', '.join(option.sources)+'; '+option.restriction)
-        menu.show('10-19, 23-29, 33-199 reserved, not selectable. Availability requires per-KIND data checks.')
+        menu.show('Reserved, not selectable: '+', '.join(f'{a}-{b}' for a,b in RESERVED_RANGES)+'.')
+        menu.show('All-electron 50-59 explicitly selects GAPW + ALL, not GPW/GTH. Availability requires per-KIND data checks.')
         menu.show('Enter keeps; /text filters (/ clears), numbers never change; d data directory; b/v explicit basis/potential file.')
         raw = menu.ask(f'Current [{current_label}]: ')
         if not raw or raw.lower() in {'0', 'back'}:

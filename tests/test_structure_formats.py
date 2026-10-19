@@ -217,7 +217,7 @@ class MainMenuTests(FormatCase):
         self.read('crystal.cif', CIF)
         output = self.dir/'crystal.inp'
         log, err = TTY(), io.StringIO()
-        lines = '0\ny\n\n0\n'
+        lines = '132\ny\n0\ny\n\n0\n'
         previous = Path.cwd()
         try:
             os.chdir(self.dir)

@@ -13,8 +13,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from .errors import KitError
-from .basis_registry import basis_option, numbered_basis, parse_basis
-from .inputgen import (CP2K_VERSIONS, FUNCTIONALS, PERIODICITIES, RUN_TYPES,
+from .basis_registry import DEFAULT_BASIS, basis_option, numbered_basis, parse_basis
+from .inputgen import (CP2K_VERSIONS, FUNCTIONALS, PERIODICITIES, RUN_TYPES, TRAJECTORY_FORMATS,
                        InputSettings, generate_input)
 from .structure import read_structure
 from .presentation import Presenter
@@ -40,16 +40,18 @@ GROUPS = (
     ("Files, project and version", (
         Field("path", "Structure path (XYZ/extXYZ/restart/GJF/CIF/POSCAR; no quotes needed for spaces)"),
         Field("frame", "XYZ frame index (default -1; other formats require -1)", "int"),
-        Field("output", "New input file path (also writes .json)"),
+        Field("output", "Input file path (existing regular .inp may be replaced)"),
         Field("project", "Project name (auto: structure filename without suffix)", optional=True),
         Field("cp2k_version", "Target CP2K version (not runtime certification)", choices=CP2K_VERSIONS))),
     ("Task and optimization", (
         Field("run_type", "Run type", choices=RUN_TYPES),
         Field("optimizer", "Optimizer (optimization tasks only)", choices=("BFGS", "LBFGS", "CG")),
+        Field("trust_radius", "TRUST_RADIUS [angstrom] (BFGS/LBFGS only)", "float", positive=True),
+        Field("trajectory_format", "Optimization trajectory format (XYZ loses cell; PDB limited precision)", choices=TRAJECTORY_FORMATS),
         Field("max_iter", "Maximum optimization steps", "int", minimum=1),
         Field("pressure", "CELL_OPT external pressure [bar]", "float"))),
     ("Method, basis and dispersion", (
-        Field("functional", "Functional (GPW/GTH)", choices=FUNCTIONALS),
+        Field("functional", "Functional (GPW/GTH or GAPW/ALL)", choices=FUNCTIONALS),
         Field("basis", "Orbital basis (immutable registry number or stable ID/name; 0 returns)", 'basis'),
         Field("dispersion", "Dispersion", choices=("none", "d3", "d3bj")),
         Field("data_dir", "CP2K data directory (verify entries and hashes)", optional=True),
@@ -59,6 +61,8 @@ GROUPS = (
         Field('custom_basis_name', 'Custom real ORB alias', optional=True),
         Field('custom_potential_file', 'Custom potential file', optional=True),
         Field('custom_potential_name', 'Custom real potential alias', optional=True),
+        Field('write_json', 'Also write provenance JSON (default off; existing JSON is protected)', 'bool'),
+        Field('gapw_profile', 'All-electron OT setup (auto: pob IRAC/other STRICT; native: CP2K algorithm default)', choices=('auto', 'native')),
         Field('basis_overrides', 'Element basis overrides: Element=basis; separate entries with semicolons; off clears. No implicit SR/non-SR fallback.', 'basis_map'),
         Field('allow_pbe_potential', 'Explicitly approve GTH-PBE potentials when matched-functional entries are absent; this is an approximation', 'bool'),
         Field('libxc_available', 'Assert target CP2K was built with Libxc (required for RPBE; not detected by this tool)', 'bool'))),
@@ -73,6 +77,7 @@ GROUPS = (
         Field("vacuum", "Automatic isolated box padding on each side [angstrom]", "float", positive=True))),
     ("SCF, k-points and occupations", (
         Field("scf", "SCF (OT for gapped systems; check diag/smearing for metals)", choices=("ot", "diag")),
+        Field("ot_algorithm", "OT ALGORITHM (auto: GAPW pob IRAC, otherwise STRICT)", choices=("IRAC", "STRICT"), optional=True),
         Field("eps_scf", "EPS_SCF (auto: task default)", "float", optional=True, positive=True),
         Field("max_scf", "Maximum inner/diagonalization SCF steps (auto: OT 25 / diag 128)", "int", optional=True, minimum=1),
         Field("kpoints", "MONKHORST-PACK NX NY NZ (non-Gamma requires XYZ + diag)", "int3", minimum=1),
@@ -103,11 +108,19 @@ def visible_fields(fields, values):
                 periodic = ''.join(a for a, flag in zip('XYZ', structure.pbc) if flag) or 'NONE'
         except (KitError, OSError):
             pass  # Invalid drafts remain editable; review reports the exact error.
+    requested = [values.get('basis', DEFAULT_BASIS), *(b for _, b in values.get('basis_overrides', ()))]
+    try:
+        has_ae = any(basis_option(b).kind_type == 'all-electron' for b in requested)
+    except KitError:
+        has_ae = True  # Invalid drafts stay editable; authoritative review gives the error.
     return tuple(f for f in fields
-                 if not (f.name == 'pressure' and values['run_type'] != 'CELL_OPT')
+                 if not (f.name == 'gapw_profile' and not has_ae)
+                 and not (f.name == 'pressure' and values['run_type'] != 'CELL_OPT')
+                 and not (f.name in {'trust_radius', 'trajectory_format'} and values['run_type'] not in {'GEO_OPT', 'CELL_OPT'})
+                 and not (f.name == 'trust_radius' and values['optimizer'] not in {'BFGS', 'LBFGS'})
                  and not (f.name == 'vacuum' and periodic != 'NONE')
                  and not (f.name in {'smearing', 'added_mos'} and values['scf'] == 'ot')
-                 and not (f.name == 'max_outer_scf' and values['scf'] != 'ot')
+                 and not (f.name in {'max_outer_scf', 'ot_algorithm'} and values['scf'] != 'ot')
                  and not (f.name == 'allow_pbe_potential' and values.get('functional') not in {'PBESOL', 'REVPBE', 'RPBE'})
                  and not (f.name == 'libxc_available' and values.get('functional') != 'RPBE'))
 
@@ -341,22 +354,39 @@ class Menu:
                       f"ADDED_MOS={field_display(Field('added_mos', ''), values)}")
         if settings.run_type in {'GEO_OPT', 'CELL_OPT'}:
             self.show(f"Optimization: {settings.optimizer}; max_iter={settings.max_iter}")
+            self.show(f"Trajectory: {settings.trajectory_format}; MOTION restart backup copies: 0")
+            if manifest['motion_output']['trust_radius_angstrom'] is not None:
+                self.show(f"TRUST_RADIUS: {settings.trust_radius} angstrom")
         if settings.run_type == 'CELL_OPT':
             self.show(f"External pressure: {settings.pressure} bar")
-        self.show(f"Atoms: {len(structure.symbols)}; Explicit valence electrons: {manifest['valence_electron_count']}")
-        self.show(f"Target version: {settings.cp2k_version}; Run type: {settings.run_type}; Method: GPW/{settings.functional}")
+        electron_label = "All electrons (including core)" if manifest['electron_count_model'] == 'all_electron' else "Explicit valence electrons"
+        self.show(f"Atoms: {len(structure.symbols)}; {electron_label}: {manifest['explicit_electron_count']}")
+        self.show(f"Target version: {settings.cp2k_version}; Run type: {settings.run_type}; Method: {manifest['method_profile']['qs_method']}/{settings.functional}")
         self.show(f"XC backend: {manifest['method_profile']['xc_backend']}; target build verified: False")
         self.show(f"Basis selection: {manifest['basis_selection']['number']} [{manifest['basis_selection']['id']}]; data: {manifest['basis_validation']['status']}; runtime validated: False")
+        gapw = manifest['method_profile']['gapw']
+        if gapw:
+            self.show(f"All-electron automatic setup: {gapw['profile']} v{gapw['profile_version']}; not convergence certification")
+            for item in gapw['automatic_settings']:
+                self.show(f"  {item['setting']} = {item['value']}: {item['reason']}")
+            self.show('Preserved user settings: '+', '.join(gapw['preserved']))
         self.show(f"Basis files: {', '.join(manifest['method_profile']['basis_files'])}")
         if settings.basis_overrides:
             self.show(f"Element basis overrides: {format_basis_overrides(settings.basis_overrides)}")
+        if settings.scf == 'ot':
+            self.show(f"OT ALGORITHM: {manifest['method_profile']['ot_algorithm']}; selection: {settings.ot_algorithm or 'auto'}")
+        self.show(f"Restart template (commented, inactive): {manifest['restart_template']['filename']}")
         self.show(f"SCF: {settings.scf}; Effective EPS_SCF: {manifest['effective_eps_scf']}; Poisson: {manifest['poisson_solver']}")
         self.show(f"Generated cell [angstrom]: {manifest['generated_structure']['cell']}")
         self.show(f"Coordinates translated: {manifest['coordinates_translated']}")
         for element, kind in manifest['kinds'].items():
-            self.show(f"{element}: basis={kind['basis']}; pseudopotential={kind['potential']}")
+            potential_label = "nuclear potential" if kind['basis_kind_type'] == 'all-electron' else "pseudopotential"
+            self.show(f"{element}: basis={kind['basis']}; {potential_label}={kind['potential']}")
             self.show(f"  Selection: {kind['basis_number']} [{kind['basis_id']}]; ORB; {kind['data_validation']}")
-            self.show(f"  q: basis={kind['basis_q']}; potential={kind['potential_q']} [{kind['potential_q_source']}]; pairing={kind['protocol_pairing']}")
+            if kind['basis_kind_type'] == 'all-electron':
+                self.show(f"  Nuclear charge Z={kind['nuclear_charge']} [{kind['nuclear_charge_source']}]; explicit electrons={kind['explicit_electrons']}; basis/potential q=not applicable")
+            else:
+                self.show(f"  q: basis={kind['basis_q']}; potential={kind['potential_q']} [{kind['potential_q_source']}]; pairing={kind['protocol_pairing']}")
             self.show(f"  Basis file: {kind['basis_file']}; potential approximation: {kind['potential_approximation']}")
             self.show(f"  Potential file: {kind['potential_file']}")
             for role in ('basis', 'potential'):
@@ -370,7 +400,11 @@ class Menu:
         for warning in manifest["warnings"]:
             self.show(f"Warning: {warning}")
         self.show(f"Input path: {Path(values['output']).resolve()}")
-        self.show(f"Sidecar path: {Path(str(values['output'])+'.json').resolve()}")
+        self.show("Existing regular .inp may be replaced; source/data files and other results stay protected.")
+        if settings.write_json:
+            self.show(f"Sidecar path: {Path(str(values['output'])+'.json').resolve()} (existing JSON is protected)")
+        else:
+            self.show("JSON output: disabled (input only)")
         if full:
             self.show("Reproducible command (current working directory; not executed automatically):")
             self.show(shlex.join(command_arguments(values["path"], values["frame"], values["output"], settings)))
@@ -380,6 +414,6 @@ class Menu:
 
 def run_interactive(path, frame, output, settings, stdin=None, stdout=None, plain=False,
                     parent_session=False):
-    """CLI-seeded single menu using the same generator and exclusive writer as batch."""
+    """CLI-seeded single menu using the same staged input writer as batch."""
     from .input_editor import run_editor
     return run_editor(path, frame, output, settings, stdin, stdout, plain, parent_session)

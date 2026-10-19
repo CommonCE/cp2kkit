@@ -11,7 +11,8 @@ No submission system or deferred Bader/PDOS/NEB post-processing is introduced.
 3. **Evidence first:** absolute paths, SHA-256, byte sizes, lines, and original text.
 4. **Conservative assessment:** null is unknown; unknown/failed/truncated cannot pass.
 5. **No implicit selection/restart merging:** sort candidates by name, not time/size guesses.
-6. **Non-destructive outputs:** exclusive creation; rollback newly created files on multi-file failure.
+6. **Narrow replacement permission:** analysis/JSON/exports remain exclusive;
+   generation alone may atomically replace regular .inp, never sources/data/symlinks.
 7. **Minimal dependencies:** standard-library core, isolated optional plotting/Rich presentation, no ASE requirement.
 
 ## Modules and dependency direction
@@ -34,8 +35,11 @@ cli.py
  |-- basis_registry.py (immutable allocated numbers/string IDs, roles/status, explicit legacy migration)
  |-- basis_resolution.py -- basis_registry.py / cp2k_data.py / data_catalog.py (ORB/potential protocol checks)
  |-- cp2k_data.py -- io.py / structure.py (actual aliases, selected payload/q checks, paths/hashes/ambiguity)
+ |   Basis/potential/D3 whole-line filenames use literal unquoted serialization.
  |-- basis_ui.py -- basis_registry.py / cp2k_data.py (one grouped scrolling basis-value list)
  |-- data_catalog.py (header-only names/q/files and pinned official source hashes)
+ |-- all_electron_catalog.py (audited AE subsets, local reference identity; no parameters)
+ |-- gapw.py (versioned derived numerical setup; explicit OT overrides win)
  |-- spin_settings.py (explicit Ueff/L parsing, collinear atom seeds, stable KIND splitting)
  `-- cube.py ------- models.py / io.py / structure.py (units; streaming checks/differences)
 
@@ -134,7 +138,7 @@ rendering and selection. Numbers stay fixed, leaving gaps for hidden fields when
 task/SCF/PBC changes; hidden values remain in the validated draft. Presenter handles folding
 and optional Rich styling; Menu handles input/navigation; editor/application dispatch
 existing business APIs. Review/previews do not write; 0/w plus explicit y/yes uses the
-exclusive writer; -10/back/cancel returns from the generator. Collisions have a
+staged input writer; -10/back/cancel returns from the generator. Collisions have a
 new-target recovery prompt, not a permanent path setting.
 Complete batch calls stay noninteractive; stdin/stdout TTY are required for menus.
 Bare cp2kkit/cp2kkit STRUCTURE opens the grouped application menu. cli.menu_request
@@ -144,7 +148,11 @@ semantics. -- PATH (optionally preceded by --plain) treats PATH literally, inclu
 leading hyphens; invalid mixed arguments still go through argparse usage errors.
 Both streams must still be TTY. --plain/NO_COLOR
 disable styling. EOF/q exits the session; Ctrl+C cancels an operation (exits at main).
-Default input text and protected writers are unchanged. Slots 124/125 now request
+Default physical settings are unchanged. Library filenames are now unquoted;
+JSON is opt-in (132/--write-json), existing regular .inp replacement is permitted.
+write_input returns (input_path, nullable_json_path, warnings). Optional JSON is
+completed before input publication, so its collision/failure preserves old input.
+Sources/data/symlinks and all other output workflows remain protected. Slots 124/125 now request
 explicit Ueff/L and collinear magnetic initialization; --cell remains CLI-only,
 while data sources are also editable inside the basis chooser without main-setting numbers. spin_settings validates and maps element/atom selectors without changing
 charge/multiplicity or source geometry. Split KIND labels retain ELEMENT-specific
@@ -152,8 +160,22 @@ basis/potential/U. Only target 2026.2 is checked for these opt-in features. The 
 also require target 2026.2. Menu 128 configures explicit element basis overrides;
 129 approves unmatched-functional PBE potentials; 130 asserts target Libxc support.
 129/130 follow functional applicability while preserving hidden values. NGRIDS uses
-actual per-KIND SR/non-SR bases. Schema 0.1.0 gains additive raw settings, generated
+a shared DEFAULT_NGRIDS=5 for every PP/AE basis; it no longer depends on SR labels.
+Menu 110 configures OT IRAC/STRICT (hidden/retained for diag); 131 selects the
+AE auto/native profile. Electron-model classification precedes spin validation.
+AE uses Z rather than PP valence, with null PP q/valence fields. Effective GAPW
+settings (numerical profile v3) omit explicit QS split tolerances and KIND atomic
+grids in both auto/native modes. Empty qs/kind and cp2k_default_controls record
+this omission without guessing runtime values. Other settings are rendered by the
+same generator, and disclosed in review/JSON. No automatic physical-state repair. Schema 0.1.0 gains additive raw settings, generated
 KIND mapping, method/catalog/file identity and reference metadata.
+
+Restart hints, motion output and radius handling also live in inputgen, not in
+CLI/TUI forks. Trajectory format (-5) is visible for GEO_OPT/CELL_OPT; radius
+(133) only for BFGS/LBFGS optimization. Hidden requests persist in settings/replay;
+restart_template and motion_output distinguish hints/raw requests from emitted
+controls. Restart filenames derive from resolved PROJECT and Gamma/non-Gamma
+naming, not the .inp output path. No restart is opened by generation.
 
 ## Cube pipeline
 

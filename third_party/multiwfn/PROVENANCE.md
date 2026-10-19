@@ -245,6 +245,134 @@ line numbers are auxiliary. Do not invent upstream commits, inspection dates, or
   CP2K execution, convergence, physical suitability or upstream menu equivalence.
   No separate grant, clean-room, full-port or license-compatibility certification.
 
+## All-electron GAPW and explicit OT algorithm (0.2.7)
+
+- Local: gapw.py, all_electron_catalog.py, basis_registry/resolution, cp2k_data,
+  inputgen and shared CLI/editor. Re-inspected Multiwfn 2026.10.1 cp2kmate.f90,
+  outCP2Kinp, SHA-256
+  `f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402`.
+- Actual references: AE family names 151-158, GAPW selection 1078-1082, no-q AE
+  orbital/nuclear ALL output 1536-1575, library mapping 1695-1700, GAPW method
+  1860-1861, FULL_ALL for GAPW 2468-2471 and pob IRAC/other STRICT 2478-2483.
+  User-requested basis numbers 50-59 and OT menu 110 are local allocations.
+- Independent local CP2K evidence: user-supplied tree
+  `/home/xwp/soft/cp2k-2026.2`, REVISION git:c92cc08. Exact data, keyword and
+  GAPW example hashes are in all_electron_catalog.py. The local revision is not
+  asserted equivalent to the named upstream release or an installed binary.
+  input_cp2k_scf.F 583-592 verifies OT ALGORITHM STRICT/IRAC and native STRICT.
+- Differences: explicit electron model and Z counting, no heavy/ECP or mixed
+  model inference; whitelisted AE coverage; strict ALL payload/occupation checks;
+  auto profile adds 110/80 atomic grids from the local water example and explicit
+  native split tolerances. This is not the example's full numerical setup and
+  does not inherit any upstream claim of convergence. PP defaults stay unchanged;
+  explicit OT choices override profile suggestions, hidden diag values persist.
+- Only header metadata/hashes and independently implemented validation/derivation
+  are bundled, not upstream Fortran or production basis/potential parameters.
+  Read-only actual data checks: 332 AE basis/nuclear pairs; unit/UI/CLI tests do
+  not establish native acceptance, convergence or scientific fitness.
+- Existing two papers/citations and custom [terms](TERMS.md) remain applicable;
+  no separate grant, clean-room, full-port or license-compatibility claim.
+
+## D3 whole-line filename serialization fix (0.2.7)
+
+- Local: cp2k_data.cp2k_long_path and inputgen.py; no new Multiwfn port/reference.
+  Preserve existing citations/custom terms and unconfirmed licensing boundaries.
+- Actual failure evidence: user supplied a CP2K ABORT from common/cp_files.F:376
+  and a generated `PARAMETER_FILE_NAME "dftd3.dat"` line with no literal internal
+  leading whitespace. Running binary version/full output were not supplied.
+- Inspected the same local CP2K tree, REVISION git:c92cc08:
+  input_cp2k_xc.F defines PARAMETER_FILE_NAME with default_lc_val;
+  input/input_parsing.F 526-584 and input/cp_parser_methods.F 535-559 use
+  fixed-size chunks, including a quote-only first chunk; input/input_val_types.F
+  398-413 joins chunks without left-stripping. common/cp_files.F 373-377 rejects
+  a leading blank. This explains the observed failure path by static inspection,
+  not execution of the user's binary.
+- Exact inspected parser hashes: input/input_parsing.F
+  `7a61a8ad06610de89a0b71dc907343655c29160ee8c30ee6d39e804e69bd0299`;
+  input/cp_parser_methods.F
+  `5bf3ae764d72d89a4a14d56db148883030c42bd84d92e2fc47bdf2ec2a5a98c3`;
+  input/input_val_types.F
+  `06587067b3ed6623d2f0fbcf81cde1fec4350129a975c26759bc6f3c4ff51e36`.
+- Fix: literal whole-line path with shared injection validation and explicit
+  rejection of ambiguous whitespace/comment edges; no global quote removal,
+  physical setting changes, source/output overwrite or native-validation claim.
+
+## Input-writing policy and library filenames (0.2.7 follow-up)
+
+- Explicit user requests: unquoted basis/potential filenames, JSON off by default,
+  and permission to replace generated .inp. These override the historical
+  input-writer defaults recorded above, not protections on expensive results.
+- Local keyword evidence: the same supplied CP2K tree, REVISION git:c92cc08,
+  src/input_cp2k_dft.F 134-147 defines BASIS_SET_FILE_NAME and POTENTIAL_FILE_NAME
+  as whole-line strings. Inspected raw SHA-256:
+  `93887178d0208020a96826b794459bac9937a66cec8ff6a69b7d4e1d393d5648`.
+  The shared literal serializer now covers all three library filename keywords;
+  no native execution/all-version parser acceptance is inferred.
+- Local write_input stages before replacing only regular .inp; structure/data
+  sources (including hardlink aliases), symlinks and non-input results remain
+  protected. Optional JSON retains exclusive creation and pre-publication failure
+  leaves old input intact. Menu 132/--write-json is opt-in; stale JSON is retained
+  and warned, never silently deleted. Analysis/export/plot/cube I/O is unchanged.
+- No new Multiwfn algorithm or production parameters are incorporated. Existing
+  citations/custom terms/unknown licensing boundaries remain unchanged.
+
+## Universal NGRIDS and omitted GAPW controls (0.2.7 latest follow-up)
+
+- Explicit user request supersedes earlier local profile-v1/v2 descriptions:
+  NGRIDS=5 for every PP/AE and SR/non-SR basis; no EPSFIT/EPSRHO0/EPSSVD or
+  LEBEDEV_GRID/RADIAL_GRID output in either profile. Numerical profile v3 retains
+  GAPW/ALL and basis-aware/manual OT selection but leaves those controls to CP2K.
+- This removes the local 110/80 example-derived override, rather than claiming
+  it was a Multiwfn default. No new upstream source or numerical coefficients
+  are incorporated. Omission resembles the inspected ordinary Multiwfn AE output
+  style, not proof of convergence or runtime equivalence. Existing citations,
+  terms, source hashes and authorization limits remain unchanged.
+
+## Restart hints, trust radius and motion print (0.2.7 follow-up)
+
+- Local implementation: inputgen.py generate_input/InputSettings; input_tui.py
+  shared fields/review/replay; input_editor.py -5/133; cli.py argument dispatch.
+- Reference: supplied Multiwfn_2026.10.1_src_Linux/cp2kmate.f90, outCP2Kinp;
+  unchanged raw SHA-256
+  `f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402`.
+  Inspected lines 2414 (NGRIDS), 2453-2456 (SCF guess), 1727-1735
+  (restart filename extension/comments), 3107-3120 and 3205-3212
+  (optimization radii), 3360-3365 and 3392-3393 (MOTION print).
+- Actual use: reference-based Python rendering of commented non-HFX restart hints,
+  0.2 angstrom BFGS/LBFGS radius, trajectory and restart-backup templates.
+  No original Fortran is distributed or required at runtime.
+- Differences: all supported methods use inactive hints (hybrids remain unsupported);
+  name derives from resolved PROJECT. Non-Gamma uses .kp, not a falsely named .wfn.
+  XYZ is the default for both optimization tasks without task-switching resets;
+  EXTXYZ is a local extension checked only for target 2026.2. Radius editing is
+  local ID 133; CG hides/retains but does not emit it. The inspected CELL_OPT
+  LBFGS branch does not explicitly set radius; this implementation extends the
+  same explicit 0.2 value using the shared CP2K optimizer keyword definition.
+  MOTION restart backup count is 0; SCF wavefunction backup defaults are unchanged.
+- Grid comparison: upstream emits NGRIDS 5 only for ibas 3/4/5 (non-SR MOLOPT);
+  other branches omit it. Local universal NGRIDS 5 is the explicit user policy,
+  not exact upstream default equivalence. No other grid controls are added.
+- CP2K static evidence: supplied local tree REVISION git:c92cc08, not assumed
+  equivalent to an official release/binary from its directory name:
+  - src/start/input_cp2k_motion.F 1323-1327 and 1569-1573 define BFGS/LBFGS
+    TRUST_RADIUS in angstrom (defaults 0.25 and -1, respectively);
+    SHA-256 `9371421ff8ace52ba452288647328d34b73cdc30fe421b052474c62734b5963b`.
+  - src/input_cp2k_motion_print.F 250-260 / 319-323 define restart backups
+    and trajectory XYZ/PDB/EXTXYZ;
+    SHA-256 `33b63bf95fe3062f1865d3c6cb9ef54b174a8effe7dd196b897fcbe3ccb2b138`.
+  - src/input_cp2k_scf.F 207-213 / 307-318 define ATOMIC guess default,
+    restart filename RESTART and separate SCF backup controls;
+    SHA-256 `23f7fdd4abfdf64904f0c95ed6dd672f6ca645c0abb7f91b60347ab6693bacf1`.
+  - src/qs_mo_io.F 155 / 494-499 use .wfn/.kp; SHA-256
+    `c257c64e756a61e1a4d00d9c80779b78a1f445d7bfc367c1746b47e5646449cc`.
+  - src/kpoint_io.F 110 writes .kp; SHA-256
+    `aea666edd4ea27f4fc8e14bc4567a1b20da1503e01c6d212e29184caf5c03a32`.
+- Existing required 2012/2024 papers remain in generated inputs/manifests and notices.
+  Multiwfn custom terms still apply; no separate permission or licensing
+  compatibility is inferred from Python rewriting or source inspection.
+- Validation: synthetic CLI/menu/config/replay/nesting/unit/boundary regressions.
+  No CP2K/Multiwfn calculation or acceptance/convergence certification.
+
 ## Template for future features
 
 Copy this structure for each referenced feature and supply evidenced facts.

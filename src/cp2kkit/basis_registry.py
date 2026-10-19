@@ -32,7 +32,7 @@ class BasisOption:
     functionals: tuple[str, ...] = ('PBE', 'BLYP', 'PBESOL', 'REVPBE', 'RPBE')
     protocol: str = 'classic'
     status: str = 'enabled'
-    restriction: str = 'Fixed valence; element/q coverage must be checked, no substitution.'
+    restriction: str = 'Element/electron-model coverage must be checked; no substitution.'
 
     @property
     def selectable(self):
@@ -42,6 +42,7 @@ class BasisOption:
 CLASSIC = 'Classic MOLOPT / UCL extensions'
 UZH_PBE = 'UZH-PBE (paired potential protocol)'
 UZH_PBE0 = 'UZH-PBE0 (not selectable: no hybrid template)'
+ALL_ELECTRON = 'All-electron orbital bases (GAPW + ALL; audited light elements)'
 CUSTOM = 'Custom orbital basis'
 M = ('BASIS_MOLOPT', 'BASIS_MOLOPT_UCL')
 U = ('BASIS_MOLOPT_UZH_2026.2', 'BASIS_MOLOPT_UZH')
@@ -75,10 +76,31 @@ OPTIONS = (
     BasisOption('uzh-pbe0-tzv2p', 32, 'TZV2P-MOLOPT-PBE0-GTH', UZH_PBE0, 'TZV2P-MOLOPT-PBE0-GTH', U, UP,
                 ('TZV2P-MOLOPT-HYB-GTH',), functionals=('PBE0',), protocol='uzh-pbe0', status='unavailable',
                 restriction='Data names exist in v2026.2; hybrid/HF/ADMM templates are not implemented.'),
+    BasisOption('ae-6-31g-star', 50, '6-31G*', ALL_ELECTRON, '6-31G*', ('EMSL_BASIS_SETS',),
+                ('POTENTIAL',), ('6-31Gx',), kind_type='all-electron', protocol='all-electron',
+                restriction='GAPW + ALL; audited element coverage only, no ECP substitution.'),
+    BasisOption('ae-6-311g-starstar', 51, '6-311G**', ALL_ELECTRON, '6-311G**', ('EMSL_BASIS_SETS',),
+                ('POTENTIAL',), ('6-311Gxx',), kind_type='all-electron', protocol='all-electron'),
+    BasisOption('ae-def2-tzvp', 52, 'Ahlrichs-def2-TZVP', ALL_ELECTRON, 'Ahlrichs-def2-TZVP', ('EMSL_BASIS_SETS',),
+                ('POTENTIAL',), ('def2-TZVP',), kind_type='all-electron', protocol='all-electron'),
+    BasisOption('ae-def2-qzvp', 53, 'Ahlrichs-def2-QZVP', ALL_ELECTRON, 'Ahlrichs-def2-QZVP', ('EMSL_BASIS_SETS',),
+                ('POTENTIAL',), ('def2-QZVP',), kind_type='all-electron', protocol='all-electron'),
+    BasisOption('ae-pob-tzvp', 54, 'pob-TZVP', ALL_ELECTRON, 'pob-TZVP', ('BASIS_pob',),
+                ('POTENTIAL',), kind_type='all-electron', protocol='all-electron'),
+    BasisOption('ae-pob-dzvp-rev2', 55, 'pob-DZVP-rev2', ALL_ELECTRON, 'pob-DZVP-rev2', ('BASIS_pob',),
+                ('POTENTIAL',), kind_type='all-electron', protocol='all-electron'),
+    BasisOption('ae-pob-tzvp-rev2', 56, 'pob-TZVP-rev2', ALL_ELECTRON, 'pob-TZVP-rev2', ('BASIS_pob',),
+                ('POTENTIAL',), kind_type='all-electron', protocol='all-electron'),
+    BasisOption('ae-uzh-svp', 57, 'SVP-MOLOPT-PBE-ae', ALL_ELECTRON, 'SVP-MOLOPT-PBE-ae', U,
+                ('POTENTIAL',), ('SVP-MOLOPT-GGA-ae',), kind_type='all-electron', functionals=('PBE',), protocol='all-electron'),
+    BasisOption('ae-uzh-tzvpp', 58, 'TZVPP-MOLOPT-PBE-ae', ALL_ELECTRON, 'TZVPP-MOLOPT-PBE-ae', U,
+                ('POTENTIAL',), ('TZVPP-MOLOPT-GGA-ae',), kind_type='all-electron', functionals=('PBE',), protocol='all-electron'),
+    BasisOption('ae-uzh-qzvpp', 59, 'QZVPP-MOLOPT-PBE-ae', ALL_ELECTRON, 'QZVPP-MOLOPT-PBE-ae', U,
+                ('POTENTIAL',), ('QZVPP-MOLOPT-GGA-ae',), kind_type='all-electron', functionals=('PBE',), protocol='all-electron'),
     BasisOption('custom-orbital', 900, 'Custom orbital basis (file + real name)', CUSTOM, '', (),
                 protocol='custom', restriction='Explicit pseudopotential ORB request; unknown q is unverified, not inferred.'),
 )
-RESERVED_RANGES = ((10, 19), (23, 29), (33, 39), (40, 59), (60, 79), (80, 99), (100, 199))
+RESERVED_RANGES = ((10, 19), (23, 29), (33, 39), (40, 49), (60, 79), (80, 99), (100, 199))
 
 
 def validate_registry(options=OPTIONS):
@@ -103,7 +125,7 @@ def basis_option(value, *, require_selectable=True):
     value = value.strip()
     option = BY_ID.get(value.lower())
     if option is None:
-        option = next((o for o in OPTIONS if value.upper() in (o.name.upper(), *o.aliases)), None)
+        option = next((o for o in OPTIONS if value.upper() in tuple(n.upper() for n in (o.name, *o.aliases))), None)
     if option is None:
         raise KitError(f'Unsupported basis: {value}')
     if require_selectable and not option.selectable:

@@ -1,4 +1,4 @@
-"""Explicit GPW profiles and header-checked basis/potential selections.
+"""Explicit GGA GPW/GAPW profiles and checked basis/potential selections.
 
 Multiwfn organization informed the XC branches; see recorded provenance.
 No physical parameters, build detection, automatic q changes or runtime validation.
@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .data_catalog import BASIS_ROWS, POTENTIAL_ROWS, catalog_rows as _rows
 from .errors import KitError
-from .structure import ELEMENTS
+from .structure import ELEMENTS, ELEMENT_ORDER
 from .basis_registry import basis_option, parse_basis
 from .basis_resolution import BasisResolver, alternatives
 
@@ -81,8 +81,32 @@ def normalize_basis_overrides(value, elements):
         raise KitError(f'Invalid basis overrides: {exc}') from exc
 
 
+def electron_model(settings, elements, pseudo_valences):
+    """Select the explicitly requested model before spin/electron validation."""
+    selected = dict(normalize_basis_overrides(settings.basis_overrides, elements))
+    types = {basis_option(selected.get(el, settings.basis)).kind_type for el in elements}
+    if len(types) != 1:
+        raise KitError('Mixed all-electron/pseudopotential KINDs are not enabled; choose one electron model explicitly')
+    all_electron = types == {'all-electron'}
+    counts = {el: i for i, el in enumerate(ELEMENT_ORDER, 1)} if all_electron else pseudo_valences
+    unsupported = set(elements)-counts.keys()
+    if unsupported:
+        raise KitError('No verified basis/potential preset for: '+', '.join(sorted(unsupported)))
+    if all_electron:
+        if settings.cp2k_version != '2026.2':
+            raise KitError('All-electron GAPW profiles require target CP2K 2026.2')
+        if settings.run_type == 'CELL_OPT' or settings.kpoints != (1, 1, 1):
+            raise KitError('All-electron GAPW currently supports Gamma ENERGY/ENERGY_FORCE/GEO_OPT, not CELL_OPT/non-Gamma')
+        if settings.dft_plus_u:
+            raise KitError('All-electron GAPW DFT+U projector suitability is not enabled/validated')
+        if settings.electron_density or settings.spin_density:
+            raise KitError('GAPW density CUBE hard/soft contributions are not enabled; GPW valence-density semantics cannot be reused')
+    return all_electron, counts
+
+
 def resolve_method(settings, elements, valences, kind_specs=None):
     profile = FUNCTIONAL_PROFILES[settings.functional]
+    _, valences = electron_model(settings, elements, valences)
     if type(settings.allow_pbe_potential) is not bool or type(settings.libxc_available) is not bool:
         raise KitError('Potential approval and Libxc availability assertions must be Boolean')
     overrides = normalize_basis_overrides(settings.basis_overrides, elements)
@@ -108,7 +132,7 @@ def resolve_method(settings, elements, valences, kind_specs=None):
         except KitError as exc:
             if exc.code != 2:
                 raise
-            candidates = ', '.join(alternatives(el, q, settings.functional)) or 'none in pinned catalog'
+            candidates = ', '.join(alternatives(el, q, settings.functional, option.kind_type)) or 'none in pinned catalog'
             labels = ', '.join(label for label, (element, _) in (kind_specs or {}).items() if element == el) or el
             missing.append(f'KIND(s) {labels} / element {el} q{q}: {exc} Catalog alternatives (not substitutions; require checks): {candidates}')
     if missing:
@@ -127,6 +151,10 @@ def resolve_method(settings, elements, valences, kind_specs=None):
         warnings.append(f'User-approved GTH-PBE pseudopotential approximation for {settings.functional}: '+', '.join(approximate)+'. This is not a matched-functional potential; validate the target property.')
     if profile.libxc:
         warnings.append('RPBE uses Libxc GGA_X_RPBE + GGA_C_PBE. Libxc build support is user-asserted, not probed or runtime-validated.')
+    if any(r['basis_kind_type'] == 'all-electron' for r in records.values()):
+        warnings.append('All-electron GAPW/ALL: electron counts include core electrons. Atomic grids, '
+                        'GAPW hard/soft tolerances and cutoff/basis convergence need independent checks; '
+                        'the selected numerical profile is a starting setup, not claimed converged. No relativistic/ECP model is inferred.')
     if overrides:
         warnings.append('Explicit element-specific basis overrides are applied to every split KIND of that element; no missing-entry fallback or q change is performed.')
     return profile, overrides, records, warnings
