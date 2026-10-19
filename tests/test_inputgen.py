@@ -32,7 +32,7 @@ class InputGenerationTests(unittest.TestCase):
         self.assertIn("POISSON_SOLVER WAVELET", text)
         self.assertNotIn("VDW_POTENTIAL", text)
         self.assertEqual(manifest["valence_electron_count"], 8)
-        self.assertEqual(manifest["effective_eps_scf"], 5e-6)
+        self.assertEqual(manifest["effective_eps_scf"], 1e-6)
         self.assertEqual(manifest["input_sha256"], hashlib.sha256(text.encode()).hexdigest())
         self.assertFalse(manifest["runtime_validated"])
         self.assertIsNone(manifest["runtime_version"])
@@ -41,7 +41,7 @@ class InputGenerationTests(unittest.TestCase):
         self.assertEqual((text, manifest), generate_input(self.water, self.settings))
 
     def test_readable_eps_formatting_and_custom_precision(self):
-        for task, default, eps in (("ENERGY", "1.0E-11", "5.0E-06"),
+        for task, default, eps in (("ENERGY", "1.0E-11", "1.0E-06"),
                                    ("GEO_OPT", "1.0E-12", "1.0E-06")):
             text, _ = generate_input(self.water, replace(self.settings, run_type=task))
             self.assertIn(f"EPS_DEFAULT {default}\n", text)
@@ -65,7 +65,7 @@ class InputGenerationTests(unittest.TestCase):
                     '      A    16.18680000     0.00000000     0.00000000\n'
                     '      B     0.00000000    28.03630000     0.00000000\n'
                     '      C     0.00000000     0.00000000    40.44410000\n'
-                    '      PERIODIC XYZ #Direction(s) of applied PBC (geometry aspect)\n'
+                    '      PERIODIC XYZ\n'
                     '    &END CELL\n'
                     '    &COORD\n'
                     '      Zn          1.41636598    4.48472671    2.14717961\n'

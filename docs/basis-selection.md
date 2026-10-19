@@ -66,21 +66,22 @@ JSON list the derived settings. Global/element basis choices must resolve to one
 electron model; AE basis families may be mixed explicitly with other AE families.
 There is no automatic charge, multiplicity, magnetic-state or functional repair.
 
-The default `gapw_profile=auto` (menu **131**) now uses numerical profile **v3**:
+The default `gapw_profile=auto` (menu **131**) now uses numerical profile **v4**:
 
 | Location | Effective setup |
 |---|---|
 | QS | GAPW; omit EPSFIT/EPSRHO0/EPSSVD and use CP2K defaults |
-| MGRID | NGRIDS 5 for all PP/AE bases; preserve CUTOFF/REL_CUTOFF (default 400/55 Ry) |
+| MGRID | Omit NGRIDS for AE; PP classic non-SR TZVP/TZV2P/TZV2PX emit 5; preserve CUTOFF/REL_CUTOFF |
 | Each KIND | Omit LEBEDEV_GRID/RADIAL_GRID and use CP2K defaults |
-| OT | Retain FULL_ALL; IRAC if any effective AE basis is pob, otherwise STRICT |
+| OT | Retain FULL_ALL; explicitly emit IRAC for every AE basis, STRICT for PP (manual overrides win) |
 
 By explicit request, all five extra QS/KIND settings have been removed from the
 generated input in both profiles, not merely hidden in native mode. In metadata
 qs/kind are empty; cp2k_default_controls lists the omitted settings without
 claiming their effective runtime values or convergence. Old v1/v2 inputs are not
-rewritten. `native` now differs only by omitting the automatic OT algorithm;
-explicit --ot-algorithm still wins. GAPW/ALL/electron counting remain automatic.
+rewritten. The latest explicit 0.2.8 request supersedes that distinction:
+`auto`/`native` are retained for config compatibility and now use the same IRAC
+default for every AE family; explicit --ot-algorithm still wins. GAPW/ALL/electron counting remain automatic.
 
 EPSFIT controls hard/soft Gaussian splitting, EPSRHO0 the compensation contribution
 range, and EPSSVD projector-matrix SVD tolerance. LEBEDEV_GRID/RADIAL_GRID control
@@ -93,8 +94,9 @@ Main-menu **110 ALGORITHM** is visible only for OT. Choose IRAC or STRICT by
 name/number; Enter keeps, `back` abandons, `auto` restores the basis-aware default.
 An explicit `--ot-algorithm STRICT` or IRAC overrides either AE profile. Diag hides
 and retains the request without emitting it into OT or replacing diagonalization's
-STANDARD algorithm. Old PP auto physics remains unchanged (native STRICT);
-NGRIDS is now universally 5 and library filename quotes are intentionally removed.
+STANDARD algorithm. PP OT now explicitly writes STRICT. NGRIDS follows the
+Multiwfn branch for the three classic non-SR triple-zeta families, not a universal
+five-grid rule. Omitted NGRIDS is null in metadata; runtime defaults are not guessed.
 
 ```bash
 # Starting templates only, not converged physical models; writes new files only.

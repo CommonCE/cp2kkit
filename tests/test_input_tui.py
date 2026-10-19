@@ -87,7 +87,7 @@ class MenuTests(unittest.TestCase):
         self.assertNotIn('Common/advanced options', log)
         rendered = log.split('Select a displayed number')[0]
         for number, field in NUMBERED_FIELDS:
-            if field.name in {'pressure', 'smearing', 'added_mos', 'optimizer', 'max_iter', 'allow_pbe_potential', 'libxc_available', 'gapw_profile', 'trust_radius', 'trajectory_format'}:
+            if field.name in {'pressure', 'smearing', 'added_mos', 'optimizer', 'max_iter', 'allow_pbe_potential', 'libxc_available', 'gapw_profile', 'trust_radius', 'trajectory_format', 'fixed_atoms'}:
                 self.assertNotIn(f'{number:3}. {LABELS[field.name]}:', rendered)
             else:
                 self.assertIn(f'{number:3}. {LABELS[field.name]}:', rendered)
@@ -160,7 +160,7 @@ class MenuTests(unittest.TestCase):
         displays = log.split('=== CP2K input generation: all settings ===')[1:]
         self.assertEqual(len(displays), 3)
         for index, display in enumerate(displays):
-            hidden = ({12, 6, 112, 10, 123, -5, 133}, {6, 112}, {110, 122})[index] | {129, 130, 131}
+            hidden = ({12, 6, 112, 9, 10, 123, -5, 133}, {6, 112}, {110, 122})[index] | {129, 130, 131}
             for number, field in NUMBERED_FIELDS:
                 text = f'{number:3}. {LABELS[field.name]}:'
                 if number in hidden:
@@ -277,7 +277,7 @@ class MenuTests(unittest.TestCase):
         self.assertEqual(dict(FIELD_IDS), {
             -7: 'periodic', -5: 'trajectory_format', -3: 'electron_density', -1: 'run_type',
             1: 'functional', 2: 'basis', 3: 'dispersion', 4: 'scf', 6: 'smearing',
-            8: 'kpoints', 10: 'optimizer', 12: 'pressure',
+            8: 'kpoints', 9: 'fixed_atoms', 10: 'optimizer', 12: 'pressure',
             101: 'charge', 102: 'multiplicity', 105: 'cutoff', 106: 'rel_cutoff',
             107: 'vacuum', 110: 'ot_algorithm', 112: 'added_mos', 120: 'eps_scf', 121: 'max_scf',
             122: 'max_outer_scf', 123: 'max_iter', 124: 'dft_plus_u', 125: 'magnetism',

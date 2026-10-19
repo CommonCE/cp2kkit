@@ -19,6 +19,7 @@ from .inputgen import (CP2K_VERSIONS, FUNCTIONALS, PERIODICITIES, RUN_TYPES, TRA
 from .structure import read_structure
 from .presentation import Presenter
 from .method_profiles import parse_basis_overrides, format_basis_overrides
+from .constraints import parse_fixed_atoms
 from .spin_settings import (parse_dft_plus_u, parse_magnetism,
                             format_dft_plus_u, format_magnetism)
 
@@ -46,6 +47,7 @@ GROUPS = (
     ("Task and optimization", (
         Field("run_type", "Run type", choices=RUN_TYPES),
         Field("optimizer", "Optimizer (optimization tasks only)", choices=("BFGS", "LBFGS", "CG")),
+        Field("fixed_atoms", "Fixed atoms: 1-based indices/ranges (1,3-5); off/0 clears; fractional XYZ", "fixed_atoms"),
         Field("trust_radius", "TRUST_RADIUS [angstrom] (BFGS/LBFGS only)", "float", positive=True),
         Field("trajectory_format", "Optimization trajectory format (XYZ loses cell; PDB limited precision)", choices=TRAJECTORY_FORMATS),
         Field("max_iter", "Maximum optimization steps", "int", minimum=1),
@@ -62,7 +64,7 @@ GROUPS = (
         Field('custom_potential_file', 'Custom potential file', optional=True),
         Field('custom_potential_name', 'Custom real potential alias', optional=True),
         Field('write_json', 'Also write provenance JSON (default off; existing JSON is protected)', 'bool'),
-        Field('gapw_profile', 'All-electron OT setup (auto: pob IRAC/other STRICT; native: CP2K algorithm default)', choices=('auto', 'native')),
+        Field('gapw_profile', 'AE profile (auto/native retained for compatibility; both default to explicit IRAC)', choices=('auto', 'native')),
         Field('basis_overrides', 'Element basis overrides: Element=basis; separate entries with semicolons; off clears. No implicit SR/non-SR fallback.', 'basis_map'),
         Field('allow_pbe_potential', 'Explicitly approve GTH-PBE potentials when matched-functional entries are absent; this is an approximation', 'bool'),
         Field('libxc_available', 'Assert target CP2K was built with Libxc (required for RPBE; not detected by this tool)', 'bool'))),
@@ -77,7 +79,7 @@ GROUPS = (
         Field("vacuum", "Automatic isolated box padding on each side [angstrom]", "float", positive=True))),
     ("SCF, k-points and occupations", (
         Field("scf", "SCF (OT for gapped systems; check diag/smearing for metals)", choices=("ot", "diag")),
-        Field("ot_algorithm", "OT ALGORITHM (auto: GAPW pob IRAC, otherwise STRICT)", choices=("IRAC", "STRICT"), optional=True),
+        Field("ot_algorithm", "OT ALGORITHM (auto: all AE IRAC, PP STRICT; always explicit)", choices=("IRAC", "STRICT"), optional=True),
         Field("eps_scf", "EPS_SCF (auto: task default)", "float", optional=True, positive=True),
         Field("max_scf", "Maximum inner/diagonalization SCF steps (auto: OT 25 / diag 128)", "int", optional=True, minimum=1),
         Field("kpoints", "MONKHORST-PACK NX NY NZ (non-Gamma requires XYZ + diag)", "int3", minimum=1),
@@ -116,7 +118,7 @@ def visible_fields(fields, values):
     return tuple(f for f in fields
                  if not (f.name == 'gapw_profile' and not has_ae)
                  and not (f.name == 'pressure' and values['run_type'] != 'CELL_OPT')
-                 and not (f.name in {'trust_radius', 'trajectory_format'} and values['run_type'] not in {'GEO_OPT', 'CELL_OPT'})
+                 and not (f.name in {'trust_radius', 'trajectory_format', 'fixed_atoms'} and values['run_type'] not in {'GEO_OPT', 'CELL_OPT'})
                  and not (f.name == 'trust_radius' and values['optimizer'] not in {'BFGS', 'LBFGS'})
                  and not (f.name == 'vacuum' and periodic != 'NONE')
                  and not (f.name in {'smearing', 'added_mos'} and values['scf'] == 'ot')
@@ -176,6 +178,8 @@ def parse_value(field, raw):
     """Local lexical/range validation only; cross-field chemistry stays in inputgen."""
     if field.kind == 'basis':
         return numbered_basis(int(raw)) if raw.isdigit() else parse_basis(raw)
+    if field.kind == 'fixed_atoms':
+        return parse_fixed_atoms(raw)
     if field.kind == 'paths':
         import json
         value = json.loads(raw)
@@ -355,6 +359,7 @@ class Menu:
         if settings.run_type in {'GEO_OPT', 'CELL_OPT'}:
             self.show(f"Optimization: {settings.optimizer}; max_iter={settings.max_iter}")
             self.show(f"Trajectory: {settings.trajectory_format}; MOTION restart backup copies: 0")
+            self.show(f"Fixed atoms (1-based, fractional XYZ): {manifest['settings']['fixed_atoms']}; count={len(manifest['constraints']['fixed_atoms'])}")
             if manifest['motion_output']['trust_radius_angstrom'] is not None:
                 self.show(f"TRUST_RADIUS: {settings.trust_radius} angstrom")
         if settings.run_type == 'CELL_OPT':
@@ -375,7 +380,8 @@ class Menu:
             self.show(f"Element basis overrides: {format_basis_overrides(settings.basis_overrides)}")
         if settings.scf == 'ot':
             self.show(f"OT ALGORITHM: {manifest['method_profile']['ot_algorithm']}; selection: {settings.ot_algorithm or 'auto'}")
-        self.show(f"Restart template (commented, inactive): {manifest['restart_template']['filename']}")
+        self.show("SCF wavefunction restart backups: 0; restart writing is not disabled")
+        self.show(f"Restart suggestion (metadata only, inactive): {manifest['restart_template']['filename']}")
         self.show(f"SCF: {settings.scf}; Effective EPS_SCF: {manifest['effective_eps_scf']}; Poisson: {manifest['poisson_solver']}")
         self.show(f"Generated cell [angstrom]: {manifest['generated_structure']['cell']}")
         self.show(f"Coordinates translated: {manifest['coordinates_translated']}")

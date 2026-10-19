@@ -221,15 +221,17 @@ with 50-59; no previously allocated number/ID changes meaning.
   atomic_number_catalog, explicit_electrons=Z; basis_q, potential_q,
   potential_q_source, potential_functional and valence_electrons are null.
   protocol_pairing=all_electron_nuclear_charge; potential_approximation=false.
-- `method_profile.qs_method`: GPW/GAPW; `ngrids`: effective count;
+- `method_profile.qs_method`: GPW/GAPW; `ngrids`: emitted count or null when omitted;
   `ot_algorithm`: effective IRAC/STRICT for OT, null for diag. Hidden raw settings
   are retained but must not be confused with effective settings.
 - `method_profile.gapw`: null for PP, or versioned profile/qs/kind/ot_algorithm/
   ngrids/automatic_settings/preserved/convergence_verified=false. Derived entries
   record setting/value/reason; explicit OT overrides carry source=user. Numerical
-  profile v3 has empty qs/kind maps: cp2k_default_controls lists omitted EPSFIT,
-  EPSRHO0, EPSSVD, LEBEDEV_GRID, RADIAL_GRID without guessing runtime values.
-  method_profile.ngrids is now 5 for every PP/AE basis, including SR.
+  profile v4 has empty qs/kind maps: cp2k_default_controls lists omitted EPSFIT,
+  EPSRHO0, EPSSVD, LEBEDEV_GRID, RADIAL_GRID and NGRIDS for AE without guessing
+  runtime values. method_profile.ngrids is 5 only for an effective classic non-SR
+  TZVP/TZV2P/TZV2PX-MOLOPT-GTH basis; null otherwise. Both legacy AE profiles
+  default to explicit IRAC; PP defaults to explicit STRICT. Manual overrides win.
 - AE catalog_reference_version is null: catalog_sources identifies exact local
   paths/hashes/REVISION and does not infer upstream equivalence. Actual source
   records may identify recognized local bytes with reference_path/source_revision;
@@ -267,6 +269,30 @@ also records `dft_plus_u` (empty array by default) and `magnetism` (null by defa
   UKS singlet is distinct from default RKS; density_output.spin_density and the
   generated two-spin ADDED_MOS follow effective UKS rather than multiplicity alone.
 
+## Generated input JSON: fixed atoms (software 0.2.8)
+
+Schema stays 0.1.0; existing analysis/CSV and optional JSON write policies are
+unchanged. Missing settings in old configs default to off.
+
+- settings.fixed_atoms: compact text, default 'off'. Explicit positive 1-based
+  indices/ranges are sorted deterministically; off/none/0 normalize to off.
+  Hidden selections remain requests, not evidence of emitted constraints.
+- constraints.enabled: true only when GEO_OPT/CELL_OPT has a nonempty, validated
+  selection. Active constraints currently require target 2026.2.
+- constraints.fixed_atoms: ordered expanded active indices, [] when disabled.
+  Bounds are checked against the loaded structure before expansion. Inactive
+  selections are not expanded and are checked when optimization becomes active.
+- constraints.index_base=1; index_reference identifies generated_structure atom
+  order after source symmetry expansion/frame selection. Atom order, geometry,
+  KIND splitting, charge and spin are unchanged.
+- components_to_fix='XYZ', coordinate_space='fractional' when active, otherwise
+  null. CELL_OPT therefore does not pin absolute Cartesian positions.
+- keyword_reference records the inspected supplied local CP2K revision,
+  definition file/hash and target; null when disabled. It does not assert
+  installed data/binary identity or native acceptance.
+- runtime_validated=false. The generator does not inherit source constraints,
+  remap atom identities, execute CP2K or certify convergence.
+
 ## Generated input JSON: restart and motion output (software 0.2.7)
 
 Schema remains 0.1.0. These additive fields are available in the in-memory
@@ -276,9 +302,9 @@ manifest/review and optional JSON; the default writer still creates input only.
   is angstrom. settings.trajectory_format is PDB/XYZ/EXTXYZ, default XYZ.
   Hidden values remain raw requests, not evidence of active output.
 - restart_template: filename follows PROJECT with -RESTART.wfn for Gamma or
-  -RESTART.kp for non-Gamma. scf_guess=RESTART describes the commented hint;
-  enabled=false, filename_commented=true, guess_commented=true. No active
-  SCF_GUESS is emitted; CP2K's default applies until edited by the user.
+  -RESTART.kp for non-Gamma. scf_guess=RESTART is a metadata-only suggestion;
+  enabled=false, emitted=false, filename_commented=false, guess_commented=false.
+  Neither hint is emitted or enabled. CP2K's guess default applies until edited.
   naming_basis describes default restart naming, runtime_verified=false.
   This is not evidence that the file exists or is compatible with the calculation.
 - motion_output.enabled: true for GEO_OPT/CELL_OPT, false otherwise.
@@ -286,8 +312,11 @@ manifest/review and optional JSON; the default writer still creates input only.
   controls; both are null outside optimization.
   trust_radius_angstrom is the effective BFGS/LBFGS radius, null for CG and
   non-optimization tasks, even when settings.trust_radius retains a value.
-- No trajectory cadence or filename override is imposed. MOTION restart backup
-  policy is separate from the unchanged SCF wavefunction backup defaults.
+- wavefunction_output records restart_enabled=true, restart_backup_copies=0,
+  section=FORCE_EVAL/DFT/SCF/PRINT/RESTART, runtime_validated=false. This describes
+  output controls, not proof of an existing or successfully written wavefunction.
+- No trajectory cadence or filename override is imposed. SCF and MOTION each
+  explicitly set backup count 0, without disabling restart writing.
   Static keyword/naming checks are not native acceptance or convergence proof.
 
 ## Cube check JSON

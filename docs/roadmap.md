@@ -1,13 +1,37 @@
 # Development status and next steps
 
-Current software: **0.2.7** (retained by explicit request, including the D3 filename fix); schema: **0.1.0**.
+Current software: **0.2.8** (explicit user version); schema: **0.1.0**.
+Latest retained-version policy supersedes the historical universal grid/OT/hint
+defaults below: only effective classic non-SR TZVP/TZV2P/TZV2PX emit NGRIDS 5;
+all others omit it (null metadata). OT always emits PP STRICT / AE IRAC in both
+legacy AE profiles; explicit overrides win. Numerical profile v4 retains native
+GAPW controls. SCF wavefunction and MOTION restart backups are explicitly zero,
+without disabling writing. Only generator/Multiwfn opening comments remain;
+restart suggestions are metadata/review only, not enabled or emitted directives.
+EPS_SCF now defaults to 1e-6 for every task, including ENERGY (previously 5e-6).
+Explicit overrides still win; task-dependent EPS_DEFAULT remains unchanged.
+Optimization menu 9 / --fixed-atoms adds explicit 1-based fixed-atom selections,
+including ranges, with default off. Shared CLI/menu/config/replay handling writes
+fractional XYZ constraints only for GEO_OPT/CELL_OPT and target 2026.2. Atom/frame/
+expanded-CIF order is explicit; source changes warn without identity remapping.
+Malformed/overlapping/active out-of-bounds selections fail before publication;
+inactive requests remain compact and hidden. No source constraints are inherited.
+CELL_OPT can move fixed fractional positions with the cell. Existing defaults,
+protected-result writes and native-validation boundaries are retained.
+Current validation: **346 tests passed, none skipped**, including 22 fixed-atom
+methods and nine latest-policy regressions; compileall, CLI version, documentation links/text and diff checks passed.
+No calculations, submissions, new dependencies, publication, commit or push in this round.
+
+### 0.2.7 implementation (historical)
+
+Version 0.2.7 was retained by explicit request, including the D3 filename fix; schema 0.1.0.
 D3/D3(BJ) PARAMETER_FILE_NAME now uses literal whole-line serialization instead
 of quoted-token output; the input-writing follow-up extends it to basis/potential
 filenames. Default output is input-only, JSON is opt-in (132/--write-json).
 Existing regular .inp may be atomically replaced; sources/data/symlinks, optional
 JSON and all other results remain protected. This fixes
 the statically identified blank-prefix path, without claiming native execution.
-Current validation: **315 tests passed, none skipped**, including 22 AE/OT tests,
+Historical validation: **315 tests passed, none skipped**, including 22 AE/OT tests,
 five filename regressions, 17 input-writing tests and 17 restart/motion tests;
 compileall, CLI version, documentation links/text and diff checks passed. All 10
 local reference hashes matched in the preceding audit. Default PP physics still

@@ -1,6 +1,6 @@
 # CP2K input generation
 
-This guide describes cp2kkit **0.2.7**. Older defaults and migration notes are in
+This guide describes cp2kkit **0.2.8**. Older defaults and migration notes are in
 [the changelog](../CHANGELOG.md). AE automatic setup is described in
 [the basis guide](basis-selection.md#all-electron-automatic-setup-027).
 The [registry-v1 basis guide](basis-selection.md) defines permanent numbering toward
@@ -68,23 +68,85 @@ as potentially stale. This changes input-generation defaults only, not analysis,
 structure-export or cube/plot output protections. No multi-file power-loss atomicity
 is promised.
 
-## Restart hints and optimization output (0.2.7 follow-up)
+## Fixed atoms (0.2.8)
 
-The generator no longer forces `SCF_GUESS ATOMIC`. Instead it writes inactive
-restart hints in DFT and DFT/SCF, respectively:
+Main-menu **9. Fixed atoms** appears for GEO_OPT/CELL_OPT only. Selecting it
+shows 1-based atom indices, elements and Cartesian positions [angstrom] from the
+currently loaded frame/expanded structure. Enter `1,3-5,8` or space-separated
+entries; `off`, `none` or `0` clears, Enter keeps, `back` abandons the edit.
+Ranges must ascend and must not duplicate/overlap. The default is off.
+This first subset fixes all XYZ components; per-component selectors, element
+selectors and Multiwfn's optH shortcut are not implemented.
+
+```bash
+cp2kkit generate-input slab.extxyz -o slab-opt.inp --run-type GEO_OPT --fixed-atoms '1,3-5,8' --trajectory-format EXTXYZ
+```
+
+Explicit selections add this section inside MOTION, alongside GEO_OPT/CELL_OPT
+and PRINT, not inside an optimizer subsection:
 
 ```text
-#   WFN_RESTART_FILE_NAME water-RESTART.wfn
-#     SCF_GUESS RESTART #Use WFN_RESTART_FILE_NAME as the initial guess; uncomment both restart lines
+  &CONSTRAINT
+    &FIXED_ATOMS
+      COMPONENTS_TO_FIX XYZ
+      LIST 1 3 4 5 8
+    &END FIXED_ATOMS
+  &END CONSTRAINT
 ```
+
+CP2K fixes **fractional** coordinates. With a fixed cell this fixes atom positions;
+during CELL_OPT those atoms can move in Cartesian space with the changing cell.
+This is not an absolute-Cartesian pinning implementation. The review and warnings disclose the distinction; generated inputs omit explanatory
+comments except for generator/Multiwfn header citations. Fixing every atom is permitted with a warning,
+not treated as evidence of optimized geometry.
+
+Active nonempty constraints are keyword-checked only for target **2026.2**.
+Out-of-bounds active indices fail before writing or replacing any input. Ranges
+remain compact until checked against the actual atom count, avoiding huge
+unchecked expansion. LIST is emitted in repeated lines of at most 20 indices.
+
+Indices refer to the selected XYZ frame / symmetry-expanded CIF / generated
+atom order, never CIF site labels or split KIND labels. No atom is reordered.
+Source/header/POSCAR constraints are not inherited. Changing structure/frame
+retains the selection and warns to review it; no identity remapping or clearing
+is performed. ENERGY/ENERGY_FORCE hide and retain selections but emit no
+constraints; inactive bounds are checked when optimization is enabled again.
+
+CLI, menu, config/replay, full preview, and optional JSON share the generator.
+`InputSettings.fixed_atoms` is compact text (default `'off'`), normalized
+deterministically; the manifest's `constraints` object records the active atom
+indices and fractional XYZ semantics. Old configs without the setting stay
+unconstrained. No CP2K execution or convergence guarantee is implied.
+
+## Restart hints and optimization output (0.2.7 follow-up)
+
+Updated within retained **0.2.8**: generated inputs retain only the opening
+generator/Multiwfn comments and citations. Explanations remain in review/docs/JSON.
+The commented SCF_GUESS and WFN_RESTART_FILE_NAME templates are removed, not
+uncommented; no restart read is enabled. CP2K's guess default applies (ATOMIC in
+the inspected source). Filename suggestions remain metadata/review only.
+
+All tasks now emit the following within DFT/SCF:
+
+```text
+      &PRINT
+        &RESTART
+          BACKUP_COPIES 0
+        &END RESTART
+      &END PRINT
+```
+
+This suppresses SCF wavefunction restart backups (.wfn at Gamma, .kp otherwise),
+not restart writing. To suppress wavefunction writing, manually use RESTART OFF
+only when intended; that is not the generated default. No cadence/name override
+or automatic reuse of existing wavefunctions is introduced.
 
 The name follows the actual **PROJECT**, not a separately selected input-output
 basename. Gamma uses `PROJECT-RESTART.wfn`; non-Gamma k-points use
 `PROJECT-RESTART.kp`, matching the inspected CP2K writers and Multiwfn templates.
-With both lines commented, no restart is requested and the CP2K guess default
-applies (ATOMIC in the inspected local source). To restart, check that the file
-exists and is compatible with the system, electron model, basis and spin settings,
-then uncomment both lines. No restart is searched, read or modified by generation.
+To restart manually, first verify file compatibility with the system, electron
+model, basis and spin, then explicitly add WFN_RESTART_FILE_NAME in DFT and
+SCF_GUESS RESTART in SCF. No restart is searched, read or modified by generation.
 The naming rule assumes the generated single FORCE_EVAL/default restart print names;
 it is not evidence that a wavefunction file exists or was written successfully.
 
@@ -111,23 +173,30 @@ Both optimization tasks append:
       FORMAT XYZ
     &END TRAJECTORY
     &RESTART
-      BACKUP_COPIES 0 #Maximum number of backup copies; 0 disables backups, not restart writing
+      BACKUP_COPIES 0
     &END RESTART
   &END PRINT
 ```
 
 This is inside MOTION, after GEO_OPT/CELL_OPT. Backup count 0 disables backup
-copies of the **MOTION restart**, not restart writing and not SCF wavefunction
-backups. Archive existing results before executing in a reused directory; cp2kkit
+copies of the **MOTION restart**, not restart writing. The separate SCF block
+above suppresses wavefunction backups too. Archive existing results before executing in a reused directory; cp2kkit
 does not execute the input or change any existing restart/wavefunction file.
 No custom trajectory cadence or filename is imposed. ENERGY/ENERGY_FORCE omit
 MOTION; hidden format/radius preferences remain in settings and replay commands.
 
-The inspected Multiwfn source explicitly emits NGRIDS 5 only for its non-SR
-MOLOPT basis numbers 3/4/5; other basis branches omit the keyword. cp2kkit's
-**universal NGRIDS 5** remains the user's separate explicit policy, not an
-assertion of exact Multiwfn grid-default equivalence. Static source checks and
-synthetic tests are not native CP2K acceptance or convergence evidence.
+NGRIDS now follows Multiwfn's explicit branch: emit 5 only for non-SR
+TZVP/TZV2P/TZV2PX-MOLOPT-GTH (upstream ibas 3/4/5). Other bases, including
+SR, UZH and AE, omit the keyword; metadata records null, not a guessed runtime
+default. With element overrides, any effective matching basis triggers 5;
+a completely overridden global choice does not. Custom aliases are not inferred
+from name substrings. This supersedes the earlier universal-five-grid policy.
+
+Every OT block explicitly emits ALGORITHM: STRICT for PP, IRAC for all AE bases,
+including auto/native profiles. Manual menu 110 / --ot-algorithm overrides win;
+diagonalization hides/retains the request and emits no OT block. The all-AE IRAC
+rule is the user's explicit policy, broader than Multiwfn's pob-only IRAC branch.
+Static checks and synthetic tests are not native acceptance or convergence proof.
 
 ## D3 parameter filenames (0.2.7)
 
@@ -159,7 +228,7 @@ All applicable settings appear together in one scrolling numbered menu, using
 Multiwfn-style direct selection. There are no sequential steps, hidden advanced
 pages, or group-selection submenus. Corresponding main-menu IDs follow the inspected
 Multiwfn 2026.10.1 source; unsupported entries are omitted, not reassigned.
-The same `InputSettings`, generator and staged writer serve CLI and menus. Version **0.2.7** retains the menu introduced in 0.2.4;
+The same `InputSettings`, generator and staged writer serve CLI and menus. Version **0.2.8** retains the menu introduced in 0.2.4;
 its explicitly requested follow-ups change defaults as documented above, without
 automatically repairing charge, spin, method or periodicity.
 
@@ -173,6 +242,7 @@ automatically repairing charge, spin, method or periodicity.
 | 0 | Review and generate, with explicit y/yes confirmation | Multiwfn generate ID; extra safety confirmation |
 | 1 / 2 / 3 / 4 | Functional / basis / dispersion / OT-diag | Multiwfn main menu |
 | 6 / 8 | Smearing temperature / k-points | Multiwfn main menu; local parameter prompts |
+| 9 | Fixed atoms: explicit 1-based indices/ranges; off clears | Multiwfn main menu; optimization subset only |
 | 10 / 12 | Optimizer / CELL_OPT pressure | Multiwfn main menu |
 | 101 / 102 | Charge / multiplicity | Local extensions (upstream Other settings 1/2) |
 | 105 / 106 | CUTOFF / REL_CUTOFF | Local extensions (upstream Other settings 5 combines both) |
@@ -202,7 +272,7 @@ reserved ranges, neither of which can be selected.
   These values and absolute output paths remain in review/manifest for traceability.
 - Select any displayed number directly; a prompt shows its choices. Numbers remain
   fixed across task/SCF/PBC changes. Hidden fields cannot be selected.
-  Pressure appears only for CELL_OPT; optimizer/step limits and trajectory format
+  Pressure appears only for CELL_OPT; optimizer/step limits, trajectory format and fixed atoms
   only for optimization. TRUST_RADIUS appears only for optimization BFGS/LBFGS.
   Isolated padding requires effective NONE, not Unknown. OT hides smearing/ADDED_MOS;
   diag hides outer SCF limits and 110 ALGORITHM. Enter keeps the algorithm;
@@ -240,7 +310,8 @@ Optional Rich (`.[ui]`) has a standard-library fallback; `--plain` and the prese
 of `NO_COLOR` disable styling. Text folds on narrow terminals without clearing,
 alternate screen, or continuous redraw. Both stdin and stdout must be TTY.
 Redirected/piped sessions fail promptly with batch alternatives rather than waiting.
-Batch remains noninteractive; schema stays 0.1.0. Explicit default changes are\ndocumented in the restart/output and grid sections above.
+Batch remains noninteractive; schema stays 0.1.0. Explicit default changes are
+documented in the restart/output and grid sections above.
 Input-only output and regular .inp replacement are the explicit new write policy; identical structure/settings produce identical text/manifest.
 
 ## Scope and defaults
@@ -255,12 +326,15 @@ Input-only output and regular .inp replacement are the explicit new write policy
 | Dispersion | none (default), D3, D3(BJ); dftd3.dat and REFERENCE_FUNCTIONAL |
 | Charge/spin | 0/1; explicit valence-electron parity check; UKS for multiplicity > 1 or explicit magnetic request |
 | SCF | OT+FULL_ALL/DIIS+outer SCF (default), or diagonalization+Broyden mixing |
-| EPS_SCF | ENERGY 5e-6, other tasks 1e-6; override allowed |
+| EPS_SCF | 1e-6 for all tasks, including ENERGY; explicit override allowed |
 | SCF limits | OT inner/outer 25/20; diag 128; `--max-scf`/`--max-outer-scf` overrides |
-| Grid | CUTOFF 400 Ry/REL_CUTOFF 55 Ry; NGRIDS 5 for all PP/AE bases; no explicit GAPW split-tolerance or atomic-grid overrides |
+| Grid | CUTOFF 400 Ry/REL_CUTOFF 55 Ry; NGRIDS 5 only for classic non-SR TZVP/TZV2P/TZV2PX, omitted otherwise; no GAPW control overrides |
 | k-points | Gamma default; non-Gamma requires XYZ+diag |
 | Smearing/empty orbitals | Optional Fermi-Dirac K, requires diag; auto `max(30, NINT(atom_count/2))` with smearing, otherwise 0; OT rejects smearing/nonzero empty orbitals |
-| Optimization | BFGS (default), LBFGS, CG; max 400 steps; BFGS/LBFGS TRUST_RADIUS 0.2 angstrom |\n| Restart hints | Commented PROJECT-RESTART.wfn / .kp and SCF_GUESS RESTART; no active guess override |\n| Motion output | Optimization only: XYZ (default), PDB, EXTXYZ (target 2026.2); MOTION restart BACKUP_COPIES 0 |
+| Optimization | BFGS (default), LBFGS, CG; max 400 steps; BFGS/LBFGS TRUST_RADIUS 0.2 angstrom |
+| Restart hints | PROJECT-based .wfn/.kp suggestion in metadata/review only; no active guess override |
+| Motion output | Optimization only: XYZ (default), PDB, EXTXYZ (target 2026.2); MOTION restart BACKUP_COPIES 0 |
+| Fixed atoms | Off by default; 1-based selection, fractional XYZ, target 2026.2; GEO_OPT/CELL_OPT only |
 | CELL_OPT | Requires XYZ/lower-triangular cell; analytical stress; default pressure 1.01325 bar |
 | Target version | 2026.2 default; common density syntax profiles 2024.1/2/3, 2025.1/2, 2026.1/2; not runtime certification |
 | Density cubes | Optional electron/applicable UKS spin density; stride default 1 1 1; final-step policy in [cube guide](cube.md) |
@@ -412,7 +486,8 @@ checked separately and raw bytes are hashed. An entry in the wrong library or wi
 a different q cannot satisfy a selection. Registry-v1 actual files are authoritative for an enabled family at the fixed q;
 explicit files may supply entries beyond pinned catalog coverage. They do not add
 new method templates or change q. Use custom 900 for a literal custom ORB alias.
-NGRIDS now defaults to 5 for every effective basis, SR/non-SR and PP/AE alike. CUTOFF/REL_CUTOFF
+NGRIDS is emitted as 5 only when an effective basis is classic non-SR
+TZVP/TZV2P/TZV2PX-MOLOPT-GTH; otherwise it is omitted. CUTOFF/REL_CUTOFF
 remain 400/55 Ry by default, not property-converged values. Larger Gaussian bases,
 grid convergence and overlap conditioning are separate checks.
 
@@ -508,8 +583,9 @@ older-version differences are in the [cube guide](cube.md).
 ## Generated text formatting
 
 - EPS_DEFAULT and inner/outer EPS_SCF use uppercase scientific notation, e.g.
-  `1.0E-12`/`1.0E-06`. Numerical defaults remain ENERGY 1e-11/5e-6, other tasks
-  1e-12/1e-6. Custom EPS retains float significant digits, not a fixed one-decimal rounding.
+  `1.0E-12`/`1.0E-06`. EPS_DEFAULT/EPS_SCF defaults are ENERGY 1e-11/1e-6, other tasks
+  1e-12/1e-6. The uniform SCF default supersedes the earlier Multiwfn-derived
+  ENERGY 5e-6 policy within retained version 0.2.8; explicit overrides still win. Custom EPS retains float significant digits, not a fixed one-decimal rounding.
 - CELL A/B/C and Cartesian COORD columns use eight decimal places, normalize
   `-0.00000000`, and retain separating spaces for values exceeding the column width.
 - Omit `[angstrom]`/`UNIT angstrom` as requested, using CP2K's angstrom defaults;

@@ -34,10 +34,12 @@ class RestartMotionTests(unittest.TestCase):
     def generate(self, **kwargs):
         return generate_input(self.atom, replace(self.settings, **kwargs))
 
-    def test_gamma_restart_lines_are_commented_and_use_project_not_output(self):
+    def test_gamma_restart_suggestion_is_metadata_only_and_uses_project(self):
         text, m = self.generate(project='custom-name')
-        self.assertIn('#   WFN_RESTART_FILE_NAME custom-name-RESTART.wfn\n', text)
-        self.assertIn('#     SCF_GUESS RESTART #', text)
+        self.assertNotIn('WFN_RESTART_FILE_NAME', text)
+        self.assertNotIn('SCF_GUESS', text)
+        self.assertFalse(m['restart_template']['emitted'])
+        self.assertFalse(m['restart_template']['filename_commented'])
         active = '\n'.join(line.split('#', 1)[0] for line in text.splitlines())
         self.assertNotIn('SCF_GUESS', active)
         self.assertNotIn('WFN_RESTART_FILE_NAME', active)
@@ -47,18 +49,18 @@ class RestartMotionTests(unittest.TestCase):
         self.assertEqual(m['restart_template']['filename'], 'custom-name-RESTART.wfn')
 
     def test_default_project_restart_name_follows_source_stem(self):
-        self.assertIn('#   WFN_RESTART_FILE_NAME oxygen-RESTART.wfn', self.generate()[0])
+        self.assertEqual(self.generate()[1]['restart_template']['filename'], 'oxygen-RESTART.wfn')
 
     def test_non_gamma_uses_kp_extension_without_reading_restart(self):
         text, m = self.generate(project='solid', periodic='XYZ', cell=(12., 12., 12.),
                                 scf='diag', kpoints=(2, 2, 2))
-        self.assertIn('#   WFN_RESTART_FILE_NAME solid-RESTART.kp', text)
+        self.assertEqual(m['restart_template']['filename'], 'solid-RESTART.kp')
         self.assertNotIn('solid-RESTART.wfn', text)
         self.assertFalse(m['restart_template']['enabled'])
         self.assertEqual(list(self.root.iterdir()), [self.source])
 
     def test_gamma_diagonalization_still_uses_wfn(self):
-        self.assertIn('oxygen-RESTART.wfn', self.generate(scf='diag')[0])
+        self.assertEqual(self.generate(scf='diag')[1]['restart_template']['filename'], 'oxygen-RESTART.wfn')
 
     def test_bfgs_lbfgs_radius_nesting_for_both_optimization_tasks(self):
         for task in ('GEO_OPT', 'CELL_OPT'):
@@ -78,7 +80,7 @@ class RestartMotionTests(unittest.TestCase):
                                     gapw_profile=profile, trajectory_format='EXTXYZ')
             self.assertEqual(m['electron_count_model'], 'all_electron')
             self.assertIn('METHOD GAPW', text)
-            self.assertIn('#   WFN_RESTART_FILE_NAME oxygen-RESTART.wfn', text)
+            self.assertEqual(m['restart_template']['filename'], 'oxygen-RESTART.wfn')
             self.assertIn('TRUST_RADIUS [angstrom] 0.2', text)
             self.assertIn('FORMAT EXTXYZ', text)
             self.assertIn('BACKUP_COPIES 0', text)
@@ -113,7 +115,7 @@ class RestartMotionTests(unittest.TestCase):
                     text, m = self.generate(run_type=task, periodic='XYZ', cell=(12., 12., 12.),
                                             trajectory_format=fmt)
                     self.assertIn('  &PRINT\n    &TRAJECTORY\n      FORMAT '+fmt+'\n    &END TRAJECTORY\n    &RESTART\n      BACKUP_COPIES 0', text)
-                    self.assertEqual(text.count('BACKUP_COPIES 0'), 1)
+                    self.assertEqual(text.count('BACKUP_COPIES 0'), 2)
                     self.assertEqual(m['motion_output']['trajectory_format'], fmt)
                     self.assertEqual(m['motion_output']['restart_backup_copies'], 0)
                     self.assertIn('RESTART\n  &END PRINT\n&END MOTION', text)
@@ -150,7 +152,8 @@ class RestartMotionTests(unittest.TestCase):
         text = output.read_text()
         self.assertIn('FORMAT EXTXYZ', text)
         self.assertIn('TRUST_RADIUS [angstrom] 0.15', text)
-        self.assertIn('actual-project-RESTART.wfn', text)
+        self.assertNotIn('WFN_RESTART_FILE_NAME', text)
+        self.assertNotIn('actual-project-RESTART.wfn', text)
         self.assertNotIn('different-output-RESTART.wfn', text)
 
     def test_config_and_replay_roundtrip_preserve_motion_settings(self):

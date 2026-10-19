@@ -40,6 +40,7 @@ cli.py
  |-- data_catalog.py (header-only names/q/files and pinned official source hashes)
  |-- all_electron_catalog.py (audited AE subsets, local reference identity; no parameters)
  |-- gapw.py (versioned derived numerical setup; explicit OT overrides win)
+ |-- constraints.py (compact fixed-atom parsing, bounded active expansion, keyword evidence)
  |-- spin_settings.py (explicit Ueff/L parsing, collinear atom seeds, stable KIND splitting)
  `-- cube.py ------- models.py / io.py / structure.py (units; streaming checks/differences)
 
@@ -160,11 +161,13 @@ basis/potential/U. Only target 2026.2 is checked for these opt-in features. The 
 also require target 2026.2. Menu 128 configures explicit element basis overrides;
 129 approves unmatched-functional PBE potentials; 130 asserts target Libxc support.
 129/130 follow functional applicability while preserving hidden values. NGRIDS uses
-a shared DEFAULT_NGRIDS=5 for every PP/AE basis; it no longer depends on SR labels.
+shared resolve_ngrids over actual effective basis IDs: only classic non-SR
+TZVP/TZV2P/TZV2PX emit 5; others omit it and record null.
 Menu 110 configures OT IRAC/STRICT (hidden/retained for diag); 131 selects the
-AE auto/native profile. Electron-model classification precedes spin validation.
+legacy AE auto/native names (same explicit IRAC default). PP OT explicitly
+emits STRICT; manual selections override either model. Electron-model classification precedes spin validation.
 AE uses Z rather than PP valence, with null PP q/valence fields. Effective GAPW
-settings (numerical profile v3) omit explicit QS split tolerances and KIND atomic
+settings (numerical profile v4) omit explicit QS split tolerances and KIND atomic
 grids in both auto/native modes. Empty qs/kind and cp2k_default_controls record
 this omission without guessing runtime values. Other settings are rendered by the
 same generator, and disclosed in review/JSON. No automatic physical-state repair. Schema 0.1.0 gains additive raw settings, generated
@@ -175,7 +178,17 @@ CLI/TUI forks. Trajectory format (-5) is visible for GEO_OPT/CELL_OPT; radius
 (133) only for BFGS/LBFGS optimization. Hidden requests persist in settings/replay;
 restart_template and motion_output distinguish hints/raw requests from emitted
 controls. Restart filenames derive from resolved PROJECT and Gamma/non-Gamma
-naming, not the .inp output path. No restart is opened by generation.
+naming, not the .inp output path. Suggestions remain metadata/review only, not
+commented input directives. Only generator/Multiwfn header comments remain.
+SCF and MOTION explicitly disable restart backups, not restart writing. No restart
+is opened by generation.
+
+Optimization-only menu 9 / --fixed-atoms delegates to constraints.py and the
+same inputgen writer. Selections stay compact until checked against the active
+loaded structure; repeated LIST lines keep emitted input bounded. Source/frame
+changes retain indices with a warning, never infer identity remapping. Explicit
+fractional XYZ constraints and inactive requests are distinguished in metadata.
+No source/POSCAR constraints are implicitly inherited.
 
 ## Cube pipeline
 

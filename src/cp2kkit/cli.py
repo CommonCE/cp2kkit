@@ -19,6 +19,7 @@ from .quality import quality_report
 from .structure import read_structure
 from .spin_settings import parse_dft_plus_u, parse_magnetism
 from .method_profiles import parse_basis_overrides
+from .constraints import parse_fixed_atoms
 
 
 def build_parser():
@@ -61,7 +62,7 @@ def build_parser():
     gen.add_argument("--basis", type=parse_basis, default=DEFAULT_BASIS,
                      help="Stable ORB ID or legacy family name; numbers are interactive-only")
     gen.add_argument("--gapw-profile", choices=("auto", "native"), default="auto",
-                     help="AE only: auto chooses pob IRAC/other STRICT; native leaves OT algorithm to CP2K unless explicitly selected. GAPW tolerances/atomic grids stay native.")
+                     help="AE auto/native names retained for compatibility; both default to explicit OT IRAC. GAPW tolerances/atomic grids stay native.")
     gen.add_argument("--basis-file", dest="basis_files", action="append", default=[], help="Explicit basis library; repeat to provide sources, differing duplicate aliases are rejected")
     gen.add_argument("--potential-file", dest="potential_files", action="append", default=[], help="Explicit potential library; repeat to provide sources, no implicit merge")
     gen.add_argument("--custom-basis-file", help="Selection custom-orbital/900: literal ORB library path")
@@ -87,12 +88,14 @@ def build_parser():
     gen.add_argument("--eps-scf", type=float)
     gen.add_argument("--max-scf", type=int, help="Default: OT inner 25; diagonalization 128")
     gen.add_argument("--ot-algorithm", type=str.upper, choices=("IRAC", "STRICT"),
-                     help="OT only: explicit algorithm; auto if omitted (GAPW pob IRAC, otherwise STRICT)")
+                     help="OT only: always emitted; default IRAC for every AE basis, STRICT for PP; explicit choice overrides")
     gen.add_argument("--max-outer-scf", type=int, default=20, help="OT outer SCF limit")
     gen.add_argument("--kpoints", type=int, nargs=3, default=(1, 1, 1), metavar=("NX", "NY", "NZ"))
     gen.add_argument("--smearing", type=float, help="Fermi-Dirac electronic temperature (K); requires diag")
     gen.add_argument("--added-mos", type=int, help="Auto: max(30, NINT(atom_count/2)) with diag+smearing, otherwise 0")
     gen.add_argument("--optimizer", type=str.upper, choices=["BFGS", "LBFGS", "CG"], default="BFGS")
+    gen.add_argument("--fixed-atoms", type=parse_fixed_atoms, default="off",
+                     help="Optimization, target 2026.2: 1-based atoms/ranges, e.g. 1,3-5; off or 0 clears; fixes fractional XYZ")
     gen.add_argument("--trust-radius", type=float, default=0.2, help="Angstrom; BFGS/LBFGS optimization only")
     gen.add_argument("--trajectory-format", type=str.upper, choices=TRAJECTORY_FORMATS, default="XYZ",
                      help="Optimization position trajectory; EXTXYZ is checked for target 2026.2")

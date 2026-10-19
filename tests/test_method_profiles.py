@@ -141,7 +141,7 @@ class MethodProfileTests(unittest.TestCase):
                 text, manifest = self.generate(fe, basis=basis)
                 self.assertIn('BASIS_SET_FILE_NAME BASIS_MOLOPT_UCL', text)
                 self.assertIn('BASIS_SET '+basis+'-q16', text)
-                self.assertIn('NGRIDS 5', text)
+                self.assertNotIn('NGRIDS', text)
                 self.assertEqual(manifest['valence_electron_count'], 16)
 
     def test_sr_missing_light_elements_and_mg_q_mismatch_never_fallback(self):

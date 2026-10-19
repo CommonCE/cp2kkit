@@ -396,7 +396,7 @@ class BasisRegistryTests(unittest.TestCase):
         _, manifest = self.generate(basis='custom-orbital',custom_basis_file=b,custom_basis_name='real-q6')
         self.assertEqual(manifest['kinds']['O']['basis_q'],6)
 
-    def test_default_differs_only_in_grid_quotes_and_restart_comments_from_026(self):
+    def test_default_known_policy_changes_reconstruct_026_reference(self):
         # Independently generated from git HEAD 229d09d in a temporary source tree;
         # invented isolated O geometry, not a CP2K calculation or recommendation.
         text, _ = self.generate()
@@ -404,10 +404,14 @@ class BasisRegistryTests(unittest.TestCase):
         self.assertNotIn('POTENTIAL_FILE_NAME "', text)
         legacy_text = re.sub(r'(?m)^(\s*(?:BASIS_SET_FILE_NAME|POTENTIAL_FILE_NAME)) (.+)$',
                              r'\1 "\2"', text)
-        self.assertIn('NGRIDS 5', text)
-        legacy_text = legacy_text.replace('NGRIDS 5', 'NGRIDS 4')
-        legacy_text = re.sub(r'(?m)^#   WFN_RESTART_FILE_NAME[^\n]*\n', '', legacy_text)
-        legacy_text = re.sub(r'(?m)^#     SCF_GUESS RESTART[^\n]*$', '      SCF_GUESS ATOMIC', legacy_text)
+        self.assertNotIn('NGRIDS', text)
+        legacy_text = legacy_text.replace('# Multiwfn references:', '# CELL vectors and COORD Cartesian coordinates are in angstrom (CP2K default units).\n# Multiwfn references:')
+        legacy_text = legacy_text.replace('      REL_CUTOFF [Ry] 55\n', '      REL_CUTOFF [Ry] 55\n      NGRIDS 4\n')
+        legacy_text = legacy_text.replace('    &SCF\n', '    &SCF\n      SCF_GUESS ATOMIC\n')
+        legacy_text = legacy_text.replace('        ALGORITHM STRICT\n', '')
+        legacy_text = legacy_text.replace('EPS_SCF 1.0E-06', 'EPS_SCF 5.0E-06')
+        legacy_text = legacy_text.replace('      &PRINT\n        &RESTART\n          BACKUP_COPIES 0\n        &END RESTART\n      &END PRINT\n', '')
+        legacy_text = legacy_text.replace('      PERIODIC NONE\n    &END CELL', '      PERIODIC NONE #Direction(s) of applied PBC (geometry aspect)\n    &END CELL')
         self.assertEqual(hashlib.sha256(legacy_text.encode()).hexdigest(),
                          '26af096bc28739351a0d34635c5612969c6a248c3c6fcfe91786fb323b0a2308')
 

@@ -177,7 +177,7 @@ class InputWritingTests(unittest.TestCase):
             self.assertIn('POTENTIAL_FILE_NAME ', text)
             self.assertIn('BASIS_SET_FILE_NAME ', text)
 
-    def test_five_grid_default_for_all_enabled_builtin_profiles(self):
+    def test_multiwfn_grid_emission_for_all_enabled_builtin_profiles(self):
         from cp2kkit.basis_registry import OPTIONS
         for option in OPTIONS:
             if not option.selectable or option.protocol == 'custom':
@@ -186,9 +186,10 @@ class InputWritingTests(unittest.TestCase):
             atom = replace(self.atom, symbols=[element])
             with self.subTest(basis=option.id):
                 text, manifest = generate_input(atom, replace(self.settings, basis=option.id))
-                self.assertIn('NGRIDS 5', text)
-                self.assertNotIn('NGRIDS 4', text)
-                self.assertEqual(manifest['method_profile']['ngrids'], 5)
+                five = option.id in {'molopt-tzvp', 'molopt-tzv2p', 'molopt-tzv2px'}
+                self.assertEqual('NGRIDS 5' in text, five)
+                self.assertEqual('NGRIDS' in text, five)
+                self.assertEqual(manifest['method_profile']['ngrids'], 5 if five else None)
 
     def test_json_flag_api_type_is_checked(self):
         with self.assertRaises(KitError):

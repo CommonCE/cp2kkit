@@ -16,7 +16,7 @@ FIELDS = {field.name: field for _, fields in GROUPS for field in fields}
 FIELD_IDS = (
     (-7, 'periodic'), (-5, 'trajectory_format'), (-3, 'electron_density'), (-1, 'run_type'),
     (1, 'functional'), (2, 'basis'), (3, 'dispersion'), (4, 'scf'),
-    (6, 'smearing'), (8, 'kpoints'), (10, 'optimizer'), (12, 'pressure'),
+    (6, 'smearing'), (8, 'kpoints'), (9, 'fixed_atoms'), (10, 'optimizer'), (12, 'pressure'),
     (101, 'charge'), (102, 'multiplicity'), (105, 'cutoff'), (106, 'rel_cutoff'),
     (107, 'vacuum'), (110, 'ot_algorithm'), (112, 'added_mos'), (120, 'eps_scf'), (121, 'max_scf'),
     (122, 'max_outer_scf'), (123, 'max_iter'), (124, 'dft_plus_u'), (125, 'magnetism'),
@@ -40,6 +40,7 @@ LABELS = {
     'libxc_available': 'Target CP2K has Libxc (user assertion)',
     'gapw_profile': 'All-electron automatic setup',
     'write_json': 'Write provenance JSON',
+    'fixed_atoms': 'Fixed atoms',
     'trajectory_format': 'Trajectory format', 'trust_radius': 'TRUST_RADIUS [angstrom]',
 }
 
@@ -108,6 +109,9 @@ def edit_source(menu, values, name):
     values[name] = new
     if name == 'path' and values['_auto_output']:
         values['output'] = Path(new).stem+'.inp'
+    if values['fixed_atoms'] != 'off':
+        menu.show('Warning: Fixed-atom indices were retained, not remapped to the changed structure/frame. '
+                  'Review selection 9 against the loaded/expanded atom order before generation.')
     compatibility(menu, values)
 
 
@@ -137,17 +141,22 @@ def run_editor(path, frame, output, settings, stdin=None, stdout=None, plain=Fal
             if raw in {str(number) for number in selectable}:
                 field = selectable[int(raw)]
                 old = values[field.name]
-                if field.name == 'magnetism':
+                if field.name in {'magnetism', 'fixed_atoms'}:
                     try:
                         structure = read_structure(values['path'], values['frame']) if values['path'] else None
                         if structure is not None:
                             menu.show('Atom indices below refer to loaded/expanded geometry, not CIF site labels [angstrom]:')
                             for index, (element, position) in enumerate(zip(structure.symbols, structure.positions), 1):
-                                menu.show(f'  @{index}: {element} ' + ' '.join(f'{x:.8f}' for x in position))
+                                label = f'@{index}' if field.name == 'magnetism' else str(index)
+                                menu.show(f'  {label}: {element} ' + ' '.join(f'{x:.8f}' for x in position))
                     except (KitError, OSError) as exc:
                         menu.show(f'Warning: Atom list unavailable: {exc}')
-                    menu.show('An explicit magnetic request enables UKS. Charge/multiplicity stay unchanged. '
-                              'Element seeds apply first; @atom seeds override them. This is an initial guess, not a moment constraint.')
+                    if field.name == 'magnetism':
+                        menu.show('An explicit magnetic request enables UKS. Charge/multiplicity stay unchanged. '
+                                  'Element seeds apply first; @atom seeds override them. This is an initial guess, not a moment constraint.')
+                    else:
+                        menu.show('Fix fractional XYZ components; CELL_OPT can still move atoms with the cell. '
+                                  'Source constraints are not inherited. Enter keeps; off or 0 clears the selection.')
                 previous_sources = tuple(values[name] for name in ('data_dir', 'basis_files', 'potential_files',
                                          'custom_basis_file', 'custom_basis_name', 'custom_potential_file', 'custom_potential_name'))
                 values[field.name] = menu.edit(field, old, values)

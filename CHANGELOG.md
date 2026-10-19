@@ -8,6 +8,56 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.2.8
+
+### Uniform SCF threshold follow-up (version retained)
+
+- Change ENERGY default EPS_SCF from 5e-6 to 1e-6 by explicit user request;
+  all supported tasks now default to 1e-6. Apply equally to OT inner/outer and
+  diagonalization. Explicit --eps-scf/API/config values still take priority.
+- Keep task-dependent EPS_DEFAULT, physical settings and existing generated files
+  unchanged. This deliberately differs from Multiwfn ordinary single-point defaults,
+  not a claim of convergence or a 1e-6 hartree energy-error guarantee.
+- Validation: 346 tests passed, including all-task/SCF/default/override checks.
+
+### Grid, explicit OT, wavefunction backups and comment follow-up (version retained)
+
+- Follow Multiwfn's NGRIDS emission branch: 5 only for effective classic non-SR
+  TZVP/TZV2P/TZV2PX-MOLOPT-GTH, omitted otherwise (metadata null). Explicit
+  element overrides use actual effective families; custom names are not inferred.
+- Always emit OT ALGORITHM: PP STRICT / AE IRAC, including both legacy AE
+  auto/native profile names. Manual selections still win; diag emits no OT.
+  This all-AE IRAC policy is an explicit user extension, not Multiwfn equivalence.
+- Set DFT/SCF/PRINT/RESTART BACKUP_COPIES 0 in all tasks, separately from MOTION
+  restart backups. Wavefunction writing stays enabled; existing files are not
+  modified by generation. Add effective wavefunction_output metadata.
+- Retain only generator/Multiwfn opening comments. Remove explanatory comments
+  and inactive restart directives without enabling restart reads. Keep filename
+  suggestions in metadata/review (emitted=false). Numerical profile is now v4;
+  schema and software versions stay 0.1.0 / 0.2.8.
+- Validation: 345 tests passed, including eight additional policy regressions;
+  no native calculation. Earlier 0.2.8 fixed-atom work follows below.
+
+- Add optimization main-menu 9 Fixed atoms and CLI --fixed-atoms. Explicit
+  1-based indices/ranges (1,3-5,8), off/none/0 clears; default off. Preserve
+  existing menu IDs and all unconstrained input defaults.
+- Share compact selection parsing and source-bound resolution across CLI, menu,
+  config and replay. Reject invalid, duplicate, overlapping or out-of-bounds
+  active selections; validate bounds before expanding ranges.
+- Emit MOTION/CONSTRAINT/FIXED_ATOMS with COMPONENTS_TO_FIX XYZ and repeated
+  bounded LIST lines for GEO_OPT/CELL_OPT. Active constraints currently require
+  target 2026.2; ENERGY/ENERGY_FORCE retain but do not emit hidden selections.
+- Display the loaded/expanded atom table and warn after source/frame changes:
+  indices are retained, never silently remapped. Do not inherit source constraints.
+- Explain fractional-coordinate semantics, particularly moving Cartesian positions
+  during CELL_OPT, and warn when all atoms are fixed.
+- Add settings.fixed_atoms and effective constraints metadata; schema remains
+  0.1.0. Older configs default to unconstrained. Keep local source evidence
+  distinct from installed/runtime verification; register Multiwfn references.
+- Validation: 337 tests passed with no skips, including 22 focused synthetic
+  constraint methods; compileall, CLI version, documentation links/text and diff
+  checks passed. No CP2K execution.
+
 ## 0.2.7
 
 ### Restart and optimization-output follow-up (version retained)

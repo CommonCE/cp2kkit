@@ -68,12 +68,12 @@ class AllElectronTests(unittest.TestCase):
 
     def test_automatic_settings_and_pob_irac(self):
         text, m = self.generate(cutoff=477., rel_cutoff=63.)
-        for line in ('NGRIDS 5', 'ALGORITHM IRAC', 'PRECONDITIONER FULL_ALL',
+        for line in ('ALGORITHM IRAC', 'PRECONDITIONER FULL_ALL',
                      'CUTOFF [Ry] 477', 'REL_CUTOFF [Ry] 63'):
             self.assertIn(line, text)
         self.assertFalse(m['method_profile']['gapw']['convergence_verified'])
         self.assertTrue(m['method_profile']['gapw']['automatic_settings'])
-        self.assertIn('ALGORITHM STRICT', self.generate(basis='ae-def2-tzvp')[0])
+        self.assertIn('ALGORITHM IRAC', self.generate(basis='ae-def2-tzvp')[0])
         self.assertFalse(any('Non-SR MOLOPT' in w for w in m['warnings']))
 
     def test_all_profiles_omit_gapw_threshold_and_atomic_grid_overrides(self):
@@ -87,31 +87,30 @@ class AllElectronTests(unittest.TestCase):
                     gapw = m['method_profile']['gapw']
                     self.assertEqual(gapw['qs'], {})
                     self.assertEqual(gapw['kind'], {})
-                    self.assertEqual(gapw['cp2k_default_controls'], list(controls))
+                    self.assertEqual(gapw['cp2k_default_controls'], [*controls, 'NGRIDS'])
                     self.assertFalse(any(i['setting'].split('/')[-1] in controls for i in gapw['automatic_settings']))
 
     def test_native_profile_omits_numerical_conveniences(self):
         text, m = self.generate(gapw_profile='native')
-        for keyword in ('EPSFIT', 'EPSRHO0', 'EPSSVD', 'LEBEDEV_GRID', 'RADIAL_GRID', 'ALGORITHM IRAC'):
+        for keyword in ('EPSFIT', 'EPSRHO0', 'EPSSVD', 'LEBEDEV_GRID', 'RADIAL_GRID'):
             self.assertNotIn(keyword, text)
         self.assertIn('METHOD GAPW', text)
-        self.assertIn('NGRIDS 5', text)
-        self.assertEqual(m['method_profile']['ot_algorithm'], 'STRICT')
+        self.assertNotIn('NGRIDS', text)
+        self.assertIn('ALGORITHM IRAC', text)
+        self.assertEqual(m['method_profile']['ot_algorithm'], 'IRAC')
 
-    def test_ae_five_grid_policy_matches_metadata_without_resetting_cutoffs(self):
+    def test_ae_omitted_grid_matches_metadata_without_resetting_cutoffs(self):
         for profile in ('auto', 'native'):
             text, m = self.generate(gapw_profile=profile, cutoff=477., rel_cutoff=63.)
-            self.assertIn('NGRIDS 5', text)
-            self.assertNotIn('NGRIDS 4', text)
-            self.assertEqual(m['method_profile']['ngrids'], 5)
-            self.assertEqual(m['method_profile']['gapw']['ngrids'], 5)
-            self.assertEqual(m['method_profile']['gapw']['profile_version'], 3)
-            item = next(i for i in m['method_profile']['gapw']['automatic_settings']
-                        if i['setting'] == 'MGRID/NGRIDS')
-            self.assertEqual(item['value'], 5)
+            self.assertNotIn('NGRIDS', text)
+            self.assertIsNone(m['method_profile']['ngrids'])
+            self.assertIsNone(m['method_profile']['gapw']['ngrids'])
+            self.assertEqual(m['method_profile']['gapw']['profile_version'], 4)
+            self.assertFalse(any(i['setting'] == 'MGRID/NGRIDS'
+                                 for i in m['method_profile']['gapw']['automatic_settings']))
             self.assertEqual(m['settings']['cutoff'], 477.)
             self.assertEqual(m['settings']['rel_cutoff'], 63.)
-        self.assertIn('NGRIDS 5', self.generate(basis='molopt-sr-dzvp')[0])
+        self.assertNotIn('NGRIDS', self.generate(basis='molopt-sr-dzvp')[0])
 
     def test_manual_ot_algorithm_wins_over_auto_and_native(self):
         for profile in ('auto', 'native'):
@@ -124,9 +123,9 @@ class AllElectronTests(unittest.TestCase):
                                 if i['setting'] == 'SCF/OT/ALGORITHM')
                     self.assertEqual(item['source'], 'user')
 
-    def test_pp_default_input_unchanged_when_ot_selection_is_auto(self):
+    def test_pp_default_ot_selection_is_explicit_strict(self):
         text, m = self.generate(basis='molopt-sr-dzvp')
-        self.assertNotIn('ALGORITHM STRICT', text)
+        self.assertIn('ALGORITHM STRICT', text)
         self.assertIsNone(m['method_profile']['gapw'])
         self.assertEqual(m['valence_electron_count'], 8)
         self.assertEqual(m['explicit_electron_count'], 8)

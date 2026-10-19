@@ -2,7 +2,7 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.2.7 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.2.8 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 - Analysis remains read-only: no submission/execution or modification of existing
@@ -16,7 +16,19 @@ release certified with actual CP2K runs.
   an existing regular `.inp`; sources, data files and symlinks remain protected.
 - Energies can be extracted from failed jobs without becoming valid scientific results.
 
-## Current version: 0.2.7
+## Current version: 0.2.8
+
+Version **0.2.8** adds **9. Fixed atoms** to GEO_OPT/CELL_OPT menus.
+Enter 1-based indices/ranges such as `1,3-5,8`; `off` or `0` clears,
+Enter keeps. CLI: `--fixed-atoms '1,3-5,8'`. The atom table uses the selected
+frame/expanded geometry, not CIF site labels. Defaults remain unconstrained.
+Only target 2026.2 is keyword-checked for active constraints. CP2K fixes
+**fractional XYZ coordinates**: CELL_OPT can still move atoms with the cell.
+Selections are retained, not remapped, after structure changes; source constraints
+are never inherited. See [fixed-atom details](docs/input-generation.md#fixed-atoms-028).
+Schema stays 0.1.0; no native execution/convergence certification.
+The retained-version follow-up defaults EPS_SCF to **1e-6 for all tasks**, including
+ENERGY; explicit `--eps-scf` overrides still win. EPS_DEFAULT is unchanged.
 
 Version **0.2.7** now writes only the input by default and allows replacing an
 existing regular `.inp`. Use `--write-json` or menu **132** for optional provenance
@@ -29,21 +41,25 @@ the inspected CP2K implementation. No physical parameters change. See the
 [filename notes](docs/input-generation.md#d3-parameter-filenames-027).
 
 Version **0.2.7** adds all-electron orbital choices **50-59** with automatic
-GAPW/ALL, core-inclusive electron counts and pob OT/IRAC setup. NGRIDS defaults
-to 5 for all bases; GAPW split tolerances and atomic grids are left to CP2K defaults.
+GAPW/ALL and core-inclusive electron counts. The retained 0.2.8 policy now emits
+NGRIDS 5 only for classic non-SR TZVP/TZV2P/TZV2PX-MOLOPT-GTH; other bases
+omit NGRIDS. GAPW split tolerances and atomic grids use CP2K defaults.
 Main-menu **110 ALGORITHM** appears only for OT: choose IRAC/STRICT, or `auto`
 for the basis-aware default; explicit selection wins. CLI: `--ot-algorithm IRAC`.
 The automatic AE setup is a starting profile, not convergence certification;
-`--gapw-profile native` omits its automatic OT algorithm selection.
+both legacy auto/native profile names now default to explicit IRAC for all AE
+bases. PP defaults to explicit STRICT; manual OT selections still win.
 Charge/spin, functional, dispersion, cutoff and periodicity are not repaired.
 See [the AE guide](docs/basis-selection.md#all-electron-automatic-setup-027).
 
-The retained 0.2.7 follow-up writes commented restart hints instead of forcing
-SCF_GUESS ATOMIC; names follow PROJECT (.wfn for Gamma, .kp otherwise).
+The retained 0.2.8 follow-up keeps only generator/Multiwfn header comments.
+Restart suggestions follow PROJECT (.wfn for Gamma, .kp otherwise) in metadata/
+review only; no SCF_GUESS or WFN_RESTART_FILE_NAME hint is emitted or enabled.
 Optimizations use explicit BFGS/LBFGS TRUST_RADIUS 0.2 angstrom (menu **133**,
 `--trust-radius`), and **-5** / `--trajectory-format pdb|xyz|extxyz` selects
 MOTION position output (XYZ default; EXTXYZ checked for target 2026.2).
-MOTION restart backup copies are set to 0; restart writing remains enabled,
+Both SCF wavefunction and MOTION restart backup copies are set to 0; restart
+writing remains enabled,
 so archive old results before running. See [restart/output details](docs/input-generation.md#restart-hints-and-optimization-output-027-follow-up).
 
 The preceding 0.2.6 basis follow-up added a
@@ -233,7 +249,7 @@ Cell overrides and data directories remain available through `--cell` / `--data-
 the basis chooser also has data-source controls (`d`, `b`, `v`) without numbered main-menu rows.
 Complete CLI calls remain noninteractive, and machine-readable JSON/CSV is never
 rendered through Rich. Add `--plain` for unstyled interaction.
-Neither curses nor Multiwfn is a runtime dependency. Version 0.2.7 retains this menu layout and adds OT-only 110 ALGORITHM.
+Neither curses nor Multiwfn is a runtime dependency. Version 0.2.8 retains this menu layout, including OT-only 110 ALGORITHM, and adds optimization-only 9 Fixed atoms.
 See [input generation](docs/input-generation.md).
 
 Supported: ENERGY/ENERGY_FORCE/GEO_OPT/CELL_OPT, PBE/BLYP/PBEsol/revPBE/RPBE, MOLOPT-GTH,

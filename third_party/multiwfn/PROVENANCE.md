@@ -373,6 +373,80 @@ line numbers are auxiliary. Do not invent upstream commits, inspection dates, or
 - Validation: synthetic CLI/menu/config/replay/nesting/unit/boundary regressions.
   No CP2K/Multiwfn calculation or acceptance/convergence certification.
 
+## Fixed atoms (0.2.8)
+
+- Local modules: constraints.py parse_fixed_atoms/resolve_fixed_atoms;
+  inputgen.py InputSettings/generate_input; input_editor.py menu 9 and atom table;
+  input_tui.py shared field/review/replay; cli.py --fixed-atoms.
+- Same supplied Multiwfn_2026.10.1_src_Linux/cp2kmate.f90, outCP2Kinp;
+  SHA-256 `f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402`.
+  Actual references: menu 9 at 295-302, index/range prompt at 1150-1173,
+  MOTION/CONSTRAINT/FIXED_ATOMS with fractional XYZ and LIST at 3347-3354.
+- Reference-based Python workflow/rendering, not a Fortran/str2arr port.
+  Local parsing rejects malformed, duplicate/overlapping and active out-of-range
+  selections before range expansion. Input is explicit 1-based indices/ranges;
+  optH/element shortcuts and partial components are outside this first subset.
+  Defaults remain unconstrained. Repeated LIST lines contain at most 20 indices.
+- Differences: limited to GEO_OPT/CELL_OPT (not upstream MD/TS); source/frame
+  changes retain indices with warnings, never silently clear/remap them.
+  ENERGY/ENERGY_FORCE retain but do not emit hidden selections. Constraints
+  from source/restart/POSCAR files are not inherited.
+- CP2K evidence: supplied tree REVISION git:c92cc08, not inferred official/binary
+  equivalence. src/input_cp2k_constraints.F create_fixed_atom_section, 334-377,
+  defines fractional positions, COMPONENTS_TO_FIX XYZ and repeatable integer LIST;
+  SHA-256 `2761dd6df4a1ab7200d50de32481aea2942dabbb92ab5562c722713b73bb360f`.
+  Active selections are currently gated to target 2026.2. In CELL_OPT frozen
+  fractional coordinates can move with the cell; this is not Cartesian pinning.
+- Existing 2012/2024 papers and custom terms remain in force; generated
+  inputs/manifests retain citations. No separate permission, whole-project
+  license compatibility or clean-room exemption is inferred.
+- Validation: synthetic index/range/bounds/nesting tests, CLI/menu/config/replay,
+  selected frame/expanded CIF/KIND-order checks and non-destructive write checks.
+  No CP2K/Multiwfn execution or scientific/convergence certification.
+
+## Grid/OT/SCF backup/comment policy (retained 0.2.8 follow-up)
+
+- Local gapw.py resolve_ngrids/resolve_gapw, inputgen.py generate_input, and shared
+  CLI/menu/review/config/replay. Existing fixed-atom work is retained.
+- Same supplied cp2kmate.f90/outCP2Kinp, SHA-256
+  `f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402`:
+  lines 145-147 identify ibas 3/4/5 as classic non-SR TZVP/TZV2P/TZV2PX;
+  2414 emits NGRIDS 5 only for those choices; 2478-2483 select explicit OT
+  IRAC for pob/CDFT, STRICT otherwise. This replaces the historical local
+  universal-five-grid policy. Effective per-element overrides use any matching
+  family; custom alias names do not establish a registry-family identity.
+- Explicit user extension: all AE families now default to emitted IRAC, not just
+  pob, in both legacy auto/native profiles. PP emits STRICT; manual choices win.
+  Profile v4 omits NGRIDS for AE and keeps native QS/KIND numerical controls.
+  This does not claim exact upstream algorithm/default equivalence.
+- SCF restart backup evidence: supplied local CP2K REVISION git:c92cc08,
+  src/input_cp2k_scf.F 307-318 defines SCF/PRINT/RESTART and BACKUP_COPIES;
+  SHA-256 `23f7fdd4abfdf64904f0c95ed6dd672f6ca645c0abb7f91b60347ab6693bacf1`.
+  New output explicitly sets zero backups without RESTART OFF; .wfn/.kp
+  extensions follow the previously recorded writer evidence. No cadence or
+  restart filename override is added. Generation never touches wavefunctions.
+- Header-only comment policy is the user's formatting request. Inactive restart
+  hints are removed, not activated. Suggestions remain metadata/review only,
+  with emitted=false and runtime_verified=false. Safety/units stay in review,
+  manifest and docs, rather than inline generated comments.
+- Existing source/terms/citations and unknown authorization boundaries remain
+  unchanged. No original Fortran, numerical payload or new licensing grant.
+- Validation: synthetic family/override/OT/nesting/comment/config/replay checks.
+  No CP2K/Multiwfn execution, installed-version equivalence or convergence proof.
+
+## Uniform EPS_SCF (retained 0.2.8 follow-up)
+
+- Explicit user request changes ordinary ENERGY default from the previously
+  referenced Multiwfn 5e-6 to 1e-6, matching other supported task defaults.
+  Same supplied cp2kmate.f90/hash above; lines 1778-1794 distinguish ordinary
+  ground-state ENERGY (5e-6) from derivative tasks (1e-6) and tighter tasks.
+- inputgen.py now uses 1e-6 only when eps_scf is unset; explicit CLI/API/config
+  values are preserved. OT inner/outer share it; diag emits it once. EPS_DEFAULT
+  and other physical/numerical requests are unchanged. Old inputs are not rewritten.
+- This is a local policy override, not exact Multiwfn equivalence or an energy
+  error bound in hartree. Existing terms/citations/authorization limits remain.
+  Synthetic task/SCF/default/override regressions only; no native calculation.
+
 ## Template for future features
 
 Copy this structure for each referenced feature and supply evidenced facts.

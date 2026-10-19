@@ -30,10 +30,11 @@ from .structure import Structure, check_cell
 from .spin_settings import atomic_kinds, validate_requests
 from .method_profiles import BASES, FUNCTIONALS, electron_model, resolve_method, xc_lines
 from .all_electron_catalog import AE_SOURCES
-from .gapw import DEFAULT_NGRIDS, GAPW_PROFILES, resolve_gapw
+from .gapw import GAPW_PROFILES, resolve_gapw, resolve_ngrids
 from .data_catalog import CATALOG_SOURCES
 from .basis_registry import DEFAULT_BASIS, basis_option, migrate_basis
 from .cp2k_data import cp2k_long_path
+from .constraints import CONSTRAINT_REFERENCE, resolve_fixed_atoms
 
 MULTIWFN_CITATIONS = (
     "Tian Lu, Feiwu Chen, J. Comput. Chem. 33, 580-592 (2012). DOI: 10.1002/jcc.22885",
@@ -108,11 +109,12 @@ class InputSettings:
     custom_basis_name: str | None = None
     custom_potential_file: str | None = None
     custom_potential_name: str | None = None
-    gapw_profile: str = 'auto'  # AE numerical conveniences; native opts out.
-    ot_algorithm: str | None = None  # auto: GAPW pob IRAC, otherwise native STRICT
+    gapw_profile: str = 'auto'  # Legacy auto/native names; both use native GAPW controls.
+    ot_algorithm: str | None = None  # auto: explicit AE IRAC, PP STRICT
     write_json: bool = False  # Optional provenance sidecar; existing JSON is never overwritten.
     trust_radius: float = 0.2  # angstrom; GEO_OPT/CELL_OPT BFGS/LBFGS only
     trajectory_format: str = 'XYZ'  # MOTION position trajectory, optimization only
+    fixed_atoms: str = 'off'  # 1-based indices/ranges in loaded geometry; fractional XYZ
 
     @classmethod
     def from_config(cls, values, source_version=None):
@@ -207,7 +209,7 @@ def generate_input(structure: Structure, settings: InputSettings):
         raise KitError('EXTXYZ trajectory output is keyword-checked only for target CP2K 2026.2')
     if not math.isfinite(s.pressure):
         raise KitError("Pressure must be finite (bar)")
-    eps = s.eps_scf if s.eps_scf is not None else (5e-6 if s.run_type == "ENERGY" else 1e-6)
+    eps = s.eps_scf if s.eps_scf is not None else 1e-6
     positive(eps, "eps_scf")
     uks = s.multiplicity > 1 or s.magnetism is not None
     density_enabled = s.electron_density or s.spin_density
@@ -226,6 +228,8 @@ def generate_input(structure: Structure, settings: InputSettings):
         raise KitError("Structure must have matching, nonempty atoms and positions")
     if any(len(row) != 3 or not all(math.isfinite(v) for v in row) for row in structure.positions):
         raise KitError("Coordinates must have three finite angstrom values per atom")
+    selection, fixed_atoms = resolve_fixed_atoms(s.fixed_atoms, len(structure.symbols), optimizing, s.cp2k_version)
+    s = replace(s, fixed_atoms=selection)
     elements = sorted(set(structure.symbols))
     all_electron, electron_counts = electron_model(s, elements, VALENCE)
     qs_method = 'GAPW' if all_electron else 'GPW'
@@ -237,8 +241,8 @@ def generate_input(structure: Structure, settings: InputSettings):
     method_profile, basis_overrides, element_records, method_warnings = resolve_method(s, elements, electron_counts, kind_specs)
     s = replace(s, basis_overrides=basis_overrides)
     gapw = resolve_gapw(s, element_records) if all_electron else None
-    ot_algorithm = (gapw['ot_algorithm'] if gapw else s.ot_algorithm) if s.scf == 'ot' else None
-    ngrids = DEFAULT_NGRIDS
+    ot_algorithm = (gapw['ot_algorithm'] if gapw else (s.ot_algorithm or 'STRICT')) if s.scf == 'ot' else None
+    ngrids = resolve_ngrids(element_records)
     electrons = sum(electron_counts[symbol] for symbol in structure.symbols) - s.charge
     unpaired = s.multiplicity - 1
     if electrons <= 0 or unpaired > electrons or (electrons - unpaired) % 2:
@@ -293,6 +297,13 @@ def generate_input(structure: Structure, settings: InputSettings):
     warnings = ["Generated template is not CP2K-runtime validated; converge basis, cutoff and kpoints for the target property.",
                 "Only geometry/cell/PBC are read from the source; charge, spin, method and per-kind settings are NOT inherited."]
     warnings.extend(method_warnings)
+    warnings.append('SCF/PRINT/RESTART BACKUP_COPIES 0 disables wavefunction restart backups, not restart writing; archive existing wavefunctions before running in a reused directory.')
+    if s.fixed_atoms != 'off' and not optimizing:
+        warnings.append('Fixed-atom selection is retained but inactive outside GEO_OPT/CELL_OPT.')
+    if fixed_atoms and s.run_type == 'CELL_OPT':
+        warnings.append('FIXED_ATOMS constrains fractional XYZ coordinates, not absolute Cartesian positions; fixed atoms can move with a changing cell.')
+    if fixed_atoms and len(fixed_atoms) == len(structure.symbols):
+        warnings.append('All atoms are fixed; no internal atomic degrees of freedom remain. This is not evidence of optimized geometry.')
     if optimizing:
         warnings.append('MOTION/PRINT/RESTART BACKUP_COPIES 0 disables restart backup copies, not restart writing; archive restart files before running in a reused directory.')
         if s.trajectory_format == 'XYZ' and periodic != 'NONE':
@@ -368,7 +379,6 @@ def generate_input(structure: Structure, settings: InputSettings):
     def num(v):
         return format(v, ".17g")
     lines = ["# Generated by cp2kkit; subset developed with reference to Multiwfn cp2kmate.f90",
-             "# CELL vectors and COORD Cartesian coordinates are in angstrom (CP2K default units).",
              "# Multiwfn references:", *("# " + citation for citation in MULTIWFN_CITATIONS),
              "&GLOBAL", f"  PROJECT {s.project}", f"  RUN_TYPE {s.run_type}", "  PRINT_LEVEL LOW", "&END GLOBAL",
              "&FORCE_EVAL", "  METHOD Quickstep"]
@@ -378,19 +388,18 @@ def generate_input(structure: Structure, settings: InputSettings):
     lines += ['  &DFT', *(f'    BASIS_SET_FILE_NAME {cp2k_long_path(file)}' for file in basis_files),
               f'    POTENTIAL_FILE_NAME {cp2k_long_path(files["potential"])}', f"    CHARGE {s.charge}",
               f"    MULTIPLICITY {s.multiplicity}", f"    UKS {'T' if uks else 'F'}",
-              f"#   WFN_RESTART_FILE_NAME {restart_filename}",
               "    &QS", f"      METHOD {qs_method}", f"      EPS_DEFAULT {scientific_number(1e-11 if s.run_type == 'ENERGY' else 1e-12)}",
               *(f"      {key} {scientific_number(value)}" for key, value in (gapw['qs'] if gapw else {}).items()), "    &END QS",
               "    &MGRID", f"      CUTOFF [Ry] {num(s.cutoff)}", f"      REL_CUTOFF [Ry] {num(s.rel_cutoff)}",
-              f"      NGRIDS {ngrids}", "    &END MGRID",
+              *([f"      NGRIDS {ngrids}"] if ngrids is not None else []), "    &END MGRID",
               "    &POISSON", f"      PERIODIC {periodic}", f"      POISSON_SOLVER {solver}", "    &END POISSON",
-              "    &SCF", "#     SCF_GUESS RESTART #Use WFN_RESTART_FILE_NAME as the initial guess; uncomment both restart lines", f"      EPS_SCF {scientific_number(eps)}", f"      MAX_SCF {s.max_scf}"]
+              "    &SCF", f"      EPS_SCF {scientific_number(eps)}", f"      MAX_SCF {s.max_scf}"]
     if hubbard:
         # PLUS_U_METHOD belongs in DFT, not SCF; insert before &QS.
         lines.insert(lines.index('    &QS'), '    PLUS_U_METHOD MULLIKEN')
     if s.scf == "ot":
         lines += ["      &OT", "        PRECONDITIONER FULL_ALL", "        MINIMIZER DIIS",
-                  *([f"        ALGORITHM {ot_algorithm}"] if ot_algorithm else []), "      &END OT",
+                  f"        ALGORITHM {ot_algorithm}", "      &END OT",
                   "      &OUTER_SCF", f"        EPS_SCF {scientific_number(eps)}", f"        MAX_SCF {s.max_outer_scf}", "      &END OUTER_SCF"]
     else:
         added_mos = ' '.join([str(s.added_mos)] * (2 if uks else 1))
@@ -398,7 +407,8 @@ def generate_input(structure: Structure, settings: InputSettings):
                   "      &MIXING", "        METHOD BROYDEN_MIXING", "        ALPHA 0.4", "        NBROYDEN 8", "      &END MIXING"]
         if s.smearing is not None:
             lines += ["      &SMEAR", "        METHOD FERMI_DIRAC", f"        ELECTRONIC_TEMPERATURE [K] {num(s.smearing)}", "      &END SMEAR"]
-    lines += ['    &END SCF', '    &XC', *xc_lines(s.functional)]
+    lines += ['      &PRINT', '        &RESTART', '          BACKUP_COPIES 0',
+              '        &END RESTART', '      &END PRINT', '    &END SCF', '    &XC', *xc_lines(s.functional)]
     if s.dispersion != "none":
         lines += ["      &VDW_POTENTIAL", "        POTENTIAL_TYPE PAIR_POTENTIAL", "        &PAIR_POTENTIAL",
                   f"          TYPE {'DFTD3' if s.dispersion == 'd3' else 'DFTD3(BJ)'}",
@@ -415,7 +425,7 @@ def generate_input(structure: Structure, settings: InputSettings):
         lines += ["        &END EACH", "      &END E_DENSITY_CUBE", "    &END PRINT"]
     lines += ["  &END DFT", "  &SUBSYS", "    &CELL"]
     lines += [f"      {axis}" + "".join(f" {v:14.8f}" for v in row) for axis, row in zip("ABC", cell)]
-    lines += [f"      PERIODIC {periodic} #Direction(s) of applied PBC (geometry aspect)",
+    lines += [f"      PERIODIC {periodic}",
               "    &END CELL", "    &COORD"]
     lines += [f"      {el:<8}" + "".join(f" {v:13.8f}" for v in row)
               for el, row in zip(atom_labels, positions)]
@@ -442,9 +452,15 @@ def generate_input(structure: Structure, settings: InputSettings):
             lines += [f"    EXTERNAL_PRESSURE [bar] {num(s.pressure)}", "    PRESSURE_TOLERANCE [bar] 100"]
         if s.optimizer in {'BFGS', 'LBFGS'}:
             lines += [f"    &{s.optimizer}", f"      TRUST_RADIUS [angstrom] {s.trust_radius}", f"    &END {s.optimizer}"]
-        lines += [f"  &END {s.run_type}", "  &PRINT", "    &TRAJECTORY",
+        lines.append(f"  &END {s.run_type}")
+        if fixed_atoms:
+            lines += ["  &CONSTRAINT", "    &FIXED_ATOMS",
+                      "      COMPONENTS_TO_FIX XYZ"]
+            lines += ["      LIST "+" ".join(map(str, fixed_atoms[i:i+20])) for i in range(0, len(fixed_atoms), 20)]
+            lines += ["    &END FIXED_ATOMS", "  &END CONSTRAINT"]
+        lines += ["  &PRINT", "    &TRAJECTORY",
                   f"      FORMAT {s.trajectory_format}", "    &END TRAJECTORY", "    &RESTART",
-                  "      BACKUP_COPIES 0 #Maximum number of backup copies; 0 disables backups, not restart writing",
+                  "      BACKUP_COPIES 0",
                   "    &END RESTART", "  &END PRINT", "&END MOTION"]
     text = "\n".join(lines) + "\n"
     effective = Structure(structure.symbols.copy(), positions, [row.copy() for row in cell],
@@ -463,13 +479,22 @@ def generate_input(structure: Structure, settings: InputSettings):
                                      'runtime_validated': False, 'runnable_verified': False},
                 "effective_eps_scf": eps, "poisson_solver": solver,
                 "restart_template": {"filename": restart_filename, "scf_guess": "RESTART",
-                                     "enabled": False, "filename_commented": True, "guess_commented": True,
+                                     "enabled": False, "emitted": False, "filename_commented": False, "guess_commented": False,
                                      "naming_basis": "PROJECT and Gamma/non-Gamma default restart naming",
                                      "runtime_verified": False},
+                "wavefunction_output": {"restart_enabled": True, "restart_backup_copies": 0,
+                                        "section": "FORCE_EVAL/DFT/SCF/PRINT/RESTART",
+                                        "runtime_validated": False},
                 "motion_output": {"enabled": optimizing,
                                   "trajectory_format": s.trajectory_format if optimizing else None,
                                   "restart_backup_copies": 0 if optimizing else None,
                                   "trust_radius_angstrom": s.trust_radius if optimizing and s.optimizer in {'BFGS', 'LBFGS'} else None},
+                "constraints": {"enabled": bool(fixed_atoms), "fixed_atoms": list(fixed_atoms),
+                                "index_base": 1, "index_reference": "generated_structure atom order after source expansion/frame selection",
+                                "components_to_fix": "XYZ" if fixed_atoms else None,
+                                "coordinate_space": "fractional" if fixed_atoms else None,
+                                "keyword_reference": dict(CONSTRAINT_REFERENCE) if fixed_atoms else None,
+                                "runtime_validated": False},
                 "density_output": {"enabled": bool(density_enabled),
                                    "electron_density": bool(density_enabled),
                                    "spin_density": bool(density_enabled and uks),

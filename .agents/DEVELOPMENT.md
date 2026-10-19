@@ -84,11 +84,17 @@ port or evidence of validation with the actual software.
 - Synthetic fixtures are not calculations; their version strings do not certify CP2K support.
 - Missing completion/convergence evidence cannot become passed. Normal termination
   or a single energy value is not proof of complete convergence.
-- Retained 0.2.7 defaults: universal NGRIDS 5; commented PROJECT-based .wfn/.kp
-  restart hints; BFGS/LBFGS optimization TRUST_RADIUS 0.2 angstrom; XYZ position
-  trajectories and MOTION restart BACKUP_COPIES 0. Keep inactive hints/hidden raw
-  settings distinct from emitted controls. Never treat disabled backups as
-  disabled restart writing or permission to touch existing wavefunctions.
+- 0.2.8 fixed atoms: optimization menu 9 / --fixed-atoms uses explicit 1-based
+  indices/ranges, default off; no source inheritance or identity remapping.
+  Bounds precede active expansion; fractional XYZ is not Cartesian pinning
+  during CELL_OPT. Hidden requests are retained but never emitted outside optimization.
+- Retained 0.2.8 policy: only classic non-SR TZVP/TZV2P/TZV2PX emit NGRIDS 5;
+  otherwise omit it (metadata null). OT always explicitly emits PP STRICT / AE
+  IRAC, including legacy auto/native names; manual overrides win. SCF and MOTION
+  restart BACKUP_COPIES 0 does not disable writing. Keep only generator/Multiwfn
+  header comments; restart suggestions are metadata/review only, never uncommented
+  into active input. No permission to touch existing wavefunctions is implied.
+  BFGS/LBFGS TRUST_RADIUS 0.2 angstrom and XYZ position trajectories are retained.
 - Do not start expensive calculations. Actual CP2K validation requires explicit
   authorization and a new run directory.
 - For failed-job diagnosis, load `qchem-error-diagnosis`, collect software/version

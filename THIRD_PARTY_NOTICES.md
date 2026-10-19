@@ -11,7 +11,8 @@ Register provenance for future implementations, rather than merely adding softwa
 local file hashes from the supplied CP2K tree, REVISION git:c92cc08. Its identity
 is not inferred to be an official release or binary from the directory name.
 No coefficients, nuclear potential parameters or upstream Fortran are bundled.
-GAPW atomic grids/default tolerances, OT keyword definitions, restart naming,\noptimizer radii and MOTION output controls were inspected;
+GAPW atomic grids/default tolerances, OT keyword definitions, restart naming,
+optimizer radii and MOTION output controls were inspected;
 see [the basis guide](docs/basis-selection.md#all-electron-automatic-setup-027)
 and [feature provenance](third_party/multiwfn/PROVENANCE.md).
 Existing CP2K references and upstream method/basis citations still apply; this
@@ -40,6 +41,11 @@ Registered modules include `src/cp2kkit/inputgen.py` (generation),
 `src/cp2kkit/method_profiles.py` (inspected parametrized-PBE/Libxc RPBE/q/reference branches),
 and `src/cp2kkit/input_tui.py` / `src/cp2kkit/input_editor.py` (numbered interaction
 and selected inspected upstream main-menu IDs, not a full Fortran UI port).
+Menu 9 fixed atoms references the inspected index/range workflow and
+MOTION/CONSTRAINT/FIXED_ATOMS templates; local constraints.py is a bounded Python
+parser, not a port of upstream str2arr. Fractional-coordinate semantics and LIST
+repetition were checked against the supplied local CP2K source. No Fortran or
+new numerical payload is bundled; authorization/citation limits are unchanged.
 The local 124/125 U/magnetism extensions are not upstream main-menu IDs;
 they require explicit parameters and do not reproduce upstream's automatic
 multiplicity-from-local-moments change.
