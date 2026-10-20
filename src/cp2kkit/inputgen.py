@@ -35,6 +35,7 @@ from .data_catalog import CATALOG_SOURCES
 from .basis_registry import DEFAULT_BASIS, basis_option, migrate_basis
 from .cp2k_data import cp2k_long_path
 from .constraints import CONSTRAINT_REFERENCE, resolve_fixed_atoms
+from .functional_registry import parse_functional
 
 MULTIWFN_CITATIONS = (
     "Tian Lu, Feiwu Chen, J. Comput. Chem. 33, 580-592 (2012). DOI: 10.1002/jcc.22885",
@@ -136,6 +137,10 @@ class InputSettings:
             else:
                 source_version = source_version or values.get('generator', {}).get('version')
             values = dict(values['settings'])
+        try:
+            values['functional'] = parse_functional(values.get('functional', 'PBE'))
+        except ValueError as exc:
+            raise KitError(str(exc)) from exc
         values['basis'] = migrate_basis(values.get('basis', DEFAULT_BASIS), source_version)
         if values.get('basis_overrides'):
             values['basis_overrides'] = tuple((el, migrate_basis(basis, source_version))
@@ -189,12 +194,16 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
         raise KitError("Invalid internal common-grid lock")
     if type(settings.write_json) is not bool:
         raise KitError('write_json must be Boolean')
+    try:
+        functional = parse_functional(settings.functional)
+    except ValueError as exc:
+        raise KitError(str(exc)) from exc
     project = settings.project
     if project is None:
         if not structure.source.get('path'):
             raise KitError("Automatic project name requires a source path; specify project explicitly")
         project = Path(structure.source['path']).stem
-    s = replace(settings,
+    s = replace(settings, functional=functional,
                 basis=basis_option(settings.basis).id,
                 project=project,
                 max_scf=settings.max_scf if settings.max_scf is not None else (25 if settings.scf == 'ot' else 128),
@@ -398,6 +407,24 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
         _, data_sources['dispersion'] = read_text(files['dispersion'])
     elif s.dispersion != 'none':
         warnings.append('Dispersion data dftd3.dat have not been checked; the file is resolved by CP2K at runtime.')
+    nonlocal_xc = {'enabled': method_profile.nonlocal_type is not None,
+                   'type': method_profile.nonlocal_type, 'kernel_file': method_profile.kernel_file,
+                   'parameters': list(method_profile.nonlocal_parameters) or None,
+                   'parameter_names': ['b', 'C'] if method_profile.nonlocal_parameters else None,
+                   'parameter_unit': 'dimensionless' if method_profile.nonlocal_parameters else None,
+                   'cutoff_Ry': None, 'cutoff_policy': 'CP2K native default; not convergence-validated',
+                   'kernel_source': None, 'kernel_validation': 'not_checked', 'runtime_validated': False}
+    if method_profile.nonlocal_type:
+        if data_root is not None:
+            kernel_path = str((Path(data_root)/method_profile.kernel_file).resolve())
+            cp2k_long_path(kernel_path)
+            _, source = read_text(kernel_path)
+            nonlocal_xc.update(kernel_file=kernel_path, kernel_source=source,
+                               kernel_validation='source_bytes_only')
+            data_sources['xc_kernel'] = source
+        else:
+            warnings.append(f'Nonlocal kernel {method_profile.kernel_file} has not been checked; '
+                            'CP2K resolves it at runtime. Supply --data-dir to record source bytes/hash.')
     data_checked = all(r['data_validation'] == 'data_checked' for r in element_records.values())
     if not data_checked:
         reason = 'actual all-electron basis/nuclear potential files' if all_electron else 'actual basis/potential files or basis q matching'
@@ -449,6 +476,13 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
                   f"          TYPE {'DFTD3' if s.dispersion == 'd3' else 'DFTD3(BJ)'}",
                   f'          PARAMETER_FILE_NAME {cp2k_long_path(files["dispersion"])}', f"          REFERENCE_FUNCTIONAL {s.functional}",
                   "        &END PAIR_POTENTIAL", "      &END VDW_POTENTIAL"]
+    if method_profile.nonlocal_type:
+        lines += ["      &VDW_POTENTIAL", "        POTENTIAL_TYPE NON_LOCAL", "        &NON_LOCAL",
+                  f"          TYPE {method_profile.nonlocal_type}",
+                  f"          KERNEL_FILE_NAME {cp2k_long_path(nonlocal_xc['kernel_file'])}"]
+        if method_profile.nonlocal_parameters:
+            lines.append("          PARAMETERS "+ " ".join(format(v, ".12g") for v in method_profile.nonlocal_parameters))
+        lines += ["        &END NON_LOCAL", "      &END VDW_POTENTIAL"]
     lines += ["    &END XC"]
     if s.kpoints != (1, 1, 1):
         lines += ["    &KPOINTS", "      SCHEME MONKHORST-PACK " + " ".join(map(str, s.kpoints)), "    &END KPOINTS"]
@@ -509,6 +543,7 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
                                "terms_url": "http://sobereva.com/multiwfn/download.html",
                                "notice": "THIRD_PARTY_NOTICES.md"},
                 "settings": asdict(s),
+                'nonlocal_correlation': nonlocal_xc,
                 'basis_selection': {'id': s.basis, 'number': basis_option(s.basis).number, 'registry_version': 1},
                 'basis_validation': {'status': 'data_checked' if data_checked else 'unverified_template',
                                      'scope': 'selected-entry structure, aliases, nuclear charges and source bytes only' if all_electron
@@ -557,15 +592,21 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
                 'electron_count_model': 'all_electron' if all_electron else 'pseudopotential_valence',
                 "kinds": kinds, "data_sources": data_sources,
                 "emitted_data_files": {"basis": emitted_basis_files, "potential": emitted_potential,
-                                       "dispersion": files['dispersion'] if s.dispersion != 'none' else None},
+                                       "dispersion": files['dispersion'] if s.dispersion != 'none' else None,
+                                       "xc_kernel": nonlocal_xc['kernel_file']},
                 "source_structure": structure.to_dict(), "generated_structure": effective.to_dict(),
                 "coordinates_translated": translated, "warnings": warnings,
                 "input_text": text, "input_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
     manifest['method_profile'] = {
         'functional': s.functional, 'qs_method': qs_method, 'gapw': gapw,
+        'family': method_profile.family, 'xc_components': list(method_profile.components),
+        'native_shortcut': None if method_profile.components or method_profile.parametrization else (method_profile.native or s.functional),
+        'pbe_parametrization': method_profile.parametrization,
+        'exact_exchange_fraction': 0.0, 'kinetic_energy_density': method_profile.family == 'meta-GGA',
+        'generator_scope': 'GPW Gamma ENERGY/ENERGY_FORCE/GEO_OPT without +U' if method_profile.restricted else 'existing GPW/GAPW and task restrictions',
         'ot_algorithm': (ot_algorithm or 'STRICT') if s.scf == 'ot' else None, 'ngrids': ngrids,
         'ngrids_selection': 'whole-system workflow lock' if _common_ngrids is not None else 'effective orbital basis policy',
-        'xc_backend': 'Libxc' if method_profile.libxc else 'CP2K-native',
+        'xc_backend': ('Libxc' if method_profile.components else 'CP2K-native + Libxc') if method_profile.libxc else 'CP2K-native',
         'libxc_required': method_profile.libxc, 'libxc_user_asserted': s.libxc_available,
         'build_verified': False, 'dispersion_reference': s.functional if s.dispersion != 'none' else None,
         'basis_files': basis_files, 'potential_file': files['potential'],

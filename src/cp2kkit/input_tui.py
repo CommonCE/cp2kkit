@@ -19,6 +19,7 @@ from .inputgen import (CP2K_VERSIONS, FUNCTIONALS, PERIODICITIES, RUN_TYPES, TRA
 from .structure import read_structure
 from .presentation import Presenter
 from .method_profiles import parse_basis_overrides, format_basis_overrides
+from .functional_registry import FUNCTIONAL_PROFILES, parse_functional
 from .constraints import parse_fixed_atoms
 from .spin_settings import (parse_dft_plus_u, parse_magnetism,
                             format_dft_plus_u, format_magnetism)
@@ -67,7 +68,7 @@ GROUPS = (
         Field('gapw_profile', 'AE profile (auto/native retained for compatibility; both default to explicit IRAC)', choices=('auto', 'native')),
         Field('basis_overrides', 'Element basis overrides: Element=basis; separate entries with semicolons; off clears. No implicit SR/non-SR fallback.', 'basis_map'),
         Field('allow_pbe_potential', 'Explicitly approve GTH-PBE potentials when matched-functional entries are absent; this is an approximation', 'bool'),
-        Field('libxc_available', 'Assert target CP2K was built with Libxc (required for RPBE; not detected by this tool)', 'bool'))),
+        Field('libxc_available', 'Assert target CP2K was built with Libxc (required for Libxc profiles; not detected by this tool)', 'bool'))),
     ("Charge and spin", (
         Field("charge", "Total charge [e] (not inherited from restart)", "int"),
         Field("multiplicity", "Spin multiplicity (auto: even electrons 1, odd 2; >1 enables UKS)", "int", optional=True, minimum=1))),
@@ -131,8 +132,9 @@ def visible_fields(fields, values):
                  and not (f.name == 'vacuum' and periodic != 'NONE')
                  and not (f.name in {'smearing', 'added_mos'} and values['scf'] == 'ot')
                  and not (f.name in {'max_outer_scf', 'ot_algorithm'} and values['scf'] != 'ot')
-                 and not (f.name == 'allow_pbe_potential' and values.get('functional') not in {'PBESOL', 'REVPBE', 'RPBE'})
-                 and not (f.name == 'libxc_available' and values.get('functional') != 'RPBE'))
+                 and not (f.name == 'allow_pbe_potential' and values.get('functional') in {'PBE', 'BLYP'})
+                 and not (f.name == 'libxc_available' and not
+                          getattr(FUNCTIONAL_PROFILES.get(values.get('functional')), 'libxc', False)))
 
 
 def field_display(field, values):
@@ -145,6 +147,10 @@ def field_display(field, values):
             return f'{automatic_multiplicity(structure, settings)} (auto: electron parity)'
         except (KitError, OSError, TypeError, KeyError):
             return 'auto (even electrons: 1; odd: 2)'
+    if field.name == 'dispersion':
+        profile = FUNCTIONAL_PROFILES.get(values.get('functional'))
+        if profile and profile.nonlocal_type:
+            return f'{value} (additional pair correction; required {profile.nonlocal_type} retained)'
     if field.name == 'electron_density':
         enabled = value or values.get('spin_density') or values.get('density_difference')
         label = '1 Electron density' if enabled else '0 None'
@@ -214,6 +220,8 @@ def parse_value(field, raw):
         return parse_magnetism(raw)
     if field.optional and raw.lower() == "auto":
         return None
+    if field.name == "functional" and not raw.isdigit():
+        return parse_functional(raw)
     if field.choices:
         if raw in tuple(str(i) for i in range(1, len(field.choices)+1)):
             return field.choices[int(raw)-1]
@@ -389,6 +397,11 @@ class Menu:
         self.show(f"Atoms: {len(structure.symbols)}; {electron_label}: {manifest['explicit_electron_count']}")
         self.show(f"Target version: {settings.cp2k_version}; Run type: {settings.run_type}; Method: {manifest['method_profile']['qs_method']}/{settings.functional}")
         self.show(f"XC backend: {manifest['method_profile']['xc_backend']}; target build verified: False")
+        nonlocal_xc = manifest['nonlocal_correlation']
+        if nonlocal_xc['enabled']:
+            self.show(f"Required nonlocal correlation: {nonlocal_xc['type']}; kernel: {nonlocal_xc['kernel_file']}; "
+                      f"parameters b/C: {nonlocal_xc['parameters']}; source bytes checked: {nonlocal_xc['kernel_source'] is not None}; "
+                      "runtime/physical validation: False")
         self.show(f"Basis selection: {manifest['basis_selection']['number']} [{manifest['basis_selection']['id']}]; data: {manifest['basis_validation']['status']}; runtime validated: False")
         gapw = manifest['method_profile']['gapw']
         if gapw:

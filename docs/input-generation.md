@@ -1,6 +1,6 @@
 # CP2K input generation
 
-This guide describes cp2kkit **0.2.9**. Older defaults and migration notes are in
+This guide describes cp2kkit **0.3.0**. Older defaults and migration notes are in
 [the changelog](../CHANGELOG.md). AE automatic setup is described in
 [the basis guide](basis-selection.md#all-electron-automatic-setup-027).
 The [registry-v1 basis guide](basis-selection.md) defines permanent numbering toward
@@ -407,7 +407,7 @@ charge. Integrals are not fragment net charge transfer. See [cube checks](cube.m
 |---|---|
 | Structure | `.xyz`/`.extxyz`/text `.restart`/`.gjf`/`.com`/`.cif`/POSCAR/CONTCAR/`.vasp`/`.poscar`; XYZ last frame |
 | Task | ENERGY (default), ENERGY_FORCE, GEO_OPT, CELL_OPT |
-| Method | Quickstep/GPW; PBE (default), BLYP; target 2026.2 adds PBEsol/revPBE/Libxc RPBE |
+| Method | Quickstep/GPW; 15 non-hybrid profiles at target 2026.2; per-profile limits below; PBE default |
 | Basis | DZVP-MOLOPT-SR-GTH (default); SZV-SR, DZVP/TZVP/TZV2P non-SR; target 2026.2 adds TZVP-SR/TZV2P-SR/TZV2PX and explicit element overrides |
 | Potential | Catalog-checked GTH entries with fixed `-qN`; prefer actual matched functional, explicitly approved PBE approximation otherwise |
 | Dispersion | none (default), D3, D3(BJ); dftd3.dat and REFERENCE_FUNCTIONAL |
@@ -489,13 +489,121 @@ Standard-library readers preserve original hashes and do not run Gaussian/VASP/M
 - Restart provides **geometry only**: original KIND labels merge by element;
   method/U/constraints/moments/charge/solvent are not inherited. This is a new template,
   not a complete restart of the original job.
-- Hybrid/ADMM, MD, frequencies, NEB, TDDFT, solvents, external fields, atomic
-  constraints, and other advanced Multiwfn branches are not implemented.
+- Hybrid/ADMM, MD, frequencies, NEB, TDDFT, solvents, external fields, richer
+  constraints beyond fixed atoms, and other advanced Multiwfn branches are not implemented.
   Electron/spin cubes are supported; potential/ELF/MO cubes are not.
 - Default cutoff/basis/vacuum/k-points are not converged for the target system.
   Deprecated CELL_OPT TYPE DIRECT_CELL_OPT is not emitted.
 
+## Non-hybrid XC profiles (0.3.0)
+
+Version 0.3.0 implements **15 non-hybrid profiles** from Multiwfn 2026.10.1's
+CP2K generator: no HF exact exchange, ADMM/RI-HFX, double hybrid or xTB.
+All ten additions require target **CP2K 2026.2**. The original five chooser
+positions and default PBE / DZVP-MOLOPT-SR-GTH input physics remain unchanged.
+
+| Canonical setting (case-insensitive) | XC emitted inside XC_FUNCTIONAL | Libxc assertion | Additional dispersion allowed |
+|---|---|---|---|
+| PBE | Native PBE | No | none, d3, d3bj |
+| BLYP | Native BLYP | No | none, d3, d3bj |
+| PBESOL | PBE / PARAMETRIZATION PBESOL | No | none, d3, d3bj |
+| REVPBE | PBE / PARAMETRIZATION REVPBE | No | none, d3, d3bj |
+| RPBE | GGA_X_RPBE + GGA_C_PBE | Yes | none, d3, d3bj |
+| PADE (alias LDA) | Native PADE | No | none |
+| BP86 (alias BP) | Native BP: BECKE88 + P86C | No | none, d3, d3bj |
+| TPSS | MGGA_X_TPSS + MGGA_C_TPSS | Yes | none, d3, d3bj |
+| REVTPSS | MGGA_X_REVTPSS + MGGA_C_REVTPSS | Yes | none, d3, d3bj |
+| SCAN | MGGA_X_SCAN + MGGA_C_SCAN | Yes | none, d3, d3bj |
+| R2SCAN | MGGA_X_R2SCAN + MGGA_C_R2SCAN | Yes | none, d3bj |
+| MN15L (alias MN15-L) | MGGA_X_MN15_L + MGGA_C_MN15_L | Yes | none, d3 |
+| HLE17 | MGGA_XC_HLE17 | Yes | none |
+| B97M-RV | MGGA_XC_B97M_V + required rVV10 below | Yes | none (intrinsic nonlocal retained) |
+| BEEFVDW (alias BEEF-vdW) | Native BEEFVDW + required LMKLL below | **Yes** | none (intrinsic nonlocal retained) |
+
+BEEFVDW is not Libxc-free: the inspected CP2K shortcut expands to native BEEF
+exchange, PBE correlation scaled by 0.3998335231 and **Libxc LDA_C_PW** scaled by
+0.6001664769. CP2K owns those coefficients; the generator emits its shortcut,
+not a second independently rounded expansion. Likewise HLE17 uses the combined
+Libxc definition (internally 1.25 TPSS exchange + 0.5 TPSS correlation), not an
+HF fraction. Build assertions are required even though no explicit LDA_C_PW
+subsection appears in the BEEFVDW input.
+
+### Capability and numerical limits
+
+- PADE/BP86 follow existing semilocal GPW rules, including non-Gamma diagonalization,
+  CELL_OPT and explicit +U. Existing GAPW Gamma/ALL rules are retained for
+  compatible AE families; UZH-PBE and UZH AE families remain PBE-only.
+- All meta-GGAs (including B97M-rV) and BEEF-vdW initially allow **GPW Gamma
+  ENERGY/ENERGY_FORCE/GEO_OPT without +U**, for RKS or collinear UKS. Existing
+  boundary/SCF rules also apply. GAPW/non-Gamma/CELL_OPT/+U fail explicitly. These are
+  cp2kkit scope limits, not claims that CP2K universally lacks those capabilities.
+- No new basis/q policy: prefer real matched potentials from supplied data.
+  PADE uses GTH-PADE; BP86 maps to actual GTH-BP, not invented GTH-BP86. At the
+  fixed 71-element q policy, the pinned catalog has 71 PADE and 41 BP matches.
+  Missing matches require explicit menu **114** / `--allow-pbe-potential`.
+  Record the real GTH-PBE approximation; never rename it or change q.
+- Menu **113** / `--libxc-available` asserts target build support for RPBE,
+  meta-GGAs and BEEF-vdW. No version/build is detected or installed. Selecting
+  the functional does not grant potential approval or the build assertion.
+- Meta-GGAs depend on kinetic-energy density. Retained CUTOFF/REL_CUTOFF
+  **400/55 Ry**, EPS_SCF 1e-6 and native XC low-density thresholds are starting
+  values, not demonstrated convergence. Check grids/SCF and low-density behavior
+  independently; no automatic numerical/physical resets are made.
+- Additional D3/D3(BJ) uses the canonical functional reference, never PBE as a
+  parameter substitute. The matrix follows the inspected zero/BJ parameter
+  branches in CP2K 2026.2; unsupported pairs fail before writing. This does not
+  establish optimal dispersion for a property. D4/arbitrary mixtures are deferred.
+- Density/CDD reuse the same generator and require identical nonlocal/kernel
+  metadata across whole/A/B components. Actual CUBE grids/reference states
+  remain separate checks before subtraction.
+
+### Required nonlocal correlation and kernel evidence
+
+B97M-rV always includes `VDW_POTENTIAL / POTENTIAL_TYPE NON_LOCAL / NON_LOCAL`
+with `TYPE RVV10`, `PARAMETERS 6 0.01` (dimensionless b/C) and
+`KERNEL_FILE_NAME rVV10_kernel_table.dat`. These are method-specific parameters,
+not the generic CP2K 6.3/0.0093 defaults. BEEF-vdW uses `TYPE LMKLL` and
+`KERNEL_FILE_NAME vdW_kernel_table.dat`; no rVV10 parameters apply.
+The nonlocal FFT CUTOFF is omitted (metadata null, CP2K native default);
+its grid convergence is not established. No additional pair correction is allowed.
+
+Thus `--dispersion none` means **no additional pair correction**, not removal of
+a named method's required nonlocal term. TUI review/preview and JSON make this
+distinction explicit. DFT-D parameters and nonlocal kernels are separate data roles.
+
+With `--data-dir` (or CP2K_DATA_DIR), the required kernel must be readable UTF-8;
+its absolute literal whole-line path, raw SHA-256 and size are recorded under
+`data_sources.xc_kernel` and `nonlocal_correlation.kernel_source`.
+Missing/unreadable files fail before publication. Checks are **source bytes only**,
+not validation of kernel numbers, method compatibility or numerical convergence.
+Without a data directory, the basename is emitted and resolution at runtime is
+explicitly unverified. Basis/potential-only explicit files do not imply a kernel
+location. Kernels/data and hardlink aliases stay protected from output replacement.
+
+```bash
+# Syntax/assembly examples only; geometry, spin, approximations and convergence need review.
+cp2kkit generate-input water.xyz -o water-r2scan.inp --periodic NONE \
+  --functional r2SCAN --libxc-available --allow-pbe-potential --write-json
+cp2kkit generate-input solid.extxyz -o solid-b97m-rv.inp \
+  --functional B97M-rV --libxc-available --allow-pbe-potential \
+  --data-dir /path/to/cp2k/data --dispersion none --write-json
+cp2kkit generate-input solid.extxyz -o solid-beef.inp \
+  --functional BEEF-vdW --libxc-available --allow-pbe-potential \
+  --data-dir /path/to/cp2k/data --write-json
+```
+
+Static evidence: the fixed Multiwfn source, tagged CP2K input/shortcut/D3
+definitions, and local Libxc 7.0.0 sources; see
+[feature provenance](../third_party/multiwfn/PROVENANCE.md). The versioned
+[NON_LOCAL manual](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/XC/VDW_POTENTIAL/NON_LOCAL.html)
+confirms nesting, parameter order, units and kernel names. Synthetic tests and
+read-only library checks are not native syntax acceptance, energies/forces/stress
+validation, or proof of convergence. No CP2K/Multiwfn process is run by generation.
+
 ## Functional and basis profiles (0.2.6)
+
+The original profile round is retained below; the 0.3.0 matrix above supersedes
+its five-profile scope and Libxc/menu applicability descriptions.
 
 New functional names, new families, UCL coverage extensions and nonempty element
 overrides are restricted to target **2026.2**. Existing PBE/BLYP/core basis requests
@@ -522,8 +630,8 @@ GTH-RPBE/GTH-REVPBE names are fabricated, and no q values are changed.
 RPBE additionally requires `--libxc-available` / menu **113**. This is a user assertion
 about the target CP2K build, not probing, installation, a detected Libxc version, or
 runtime certification. Native PBEsol/revPBE do not require Libxc in these profiles.
-The menu hides 114 outside the new GGA choices and 113 outside RPBE; values remain
-retained for later edits. Selecting a functional never automatically grants approval.
+As of 0.3.0, menu 114 is available outside PBE/BLYP and menu 113 follows all
+Libxc-requiring profiles, including BEEF-vdW; hidden values remain retained for later edits. Selecting a functional never automatically grants approval.
 
 All five profiles explicitly allow none/D3/D3(BJ); the new reference identifiers
 PBESOL, REVPBE and RPBE were checked in the zero/BJ parameter branches of tagged
@@ -596,8 +704,9 @@ Header checks/synthetic round trips are not native CP2K acceptance, converged
 energies/forces/stress, recommended bases/U, or validation of an adsorption model.
 
 The registry follow-up enables paired UZH-PBE DZVP/TZVP/TZV2P for target 2026.2
-and explicit custom pseudopotential ORB files. r2SCAN/meta-GGAs, hybrids/HF/ADMM,
-UZH-PBE0 templates, arbitrary q changes, auxiliary and reserved
+and explicit custom pseudopotential ORB files. Version 0.3.0 adds the bounded
+meta-GGA/nonlocal subset above. Hybrids/HF/ADMM, xTB, UZH-PBE0 templates,
+arbitrary q changes, auxiliary and reserved
 families remain unimplemented; see [basis selection](basis-selection.md).
 
 ## DFT+U and magnetic initialization (112 / 103)

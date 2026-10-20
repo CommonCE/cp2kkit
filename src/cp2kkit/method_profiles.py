@@ -1,9 +1,8 @@
-"""Explicit GGA GPW/GAPW profiles and checked basis/potential selections.
+"""Explicit non-hybrid GPW/GAPW profiles and checked basis/potential selections.
 
 Multiwfn organization informed the XC branches; see recorded provenance.
 No physical parameters, build detection, automatic q changes or runtime validation.
 """
-from dataclasses import dataclass
 from pathlib import Path
 
 from .data_catalog import BASIS_ROWS, POTENTIAL_ROWS, catalog_rows as _rows
@@ -11,25 +10,12 @@ from .errors import KitError
 from .structure import ELEMENTS, ELEMENT_ORDER
 from .basis_registry import basis_option, parse_basis
 from .basis_resolution import BasisResolver, alternatives
+from .functional_registry import FUNCTIONAL_PROFILES, FUNCTIONALS, FunctionalProfile, potential_tag
 
 LEGACY_BASES = ('SZV-MOLOPT-SR-GTH', 'DZVP-MOLOPT-SR-GTH', 'DZVP-MOLOPT-GTH',
                 'TZVP-MOLOPT-GTH', 'TZV2P-MOLOPT-GTH')
 # Import-compatible legacy inventory, NOT the numbered/complete selection registry.
 BASES = (*LEGACY_BASES, 'TZVP-MOLOPT-SR-GTH', 'TZV2P-MOLOPT-SR-GTH', 'TZV2PX-MOLOPT-GTH')
-
-
-@dataclass(frozen=True)
-class FunctionalProfile:
-    parametrization: str | None = None
-    libxc: bool = False
-    dispersion: tuple[str, ...] = ('none', 'd3', 'd3bj')
-
-
-FUNCTIONAL_PROFILES = {'PBE': FunctionalProfile(), 'BLYP': FunctionalProfile(),
-                       'PBESOL': FunctionalProfile('PBESOL'),
-                       'REVPBE': FunctionalProfile('REVPBE'),
-                       'RPBE': FunctionalProfile(libxc=True)}
-FUNCTIONALS = tuple(FUNCTIONAL_PROFILES)
 
 
 BASIS_CATALOG = {file: {basis: _rows(rows) for basis, rows in families.items()}
@@ -106,7 +92,15 @@ def electron_model(settings, elements, pseudo_valences):
 
 def resolve_method(settings, elements, valences, kind_specs=None):
     profile = FUNCTIONAL_PROFILES[settings.functional]
-    _, valences = electron_model(settings, elements, valences)
+    all_electron, valences = electron_model(settings, elements, valences)
+    if settings.dispersion not in profile.dispersion:
+        raise KitError(f'No checked {settings.dispersion} combination for {settings.functional}; '
+                       'required nonlocal correlation is intrinsic, not an extra pair correction')
+    if profile.restricted:
+        if all_electron or settings.kpoints != (1, 1, 1) or settings.run_type == 'CELL_OPT' or settings.dft_plus_u:
+            raise KitError(f'{settings.functional} currently supports GPW Gamma ENERGY/ENERGY_FORCE/GEO_OPT '
+                           'without DFT+U; GAPW, non-Gamma, CELL_OPT and +U require separate validation. '
+                           'This is a generator scope limit, not a universal CP2K limitation')
     if type(settings.allow_pbe_potential) is not bool or type(settings.libxc_available) is not bool:
         raise KitError('Potential approval and Libxc availability assertions must be Boolean')
     overrides = normalize_basis_overrides(settings.basis_overrides, elements)
@@ -123,7 +117,7 @@ def resolve_method(settings, elements, valences, kind_specs=None):
                     if potential_functional in {'PBE', 'BLYP'}:
                         raise KitError(f'No verified GTH-{potential_functional}-q{q} preset for {el}')
                     if not settings.allow_pbe_potential:
-                        raise KitError(f'No matched GTH-{potential_functional}-q{q} preset for {el}; explicitly approve the GTH-PBE approximation with --allow-pbe-potential (menu 129), or change the functional')
+                        raise KitError(f'No matched GTH-{potential_tag(potential_functional)}-q{q} preset for {el}; explicitly approve the GTH-PBE approximation with --allow-pbe-potential (menu 114), or change the functional')
                     if not resolver.potential_available(option, el, q, 'PBE', POTENTIAL_CATALOG):
                         raise KitError(f'No verified GTH-PBE-q{q} approximation for {el}')
                     potential_functional = 'PBE'
@@ -143,14 +137,22 @@ def resolve_method(settings, elements, valences, kind_specs=None):
     if extended and settings.cp2k_version != '2026.2':
         raise KitError('New functional/basis profiles and explicit basis overrides are checked only for CP2K 2026.2')
     if profile.libxc and not settings.libxc_available:
-        raise KitError('RPBE requires a Libxc-enabled target CP2K build; explicitly assert --libxc-available (menu 130). Build support is not detected by cp2kkit')
-    if settings.dispersion not in profile.dispersion:
-        raise KitError(f'No checked {settings.dispersion} combination for {settings.functional}')
+        raise KitError(f'{settings.functional} requires a Libxc-enabled target CP2K build; explicitly assert '
+                       '--libxc-available (menu 113). Build support is not detected by cp2kkit')
     approximate = [el for el, r in records.items() if r['potential_approximation']]
     if approximate:
         warnings.append(f'User-approved GTH-PBE pseudopotential approximation for {settings.functional}: '+', '.join(approximate)+'. This is not a matched-functional potential; validate the target property.')
     if profile.libxc:
-        warnings.append('RPBE uses Libxc GGA_X_RPBE + GGA_C_PBE. Libxc build support is user-asserted, not probed or runtime-validated.')
+        definition = ('uses Libxc '+ ' + '.join(profile.components)) if profile.components else 'uses a native shortcut requiring Libxc internally (LDA_C_PW)'
+        warnings.append(f'{settings.functional} {definition}. '
+                        'Libxc build support is user-asserted, not probed or runtime-validated.')
+    if profile.family == 'meta-GGA':
+        warnings.append('Meta-GGA uses kinetic-energy density. Independently converge XC/grid and SCF thresholds, '
+                        'including low-density regions; the retained 400/55 Ry defaults are not convergence evidence.')
+    if profile.nonlocal_type:
+        warnings.append(f'{settings.functional} includes required {profile.nonlocal_type} nonlocal correlation; '
+                        'dispersion=none means no additional pair correction, not removal of intrinsic correlation. '
+                        'Kernel contents/grid convergence and runtime acceptance remain unverified.')
     if any(r['basis_kind_type'] == 'all-electron' for r in records.values()):
         warnings.append('All-electron GAPW/ALL: electron counts include core electrons. Atomic grids, '
                         'GAPW hard/soft tolerances and cutoff/basis convergence need independent checks; '
@@ -166,7 +168,9 @@ def xc_lines(functional):
         return ['      &XC_FUNCTIONAL', '        &PBE',
                 f'          PARAMETRIZATION {profile.parametrization}',
                 '        &END PBE', '      &END XC_FUNCTIONAL']
-    if profile.libxc:
-        return ['      &XC_FUNCTIONAL', '        &GGA_X_RPBE', '        &END GGA_X_RPBE',
-                '        &GGA_C_PBE', '        &END GGA_C_PBE', '      &END XC_FUNCTIONAL']
-    return [f'      &XC_FUNCTIONAL {functional}', '      &END XC_FUNCTIONAL']
+    if profile.components:
+        return ['      &XC_FUNCTIONAL',
+                *(line for component in profile.components
+                  for line in (f'        &{component}', f'        &END {component}')),
+                '      &END XC_FUNCTIONAL']
+    return [f'      &XC_FUNCTIONAL {profile.native or functional}', '      &END XC_FUNCTIONAL']

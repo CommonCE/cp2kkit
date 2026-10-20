@@ -35,7 +35,9 @@ POTENTIAL_ROWS = {
     "BLYP": "H:1 He:2 Li:3 Be:4 B:3 C:4 N:5 O:6 F:7 Ne:8 Na:1,9 Mg:2,10 Al:3 Si:4 P:5 S:6 Cl:7 Ar:8 K:9 Ca:10 Sc:11 Ti:12 V:13 Cr:14 Mn:15 Fe:16 Co:17 Ni:18 Cu:11,19 Zn:12,20 Ga:3,13 Ge:4 As:5 Se:6 Br:7 Kr:8 Rb:9 Sr:10 Y:11 Zr:12 Mo:14 Ru:16 Rh:17 Pd:18 Ag:11,19 In:3,13 Sb:5 Te:6 I:7 Xe:8 Cs:9 Ba:2,10 Ce:12 Gd:18 W:14 Au:11,19 Pb:4 Bi:5,15",
     "PBESOL": "B:3",
     "REVPBE": "",
-    "RPBE": ""
+    "RPBE": "",
+    "PADE": "H:1 He:2 Li:1,3 Be:2,4 B:3 C:4 N:5 O:6 F:7 Ne:8 Na:1,9 Mg:2,10 Al:3 Si:4 P:5 S:6 Cl:7 Ar:8 K:1,9 Ca:2,10 Sc:3,11 Ti:4,12 V:5,13 Cr:6,14 Mn:7,15 Fe:8,16 Co:9,17 Ni:10,18 Cu:1,11,19 Zn:2,12,20 Ga:3,13 Ge:4 As:5 Se:6 Br:7 Kr:8 Rb:1,9 Sr:2,10 Y:3,11 Zr:4,12 Nb:5,13 Mo:6,14 Tc:7,15 Ru:8,16 Rh:9,17 Pd:10,18 Ag:1,11,19 Cd:2,12 In:3,13 Sn:4 Sb:5 Te:6 I:7 Xe:8 Cs:1,9 Ba:2,10 La:11 Ce:12 Pr:13 Nd:14 Pm:15 Sm:16 Eu:17 Gd:18 Tb:19 Dy:20 Ho:21 Er:22 Tm:23 Yb:24 Lu:25 Hf:12 Ta:5,13 W:6,14 Re:7,15 Os:8,16 Ir:9,17 Pt:10,18 Au:1,11,19 Hg:2,12 Tl:3,13 Pb:4 Bi:5 Po:6 At:7 Rn:8 Ac:11,29 Th:12,30 Pa:13,31 U:14,32 Np:15,33 Pu:16,34 Am:17,35 Cm:18,36 Bk:19,37 Cf:20,38 Es:21,39 Fm:22,40 Md:23,41 No:24,42 Lr:25,43",
+    "BP86": "H:1 He:2 Li:3 Be:4 B:3 C:4 N:5 O:6 F:7 Ne:8 Na:1,9 Mg:10 Al:3 Si:4 P:5 S:6 Cl:7 Ar:8 K:9 Ca:10 Sc:11 Ti:12 V:13 Cr:14 Mn:15 Fe:16 Co:17 Ni:18 Cu:11 Zn:12 Ga:13 Ge:4 As:5 Se:6 Br:7 Kr:8 Zr:12 Ru:16 Te:6 Cs:1,9 Au:11"
 }
 
 CATALOG_SOURCES = [
@@ -50,6 +52,10 @@ CATALOG_SOURCES = [
     {
         "url": "https://raw.githubusercontent.com/cp2k/cp2k/v2026.2/data/GTH_POTENTIALS",
         "sha256": "5a9bfbc3b37a55917ade4fb704b80546d210d843759b94e3915e74acfc3fafb2"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/cp2k/cp2k/v2026.2/src/input_cp2k_check.F",
+        "sha256": "e1f26b06bbc6121a31f9c50c4056dbe43f08a328425c46010566b4e6555ccb5d"
     },
     {
         "url": "https://raw.githubusercontent.com/cp2k/cp2k/v2026.2/src/input_cp2k_xc.F",

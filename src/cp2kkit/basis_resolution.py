@@ -7,6 +7,7 @@ from .cp2k_data import Libraries, cp2k_path, safe_token
 from .data_catalog import BASIS_ROWS, UZH_POTENTIAL_ROWS, catalog_rows as rows
 from .all_electron_catalog import AE_BASIS_ROWS
 from .errors import KitError
+from .functional_registry import potential_tag
 
 
 def catalog_files(option, element, q):
@@ -62,8 +63,9 @@ class BasisResolver:
     def potential_available(self, option, element, q, functional, catalog):
         paths = self.paths(self.settings.potential_files, option.potential_sources)
         if not paths:
-            return q in catalog[functional].get(element, ())
-        names = (f'GTH-{functional}-q{q}', f'GTH-{functional}')
+            return q in catalog.get(functional, {}).get(element, ())
+        tag = potential_tag(functional)
+        names = (f'GTH-{tag}-q{q}', f'GTH-{tag}')
         try:
             self.libraries.select(paths, 'POTENTIAL', element, names, q, match_q_family=True)
             return True
@@ -109,7 +111,8 @@ class BasisResolver:
             bfile, basis = files[0], f'{option.family}-q{q}'
         uzh = option.protocol == 'uzh-pbe'
         pdefaults = option.potential_sources
-        pnames = (f'GTH-{potential_functional}-q{q}', f'GTH-{potential_functional}')
+        tag = potential_tag(potential_functional)
+        pnames = (f'GTH-{tag}-q{q}', f'GTH-{tag}')
         if uzh:
             pnames += (f'GTH-GGA-q{q}',)
         if custom and (s.custom_potential_name is not None or s.custom_potential_file is not None):

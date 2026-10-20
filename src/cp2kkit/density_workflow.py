@@ -101,6 +101,8 @@ def generate_difference(structure, settings):
             for key in ('basis', 'potential', 'basis_file', 'potential_file', 'basis_source', 'potential_source', 'valence_electrons'):
                 if kind[key] != candidates[0][key]:
                     raise KitError(f'Fragment {label} changes {element} {key}; provide consistent explicit data sources')
+        if report['nonlocal_correlation'] != whole['nonlocal_correlation']:
+            raise KitError(f'Fragment {label} changes nonlocal correlation/kernel identity; provide consistent data sources')
         if report['generated_structure']['cell'] != cell or report['generated_structure']['positions'] != positions:
             raise KitError('Fragment generation changed shared geometry/cell')
         components['fragment_'+label.lower()] = report

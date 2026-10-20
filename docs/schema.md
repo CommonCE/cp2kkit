@@ -172,6 +172,39 @@ Fields/units/schema 0.1.0 are unchanged.
 - syntax_reference_checked/runtime_validated describe density-print validation,
   not certification of the entire generator.
 
+## Generated input JSON: non-hybrid XC additions (software 0.3.0)
+
+Schema remains 0.1.0; analysis/CSV and existing config/replay names are unchanged.
+
+- settings.functional uses one of 15 canonical non-hybrid IDs (PBESOL, REVPBE,
+  R2SCAN, B97M-RV, BEEFVDW, etc.). Documented aliases normalize on generation;
+  previous names remain accepted. No hybrid or xTB profile is enabled.
+- method_profile adds family, xc_components (ordered emitted Libxc subsections;
+  empty for native/parametrized shortcuts), native_shortcut, pbe_parametrization,
+  exact_exchange_fraction=0.0, kinetic_energy_density and generator_scope.
+  xc_backend can be CP2K-native, Libxc or CP2K-native + Libxc (BEEFVDW).
+  libxc_required applies to the native BEEFVDW shortcut too. build_verified and
+  runtime_validated remain false; true user assertions do not prove availability.
+- nonlocal_correlation records enabled, type (RVV10/LMKLL), kernel_file,
+  parameters (B97M-rV [6.0, 0.01], otherwise null), parameter_names/unit,
+  cutoff_Ry=null (omitted/native default), cutoff_policy, kernel_source,
+  kernel_validation (not_checked or source_bytes_only), runtime_validated=false.
+  Disabled profiles have null type/kernel/parameters. It is independent of
+  settings.dispersion: none disables additional pair corrections, not required
+  nonlocal correlation in B97M-rV/BEEF-vdW.
+- data_sources.xc_kernel is present only for a checked supplied-data-directory
+  kernel, with absolute path, raw SHA-256 and size_bytes. kernel_source repeats
+  this evidence; source_bytes_only does not certify a numerical kernel.
+  emitted_data_files.xc_kernel records the emitted absolute path or unchecked
+  basename (null for semilocal methods). Existing basis/potential/dispersion
+  fields retain their meanings. Kernel files/aliases become protected data sources.
+- Canonical BP86 maps to actual GTH-BP names; kinds.potential_functional remains
+  BP86 for a match, PBE for an approved approximation. No invented GTH-BP86 tag,
+  implicit PBE fallback, automatic q or charge/spin change.
+- CDD component manifests retain the same XC and nonlocal/kernel identity;
+  inconsistent kernel hashes fail before publication. Native acceptance,
+  numerical grids and scientific reference fitness remain unverified.
+
 ## Generated input JSON: method profiles (software 0.2.6)
 
 Schema stays 0.1.0; additions do not imply changes to default physical settings.

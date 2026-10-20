@@ -1,11 +1,11 @@
-# cp2kkit v0.2 architecture
+# cp2kkit v0.3 architecture
 
 ## Design principles
 
 The initial analysis MVP baseline is preserved in [the roadmap](roadmap.md).
 Later requirements add an [input-generation](input-generation.md) subset.
 The [numbering/allocation guide](menu-numbering-draft.md) records implemented
-menu layout v1 (software 0.2.9) plus separately labeled provisional future features.
+menu layout v1 (introduced in 0.2.9, retained in 0.3.0) plus separately labeled provisional future features.
 The current registry contains only implemented entries; no placeholder categories.
 No submission system or deferred Bader/PDOS/NEB post-processing is introduced.
 
@@ -35,11 +35,12 @@ cli.py
  |-- input_editor.py -- menu_registry.py (category/direct routing, aliases, drafts; same generator/writer)
  |-- presentation.py (scrolling text, optional Rich; no batch rendering)
  |-- inputgen.py --- structure.py / spin_settings.py / method_profiles.py / models.py / io.py
- |-- method_profiles.py -- basis_resolution.py / data_catalog.py (XC, approvals, per-element resolution)
+ |-- functional_registry.py (shared non-hybrid XC definitions/aliases, nonlocal/build/dispersion/scope policy)
+ |-- method_profiles.py -- functional_registry.py / basis_resolution.py / data_catalog.py (XC, approvals, per-element resolution)
  |-- basis_registry.py (immutable allocated numbers/string IDs, roles/status, explicit legacy migration)
  |-- basis_resolution.py -- basis_registry.py / cp2k_data.py / data_catalog.py (ORB/potential protocol checks)
  |-- cp2k_data.py -- io.py / structure.py (actual aliases, selected payload/q checks, paths/hashes/ambiguity)
- |   Basis/potential/D3 whole-line filenames use literal unquoted serialization.
+ |   Basis/potential/D3/nonlocal-kernel whole-line filenames use literal unquoted serialization.
  |-- basis_ui.py -- basis_registry.py / cp2k_data.py (one grouped scrolling basis-value list)
  |-- data_catalog.py (header-only names/q/files and pinned official source hashes)
  |-- all_electron_catalog.py (audited AE subsets, local reference identity; no parameters)
@@ -125,11 +126,19 @@ Do not guess labels, drop damaged final frames, or expand CP2K preprocessing.
 structures -> Structure + InputSettings -> validation -> CP2K text/manifest -> new input/JSON
 ```
 
-method_profiles resolves explicit XC branches, per-element basis overrides and fixed-q
+functional_registry defines the 15 non-hybrid profiles, aliases, exact XC
+components/native shortcuts, build/dispersion requirements and intrinsic nonlocal
+assembly. It is dependency-light and shared by basis policy, CLI, TUI and generation,
+not a parallel generator. method_profiles resolves explicit XC branches, per-element basis overrides and fixed-q
 catalog entries; inputgen still orchestrates physical validation, rendering and
 protected writes. Multiple basis files are emitted/checked independently. Matched
 potentials are preferred; explicit approval is required for a GTH-PBE approximation.
-RPBE requires a user Libxc-build assertion, not runtime/build detection. Method
+RPBE, all meta-GGAs and BEEF-vdW (native shortcut using Libxc PW92) require a
+user Libxc-build assertion, not runtime/build detection. Meta-GGA/nonlocal scope
+is GPW Gamma ENERGY/ENERGY_FORCE/GEO_OPT without +U. Required nonlocal terms
+are separate from additional pair dispersion. Kernel source bytes/hashes and
+emitted filenames are recorded separately from runtime/numerical validation;
+CDD compares whole/A/B nonlocal identity before protected publication. Method
 metadata distinguishes catalog references from installed-data hashes and preserves
 actual potential library identity. No generic input-rewriting migration is introduced.
 This is not the deferred ARC-3 prepared-state/render/manifest separation.

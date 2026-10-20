@@ -1,4 +1,4 @@
-# Orbital basis registry (software 0.2.9, registry v1)
+# Orbital basis registry (software 0.3.0, registry v1)
 
 The registry establishes the numbering contract **toward 1.0.0**; it does not
 release 1.0.0 or certify calculations. The generator uses compact shortcuts and
@@ -58,6 +58,21 @@ shown with an explicit UNAVAILABLE reason, not advertised as working templates.
 ORB, AUX_FIT and RI_AUX are distinct roles in the model; only ORB is selectable.
 No auxiliary basis, hybrid/HF/ADMM or RI method template is added. AE 50-59
 uses the separate GAPW model described below, not the fixed-q GPW policy.
+
+## Functional pairing in 0.3.0
+
+The [15 non-hybrid XC profiles](input-generation.md#non-hybrid-xc-profiles-030)
+do not add/reassign basis numbers or change fixed q. PADE uses actual GTH-PADE;
+BP86 uses GTH-BP. Pinned fixed-q coverage is 71 and 41 elements respectively,
+not identical generic GTH coverage. Missing matched potentials still require
+explicit GTH-PBE approximation approval. Supplied files are authoritative for
+real matched entries; no GTH-BP86/meta-GGA potential names are fabricated.
+Classic/custom ORB families may serve the new GPW profiles; UZH-PBE and UZH AE
+families remain PBE-only. Meta-GGAs and BEEF-vdW currently reject GAPW, non-Gamma,
+CELL_OPT and +U pending separate validation. PADE/BP86 retain the existing
+semilocal GPW/GAPW rules. These are generator scope limits, not universal CP2K
+limitations. A Libxc assertion is required for BEEF-vdW as well as RPBE and
+meta-GGAs; its native shortcut includes Libxc PW92 internally.
 
 ## All-electron automatic setup (0.2.7)
 
@@ -120,7 +135,8 @@ belong to an ECP branch. In particular, the inspected pob-TZVP-rev2 library requ
 ECPs for Rb-Po. All nuclear potentials must have real ALL/ALLELECTRON entries with
 valid selected payloads and occupations equal to Z; pseudopotentials are rejected.
 All AE families use POTENTIAL, not an inferred functional-specific GTH library.
-Pure ALL does not need GTH-PBE approximation approval; RPBE still needs Libxc.
+Pure ALL does not need GTH-PBE approximation approval; supported RPBE still
+needs Libxc. The 0.3.0 meta-GGA/BEEF-vdW scope does not enable GAPW.
 Custom 900 retains its existing pseudopotential-only meaning.
 
 First AE scope is Gamma ENERGY/ENERGY_FORCE/GEO_OPT at target 2026.2; mixed AE/PP,

@@ -9,6 +9,7 @@ import re
 from types import MappingProxyType
 
 from .errors import KitError
+from .functional_registry import FUNCTIONALS
 
 
 class BasisRole(str, Enum):
@@ -29,7 +30,7 @@ class BasisOption:
     aliases: tuple[str, ...] = ()
     kind_type: str = 'pseudopotential'
     role: BasisRole = BasisRole.ORB
-    functionals: tuple[str, ...] = ('PBE', 'BLYP', 'PBESOL', 'REVPBE', 'RPBE')
+    functionals: tuple[str, ...] = FUNCTIONALS
     protocol: str = 'classic'
     status: str = 'enabled'
     restriction: str = 'Element/electron-model coverage must be checked; no substitution.'

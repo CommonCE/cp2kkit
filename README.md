@@ -2,7 +2,7 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.2.9 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.3.0 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 - Analysis remains read-only: no submission/execution or modification of existing
@@ -16,7 +16,47 @@ release certified with actual CP2K runs.
   an existing regular `.inp`; sources, data files and symlinks remain protected.
 - Energies can be extracted from failed jobs without becoming valid scientific results.
 
-## Current version: 0.2.9
+## Planned 0.3.x functional and method coverage
+
+The [functional/method expansion proposal](docs/functional-roadmap-0.3.md) uses
+Multiwfn 2026.10.1's CP2K generator as the primary coverage/assembly reference:
+21 DFT selections, including complete nonlocal methods, plus the **GFN-xTB
+series (GFN0, GFN1 and GFN2)**. GFN0/1 use CP2K-native implementations; GFN2
+requires tblite. Delivery is staged with target-version/data/combination checks;
+upstream defaults and correlated methods are not enabled automatically.
+Version 0.3.0 implements the 15 non-hybrid DFT profiles below. The remaining
+six hybrids and all GFN-xTB models are still plans, not enabled features.
+
+## Current version: 0.3.0
+
+The non-hybrid XC scope follows Multiwfn's actual component/nonlocal assembly,
+with target **CP2K 2026.2** checks:
+
+| Family | Implemented profiles |
+|---|---|
+| LDA | PADE (LDA alias) |
+| GGA | PBE, revPBE, PBEsol, BP86 (BP alias), BLYP, RPBE |
+| Meta-GGA | TPSS, revTPSS, SCAN, r2SCAN, MN15L (MN15-L alias), HLE17 |
+| Required nonlocal correlation | B97M-rV, BEEF-vdW |
+
+RPBE, all meta-GGAs and **BEEF-vdW** require `--libxc-available` / menu 113;
+BEEF-vdW's native shortcut uses Libxc PW92 internally. This is an explicit user
+build assertion, not detection. Matched potentials are preferred; missing matches
+require `--allow-pbe-potential` / menu 114, never automatic relabeling.
+B97M-rV includes rVV10 with b/C = 6.0/0.01; BEEF-vdW includes LMKLL. Their
+`dispersion=none` means **no additional pair correction**, not disabled intrinsic
+nonlocal correlation. Supply `--data-dir` to check/read/hash the required kernel;
+without it, kernel resolution remains an unchecked runtime requirement.
+
+Initial meta-GGA/nonlocal scope is GPW, Gamma, ENERGY/ENERGY_FORCE/GEO_OPT,
+without +U. GAPW/non-Gamma/CELL_OPT/+U require separate validation; these are
+cp2kkit scope limits, not CP2K-wide prohibitions. Existing GGA paths, basis IDs,
+CLI/config/replay controls and default PBE input physics remain compatible.
+Schema stays 0.1.0 with additive XC/kernel provenance. No hybrids, xTB, new
+runtime dependency or native calculation is included. See the
+[full capability/dispersion matrix](docs/input-generation.md#non-hybrid-xc-profiles-030).
+
+### Retained 0.2.9 workflows
 
 Version **0.2.9** simplifies 602 option 4 to one six-integer line:
 `all_charge all_multiplicity A_charge A_multiplicity B_charge B_multiplicity`.
@@ -275,8 +315,10 @@ Complete CLI calls remain noninteractive. Rich is optional; --plain/NO_COLOR
 disables styling; neither curses nor Multiwfn is a runtime dependency.
 See [input generation](docs/input-generation.md).
 
-Supported: ENERGY/ENERGY_FORCE/GEO_OPT/CELL_OPT, PBE/BLYP/PBEsol/revPBE/RPBE, MOLOPT-GTH,
-D3/D3(BJ), charge/multiplicity, cell/PBC, OT/diagonalization, and k-points.
+Supported: ENERGY/ENERGY_FORCE/GEO_OPT/CELL_OPT subject to the
+[per-profile limits](docs/input-generation.md#non-hybrid-xc-profiles-030), 15 non-hybrid
+XC profiles, MOLOPT-GTH, checked D3/D3(BJ) combinations, charge/multiplicity,
+cell/PBC, OT/diagonalization, and k-points on the existing semilocal paths.
 For target CP2K **2026.2**, explicit Hubbard Ueff/L and collinear magnetic initial
 states are also supported, including same-element opposite-spin KIND splitting.
 `112`: enter `Element:L:Ueff_eV` entries separated by semicolons; `off` disables.
@@ -334,8 +376,9 @@ See [the cube guide](docs/cube.md) for formats, units, physics, AB/A/B examples,
 ## Additional GGA and basis profiles (0.2.6)
 
 Current menu IDs for these CLI controls: `221` / `--basis-overrides`, `114` / `--allow-pbe-potential`,
-`113` / `--libxc-available`. Approval is shown for new GGA profiles; the Libxc
-assertion is shown for RPBE. Hidden values are retained, not silently reset.
+`113` / `--libxc-available`. Approval is shown outside PBE/BLYP; the Libxc
+assertion follows each profile's requirement, including BEEF-vdW's native shortcut.
+Hidden values are retained, not silently reset.
 
 ```bash
 # Syntax examples only: inputs, spin, U, dispersion and convergence need system-specific checks.

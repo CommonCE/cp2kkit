@@ -39,6 +39,8 @@ workflows, parameter tables, defaults, or rewritten code. Record actual use hone
 Registered modules include `src/cp2kkit/inputgen.py` (generation),
 `src/cp2kkit/spin_settings.py` (explicit Ueff/L and initial-spin KIND organization),
 `src/cp2kkit/method_profiles.py` (inspected parametrized-PBE/Libxc RPBE/q/reference branches),
+`src/cp2kkit/functional_registry.py` (0.3.0 non-hybrid XC/component/nonlocal
+assembly, including Libxc-backed meta-GGAs and BEEFVDW's internal PW92 requirement),
 and `src/cp2kkit/input_tui.py` / `src/cp2kkit/input_editor.py` (numbered interaction
 and selected inspected upstream main-menu IDs, not a full Fortran UI port).
 Menu 9 fixed atoms references the inspected index/range workflow and
@@ -90,8 +92,8 @@ input references and database headers; sources are in [input generation](docs/in
 src/cp2kkit/data_catalog.py derives header-only name/element/q/file metadata from
 CP2K v2026.2 BASIS_MOLOPT, BASIS_MOLOPT_UCL, GTH_POTENTIALS,
 BASIS_MOLOPT_UZH_2026.2 and POTENTIAL_UZH_2026.2; versioned URLs/hashes
-also identify inspected XC/D3/input definitions. No Fortran implementations, basis
-coefficients, potential parameters or dftd3.dat are distributed. These metadata do
+also identify inspected XC/D3/input definitions. No Fortran/Libxc C implementations, basis
+coefficients, potential parameters, dftd3.dat or nonlocal kernel tables are distributed. These metadata do
 not establish whole-project license compatibility or native-runtime certification.
 The UCL library header credits Sanliang Ling and Ben Slater; MOLOPT references
 VandeVondele and Hutter, J. Chem. Phys. 127, 114105 (2007), DOI 10.1063/1.2770708. User-supplied --data-dir files are checked read-only and hashed;

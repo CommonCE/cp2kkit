@@ -8,6 +8,42 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.3.0
+
+- Add ten non-hybrid XC profiles to the original five: PADE, BP86, TPSS,
+  revTPSS, SCAN, r2SCAN, MN15L, HLE17, B97M-rV and BEEF-vdW. Reference
+  Multiwfn 2026.10.1's actual XC/nonlocal definitions; preserve the original five
+  chooser positions. Share canonical names/aliases across CLI, TUI, config and API.
+- Emit complete B97M-rV (Libxc MGGA_XC_B97M_V + rVV10 b/C=6.0/0.01) and
+  BEEF-vdW (native BEEFVDW + required LMKLL) definitions. Both retain intrinsic
+  correlation when additional dispersion is none; reject extra D3/D3(BJ).
+  Read/hash kernel files when data_dir is supplied and protect them from output
+  replacement. Unchecked runtime filenames and source-byte-only checks are
+  explicitly distinguished from numerical kernel/runtime validation.
+- Gate all new profiles to target CP2K 2026.2. Require explicit Libxc-build
+  assertions for meta-GGAs and BEEF-vdW (native shortcut needs Libxc PW92), as
+  already required for RPBE. Initial meta-GGA/nonlocal subset: GPW Gamma
+  ENERGY/ENERGY_FORCE/GEO_OPT without +U; reject GAPW/non-Gamma/CELL_OPT/+U
+  rather than silently changing physics. Existing semilocal restrictions remain.
+- Add audited header-only PADE/BP potential coverage and real BP86 -> GTH-BP
+  mapping at unchanged q. Prefer actual matched potentials; missing matches need
+  explicit PBE-approximation approval. UZH-PBE remains PBE-only. No production
+  basis/potential/kernel coefficients or Fortran are bundled.
+- Whitelist additional pair corrections per profile against the inspected CP2K
+  tables: BP86/TPSS/revTPSS/SCAN allow D3 and D3(BJ), r2SCAN D3(BJ), MN15L D3;
+  PADE/HLE17 allow neither. Retain the original five correction combinations.
+- Add XC family/components, native shortcut/parametrization, zero exact exchange,
+  kinetic-density/scope and nonlocal/kernel metadata. Lock nonlocal identity
+  across density-bundle components. Schema remains 0.1.0; basis/menu registry v1,
+  CLI/config/replay names and default PBE input text/physics are retained.
+- Validation: 430 regression tests passed, none skipped. User-authorized actual
+  generator testing against Multiwfn 2026.8.31 passed 95 paired H/O cases and
+  79 negative CLI checks. Development reference remains Multiwfn 2026.10.1;
+  the executed binary is a different version. Complete XC/nonlocal/dispersion
+  semantics and selected H/O data payloads matched in the tested matrix.
+  No CP2K execution, convergence/property certification, installation/new dependency,
+  hybrid/HFX/ADMM, xTB, submission or package publication.
+
 ## 0.2.9
 
 - Emit portable BASIS_MOLOPT_UZH / POTENTIAL_UZH names for default UZH-PBE

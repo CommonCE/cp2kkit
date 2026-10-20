@@ -1,6 +1,54 @@
 # Development status and next steps
 
-Current software: **0.2.9**; schema: **0.1.0**.
+Current software: **0.3.0**; schema: **0.1.0**.
+
+## Proposed 0.3.x scope: functional and method coverage
+
+The [functional/method expansion proposal](functional-roadmap-0.3.md) follows
+Multiwfn 2026.10.1's outCP2Kinp menu and XC/HF/ADMM/RI/dispersion branches,
+not an independently chosen 14-profile list. The reference DFT scope contains
+21 selections (including configurable PBEh and complete B97M-rV/BEEF-vdW),
+without counting ADMM/dispersion variants as additional functionals. Preserve the original five profiles.
+Add the **GFN-xTB series (GFN0, GFN1, GFN2)** separately: native GFN0/1,
+tblite GFN2. Stage registry/LDA/GGA, meta-GGA, complete nonlocal methods and
+hybrids; xTB can proceed after method dispatch exists. Audit target-version
+keywords/units, data/model pairing, spin, tasks and build requirements; do not
+copy automatic physical changes, unchecked parameters or direct writes blindly.
+MP2/RPA/GW, double hybrids and other non-XC methods remain separate later scopes.
+The non-hybrid subset is implemented in 0.3.0 below; six hybrids and the xTB
+series remain planned. Default PBE input physics is unchanged.
+
+### 0.3.0 implemented non-hybrid scope
+
+- Fifteen profiles: original five GGAs plus PADE/BP86, TPSS/revTPSS/SCAN/r2SCAN/
+  MN15L/HLE17 and complete B97M-rV/BEEF-vdW. Shared semantic registry, aliases,
+  CLI/menu/config/replay and additive XC/kernel provenance; basis/function IDs
+  and existing first-five functional chooser positions are unchanged.
+- Target 2026.2 for new profiles. Meta-GGAs/nonlocal methods: GPW Gamma
+  ENERGY/ENERGY_FORCE/GEO_OPT without +U. Explicit build assertions include
+  BEEF-vdW's internal Libxc PW92. No automatic PBE-potential approximation,
+  q/model changes or pair-dispersion addition to nonlocal methods.
+- PADE/BP header coverage audited at fixed q; complete nonlocal parameters/kernel
+  filenames and supplied-file hashes recorded. Kernel source checks do not
+  validate numerical kernels; runtime/grid convergence remain unverified.
+- Validation: **430 tests passed, none skipped**, including 27 new synthetic
+  non-hybrid methods and retained default-input regressions; compileall, CLI
+  version, 126 local links/anchors across 20 Markdown files and diff checks passed.
+  Read-only actual-data assembly covered all 15 water GPW profiles with checked
+  basis/potential sources and nonlocal-kernel byte hashes; no native execution or
+  scientific acceptance/convergence claim. See the
+  [capability/dispersion matrix](input-generation.md#non-hybrid-xc-profiles-030).
+- User-authorized actual-generator follow-up: **95/95 paired cases** against
+  Multiwfn **2026.8.31**, covering all 15 profiles for ENERGY/ENERGY_FORCE/GEO_OPT,
+  charged doublets and XYZ periodic water, plus 20 allowed D3/D3(BJ) combinations;
+  **79/79 rejection checks** passed without input publication. XC/nonlocal semantics
+  and selected H/O basis/potential payloads matched. Original inputs/logs, corrected
+  scratch-comparator history and final summaries remain locally under
+  `test-workspace/pure-functional-0.3.0-20261020-155629-SwFpIH/` (ignored, not bundled).
+  The executed binary is not the 2026.10.1 development source. No CP2K execution,
+  scientific/convergence validation or broader element-coverage claim follows.
+- Hybrids/HFX/ADMM/RI-HFX, UZH-PBE0, GFN-xTB, arbitrary mixtures, D4 and broader
+  meta-GGA task/model combinations remain future work.
 
 ### 0.2.9 implemented development scope
 
@@ -29,7 +77,7 @@ Current software: **0.2.9**; schema: **0.1.0**.
 - [Numbering/allocation guide](menu-numbering-draft.md) distinguishes this
   implemented subset from provisional unimplemented electronic/property models
   and categories 700-1000. [Workflow guide](input-generation.md) records limitations.
-- Latest validation: **403 tests passed, none skipped**, including menu/workflow
+- Historical 0.2.9 validation: **403 tests passed, none skipped**, including menu/workflow
   tests, migrated UI regressions and follow-up parity/cube/naming/navigation cases;
   compileall, CLI version, maintained-text/link and diff checks passed. Synthetic
   generation and PTY/CLI smoke only.
@@ -283,8 +331,10 @@ old default, or emitting target-version-unsupported keywords without checking.
    cell constraints, anisotropic pressure, and actual magnetic-state validation.
 3. **Methods/bases:** 0.2.6 adds PBEsol/revPBE/RPBE and explicit catalog-backed
    MOLOPT/UCL mixed bases; the registry follow-up adds UZH-PBE pairs and custom ORB.
-   Remaining: r2SCAN/meta-GGAs, native/scientific UZH validation, UZH-PBE0,
-   hybrids/HF/ADMM/RI-HFX, GPW/GAPW, auxiliary/all-electron bases, additional families/
+   Version 0.3.0 adds the non-hybrid registry and complete nonlocal methods;
+   initial GAPW/all-electron bases were added in 0.2.7. Remaining: broader meta-GGA
+   model/task support, native/scientific UZH validation, UZH-PBE0,
+   hybrids/HF/ADMM/RI-HFX, auxiliary and additional all-electron bases/families/
    q policies, correlated wavefunctions, semiempirical/force fields and SCF options.
 4. **Tasks:** frequencies/vibrations/Raman, MD, dimer TS, BAND/NEB, NMR, polarizability,
    BSSE, real-time electrons, PIMD, XAS, appropriate TDDFT.

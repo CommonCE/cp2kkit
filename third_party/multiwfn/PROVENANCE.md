@@ -4,6 +4,120 @@ This records facts, not permission inferred from labels such as "reference-based
 or "rewritten in another language". Prefer version/file/subroutine/SHA-256;
 line numbers are auxiliary. Do not invent upstream commits, inspection dates, or grants.
 
+## Non-hybrid XC implementation (0.3.0)
+
+- Local: functional_registry.py shared definitions/aliases; method_profiles.py,
+  basis_registry/resolution and data_catalog.py matching; inputgen.py XC/kernel
+  assembly/provenance; CLI/TUI/config/replay adapters; density_workflow.py
+  nonlocal-identity lock. Fifteen profiles, no hybrid/HFX/ADMM or xTB implementation.
+- Reference: Multiwfn 2026.10.1, cp2kmate.f90, outCP2Kinp; actual rechecked SHA-256
+  `f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402`.
+  Menu/mapping 933-1056, native/Libxc XC 1991-2150, nonlocal/dispersion 2329-2392.
+  Actual use: PADE/BP shortcut meanings; exact TPSS/revTPSS/SCAN/r2SCAN/MN15-L/
+  HLE17/B97M component names; B97M-rV RVV10 b/C=6.0/0.01 and kernel;
+  BEEFVDW + LMKLL/kernel; retain original parametrized-PBE/RPBE definitions.
+- Independently checked supplied CP2K tree `/home/xwp/soft/cp2k-2026.2`,
+  REVISION git:c92cc08. Directory identity is not binary-version certification.
+  input_cp2k_xc.F verifies keywords/nesting/units; input_cp2k_check.F 207-233
+  expands BEEFVDW into BEEF exchange, 0.3998335231 PBEc + 0.6001664769
+  **Libxc LDA_C_PW**, and LMKLL. The native shortcut therefore requires a
+  Libxc-build assertion. Its raw SHA-256
+  `e1f26b06bbc6121a31f9c50c4056dbe43f08a328425c46010566b4e6555ccb5d`
+  also matches fetched tagged v2026.2 bytes; reference URL/hash is in data_catalog.py.
+  Existing catalog hashes match the inspected input/XC wrapper/D3/GTH files.
+- Read-only GTH_POTENTIALS header/payload checks derive PADE/BP coverage; hash
+  `5a9bfbc3b37a55917ade4fb704b80546d210d843759b94e3915e74acfc3fafb2`.
+  At unchanged fixed-q policy: 71 PADE and 41 BP matches. BP86 -> GTH-BP is an
+  explicit mapping, not a new potential. Absent matches require explicit PBE
+  approval. UZH-PBE remains PBE-only; no q/model change or implicit fallback.
+- Local Libxc 7.0.0 source under CP2K tools/toolchain/build: src/mgga_xc_b97mv.c
+  confirms b=6.0/C=0.01 and tau dependence, hash
+  `7e3e897a94bd2b15e34d34924275954836d35a6f58d0979b71f017c88426d673`;
+  src/mgga_xc_hle17.c confirms the combined 1.25/0.5 TPSS definition, hash
+  `e333f01d054adc1521320b509ceb7898a83bd76e64b034b73ad23cded55e6035`.
+  No Libxc C implementation or numerical parameter arrays are bundled.
+- Inspected local kernel hashes: rVV10_kernel_table.dat
+  `7468a396e8f4dd3ff6492db92f200f174df73305c7a3baa85c2117c4122dddb4`;
+  vdW_kernel_table.dat
+  `d26887fb29a104edd03fa85a1d073a380a56fa1680b76eacf7b2c0e86d53a6fd`.
+  Runtime users' bytes are hashed separately; neither matching hash nor readable
+  source bytes establish numerical kernel fitness. No kernel is distributed.
+- Differences: curated dispersion whitelist follows the actual CP2K zero/BJ
+  tables, not every upstream menu combination. No automatic SCAN grid/potential,
+  solver, spin or basis resets. Meta-GGA/nonlocal initial scope is GPW Gamma
+  ENERGY/ENERGY_FORCE/GEO_OPT without +U; GAPW/non-Gamma/CELL_OPT/+U await
+  separate validation. Preserve 400/55 Ry defaults with convergence warnings.
+  No extra DFT-D on intrinsic nonlocal methods; none means no extra pair term.
+  Kernel/source protection and whole/A/B identity checks reuse local writers.
+- Existing 2012/2024 citations remain in input/JSON and notices; custom
+  [terms](TERMS.md), absent separate permission and licensing limits are unchanged.
+  Reference-based Python assembly is not a clean-room or whole-port claim.
+- Validation: synthetic XC/coefficient/nesting, alias/build/potential gates,
+  capability/dispersion matrix, CLI/TUI/config/replay, CDD identity and protected
+  publication tests; source/data parsing and hashes only. Actual-data, in-memory
+  water assemblies covered all 15 profiles (neutral, multiplicity 1, GPW,
+  DZVP-MOLOPT-SR-GTH, fixed q; matched or explicitly approved PBE potentials,
+  no additional pair dispersion). Nonlocal kernels were read/hashed only.
+  This initial implementation audit did not execute CP2K/Multiwfn; it established
+  no native acceptance, convergence, forces/stress accuracy or property validation.
+
+### User-authorized generator comparison follow-up
+
+- Actual executable `/home/xwp/soft/multiwfn/Multiwfn` reported **2026.8.31**
+  in all 95 paired runs; this is not execution of the 2026.10.1 reference source.
+  cp2kkit 0.3.0 was invoked through the configured Python module entry point;
+  both generators exited 0 for every paired case, at one Multiwfn thread each.
+- All 15 profiles: ENERGY, ENERGY_FORCE and GEO_OPT input generation, charge +1 /
+  multiplicity 2 / UKS, and XYZ periodic water; 20 additional allowed D3/D3(BJ)
+  combinations. H/O DZVP-MOLOPT-SR-GTH, q1/q6, neutral singlet or charged doublet,
+  Gamma/OT, CUTOFF/REL_CUTOFF 400/55 Ry. No electronic calculation was executed.
+- 95/95 final semantic comparisons and 79/79 negative CLI checks passed;
+  selected H/O basis/potential numerical payloads matched across POTENTIAL and
+  GTH_POTENTIALS despite generic versus explicit-q aliases. B97M-rV b/C and
+  required nonlocal kernels matched. Ordinary ENERGY EPS_SCF differs by retained
+  policy (cp2kkit 1e-6 vs this binary's 5e-6), not an input-assembly defect.
+- Local ignored evidence directory:
+  `test-workspace/pure-functional-0.3.0-20261020-155629-SwFpIH/`.
+  identity.json records actual binary/source/settings/data hashes;
+  summary-v4.json/csv and negative-summary.json/csv are final results.
+  Original generated inputs, stdin, full logs, exit/timing records, earlier
+  scratch-parser corrections and final file hashes are retained, not distributed.
+- No production source or original generated input needed modification. Corrected
+  only the scratch comparator's .inp dispatch, ORB role and lone-UKS semantics;
+  reanalysis reused the same preserved inputs. Full regression: 430 passed,
+  none skipped. This checks generators and selected data, not CP2K acceptance,
+  numerical kernel evaluation, convergence or property correctness. No new grant,
+  clean-room, version-equivalence or whole-project license claim.
+
+## Functional and GFN-xTB planning reinspection (planning-stage 0.3.x)
+
+- Historical planning inspection: [functional/method proposal](../../docs/functional-roadmap-0.3.md).
+  The non-hybrid implementation is registered above; hybrids/xTB remain planned.
+  This planning note itself adds no copied Fortran or calculation result.
+- Reinspected local Multiwfn 2026.10.1, `cp2kmate.f90`, `outCP2Kinp`;
+  development locator `../Multiwfn_2026.10.1_src_Linux/cp2kmate.f90`.
+  Actual SHA-256 recheck matches the original baseline:
+  `f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402`.
+- Actual reference scope: method menu/mapping (approximately 933-1056),
+  xTB selection (1815-1841), ADMM/XC (1964-2150), HF/RI (2168-2240),
+  dispersion/name mapping/nonlocal kernels (2329-2392). File/hash/subroutine
+  identify the source; these line locators are auxiliary.
+- Use upstream coverage and complete XC/HF/dispersion definitions as the primary
+  development reference, not a new independent functional shortlist. The inspected
+  menu has 21 DFT selections excluding double hybrids/correlated methods and
+  ADMM variants; PBEh is one configurable family. GFN0/1
+  native and GFN2/tblite agree with the user's requested series mapping.
+- Planned differences: preserve local stable IDs, semantic APIs, explicit
+  compatibility/data checks, non-destructive writers and retained defaults.
+  Target-version syntax, coefficients/units, basis/potential pairing, auxiliary
+  data and correction combinations still require individual audits. No blanket
+  migration of restart/sanity-check/solver/resource policies is authorized.
+- MP2/RPA/GW, double hybrids, PM6/DFTB/FIST remain later scopes, despite appearing
+  in the same upstream menu. Static inspection is not runtime equivalence,
+  convergence or scientific validation. Multiwfn/CP2K were not executed here.
+- Existing custom terms, both required papers and unknown authorization boundaries
+  remain unchanged. No clean-room, relicensing or separate-permission claim.
+
 ## Numbered cube selector and CDD linkage (retained 0.2.9)
 
 - Inspected Multiwfn 2026.9.20 `cp2kmate.f90`, -3 selection branch at lines

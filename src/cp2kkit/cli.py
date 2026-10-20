@@ -20,6 +20,7 @@ from .structure import read_structure
 from .spin_settings import parse_dft_plus_u, parse_magnetism
 from .method_profiles import parse_basis_overrides
 from .constraints import parse_fixed_atoms
+from .functional_registry import parse_functional
 
 
 def build_parser():
@@ -58,7 +59,8 @@ def build_parser():
     gen.add_argument("--write-json", action="store_true", help="Also write exclusive provenance JSON; default writes only input. Existing .inp may be replaced, JSON may not.")
     gen.add_argument("--project", help="Default: structure filename without its suffix")
     gen.add_argument("--run-type", type=str.upper, choices=RUN_TYPES, default="ENERGY")
-    gen.add_argument("--functional", type=str.upper, choices=FUNCTIONALS, default="PBE")
+    gen.add_argument("--functional", type=parse_functional, choices=FUNCTIONALS, default="PBE",
+                     help="Non-hybrid profile; aliases LDA/PADE, BP/BP86, MN15-L/MN15L, BEEF-vdW/BEEFVDW")
     gen.add_argument("--basis", type=parse_basis, default=DEFAULT_BASIS,
                      help="Stable ORB ID or legacy family name; numbers are interactive-only")
     gen.add_argument("--gapw-profile", choices=("auto", "native"), default="auto",
@@ -72,10 +74,11 @@ def build_parser():
     gen.add_argument('--basis-overrides', type=parse_basis_overrides, default=(),
                      help='Target 2026.2: Element=basis entries separated by semicolons; explicit mixed basis, off clears')
     gen.add_argument('--allow-pbe-potential', action='store_true',
-                     help='Explicitly approve GTH-PBE approximation where the requested GGA has no matched potential')
+                     help='Explicitly approve GTH-PBE approximation where the requested functional has no matched potential')
     gen.add_argument('--libxc-available', action='store_true',
-                     help='User assertion that target CP2K was built with Libxc, required for RPBE; not detected')
-    gen.add_argument("--dispersion", choices=["none", "d3", "d3bj"], default="none")
+                     help='User assertion that target CP2K was built with Libxc, required for Libxc profiles; not detected')
+    gen.add_argument("--dispersion", choices=["none", "d3", "d3bj"], default="none",
+                     help="Additional pair correction; B97M-rV/BEEF-vdW always retain required nonlocal correlation")
     gen.add_argument("--charge", type=int, default=0)
     gen.add_argument("--multiplicity", type=int, default=None,
                      help='Default auto: even electron count -> 1, odd -> 2; explicit values override')

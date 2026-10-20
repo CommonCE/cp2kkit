@@ -123,6 +123,14 @@ port or evidence of validation with the actual software.
   header comments; restart suggestions are metadata/review only, never uncommented
   into active input. No permission to touch existing wavefunctions is implied.
   BFGS/LBFGS TRUST_RADIUS 0.2 angstrom and XYZ position trajectories are retained.
+- 0.3.0 non-hybrid XC registry has 15 profiles; preserve the original five chooser
+  positions and immutable basis/function IDs. New profiles target 2026.2.
+  RPBE, meta-GGAs and BEEFVDW require explicit Libxc assertions (BEEFVDW's native
+  shortcut needs Libxc PW92). Initial meta-GGA/nonlocal scope: GPW Gamma
+  ENERGY/ENERGY_FORCE/GEO_OPT without +U. Required B97M-rV rVV10 b/C=6.0/0.01
+  and BEEF-vdW LMKLL are intrinsic, not extra pair dispersion; none retains them.
+  Kernel byte/hash checks do not validate numerical kernels. Keep kernel sources
+  protected and consistent across CDD components; never invent potential tags/q.
 - Do not start expensive calculations. Actual CP2K validation requires explicit
   authorization and a new run directory.
 - For failed-job diagnosis, load `qchem-error-diagnosis`, collect software/version

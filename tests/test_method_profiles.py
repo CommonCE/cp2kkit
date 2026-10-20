@@ -64,7 +64,8 @@ class MethodProfileTests(unittest.TestCase):
         (self.dir/'GTH_POTENTIALS').write_text(potential_entry('O', 6, 'GTH-PBE-q6') + potential_entry('Fe', 16, 'GTH-PBE-q16'))
 
     def test_functional_names_and_distinct_xc_expansions(self):
-        self.assertEqual(FUNCTIONALS, ('PBE', 'BLYP', 'PBESOL', 'REVPBE', 'RPBE'))
+        self.assertEqual(FUNCTIONALS[:5], ('PBE', 'BLYP', 'PBESOL', 'REVPBE', 'RPBE'))
+        self.assertEqual(len(FUNCTIONALS), 15)
         for functional in ('PBESOL', 'REVPBE', 'RPBE'):
             with self.subTest(functional=functional):
                 text, manifest = self.generate(functional=functional, allow_pbe_potential=True, libxc_available=True)
@@ -119,7 +120,7 @@ class MethodProfileTests(unittest.TestCase):
                 self.generate(**kwargs)
 
     def test_dispersion_reference_whitelist_uses_the_actual_functional(self):
-        for functional in FUNCTIONALS:
+        for functional in FUNCTIONALS[:5]:  # Retained 0.2.6 correction cross-product; new profiles have narrower whitelists.
             for dispersion in ('none', 'd3', 'd3bj'):
                 with self.subTest(functional=functional, dispersion=dispersion):
                     text, manifest = self.generate(functional=functional, dispersion=dispersion,

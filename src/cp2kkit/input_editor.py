@@ -4,6 +4,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from .errors import KitError
+from .functional_registry import parse_functional
 from .input_tui import (Cancelled, SessionExit, Menu, GROUPS, field_display,
                         parse_value, visible_fields)
 from .inputgen import InputSettings, generate_input, write_input
@@ -291,6 +292,10 @@ def run_editor(path, frame, output, settings, stdin=None, stdout=None, plain=Fal
     values = {**asdict(settings), 'path': path, 'frame': frame,
               'output': output or (Path(path).stem+'.inp' if path else None),
               '_edited': set(), '_origins': origins, '_auto_output': output is None}
+    try:
+        values['functional'] = parse_functional(values['functional'])
+    except ValueError:
+        pass  # Invalid API-seeded drafts remain editable; review reports the error.
     if values['_auto_output']:
         values['output'] = automatic_output(values)
     if values['density_difference']:
