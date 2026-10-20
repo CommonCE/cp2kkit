@@ -156,17 +156,17 @@ class InputWritingTests(unittest.TestCase):
         self.output.write_text('old input')
         log = TTY()
         run_interactive(str(self.path), -1, str(self.output), self.settings,
-                        stdin=TTY('0\n\n-10\n'), stdout=log, plain=True)
+                        stdin=TTY('w\n\n-10\n'), stdout=log, plain=True)
         self.assertEqual(self.output.read_text(), 'old input')
         run_interactive(str(self.path), -1, str(self.output), self.settings,
-                        stdin=TTY('0\ny\n\n'), stdout=log, plain=True)
+                        stdin=TTY('w\ny\n\n'), stdout=log, plain=True)
         self.assertIn('may be replaced', log.getvalue())
         self.assertFalse(Path(str(self.output)+'.json').exists())
         self.assertIn('JSON output: disabled', log.getvalue())
 
-    def test_menu_132_enables_json(self):
+    def test_menu_501_enables_json(self):
         run_interactive(str(self.path), -1, str(self.output), self.settings,
-                        stdin=TTY('132\ny\n0\ny\n\n'), stdout=TTY(), plain=True)
+                        stdin=TTY('501\ny\n0\ny\n\n'), stdout=TTY(), plain=True)
         self.assertTrue(Path(str(self.output)+'.json').exists())
 
     def test_library_filenames_have_no_quotes(self):

@@ -81,12 +81,72 @@ image/path/sha256, run, quality.
 CSV contains both record types; kind chooses the plotted subset.
 Plot segments independently without cross-segment connections.
 
+## Generated input JSON: menu/workflow additions (software 0.2.9)
+
+Schema stays 0.1.0; these are additive settings/manifest fields. Analysis/CSV
+semantics, immutable basis registry v1 and semantic CLI/config names do not change.
+Numeric 0.2.8 TUI extension scripts require explicit migration.
+
+- settings.multiplicity accepts null for automatic whole-system parity selection;
+  generated input and manifest settings resolve it to an integer (even electrons 1,
+  odd electrons 2, after charge). Explicit values are preserved; fragment
+  multiplicities remain required integers, not automatic spin predictions.
+- emitted_data_files records the literal input references for basis (list),
+  potential (string) and dispersion (string or null). Default UZH references use
+  BASIS_MOLOPT_UZH / POTENTIAL_UZH; data_sources and KIND source evidence retain
+  the independently resolved paths/hashes. Explicit file overrides are preserved.
+- generator.menu_layout_version=1: function-navigation layout, not a basis registry,
+  schema or CP2K runtime version. The same metadata is present in batch generation.
+- Settings: density_difference Boolean (default false), fragment_a_indices compact
+  1-based whole-system selection (default off), fragment_a_charge,
+  fragment_b_charge, fragment_a_multiplicity, fragment_b_multiplicity (default null).
+  Disabled workflows retain requests without applying them. Enabled workflows
+  require explicit integer fragment states and nonempty complementary partition.
+- generate_input continues returning (whole_input_text, manifest). For a workflow,
+  density_difference contains enabled, expression, density_meaning, both expanded
+  index lists, atom_index_base=1, atom_mapping, common_grid_policy,
+  magnetic_seed_policy, ghost_basis=false, charge_conserving=true,
+  runtime_validated=false and cube_grid_match_verified=false.
+- components.whole/fragment_a/fragment_b are complete ordinary generator manifests,
+  including settings, source/data identities, generated geometry, KINDs, input_text,
+  input_sha256, electron counts, units, density output and validation boundaries.
+  Their density_difference setting is false to prevent recursive workflows.
+  Fragment source metadata adds derived_fragment and whole_atom_indices.
+- Workflow settings retain raw global electron_density toggles; components explicitly
+  enable density output. Resolved numerical defaults and per-element requests are
+  inherited from the whole calculation; fragment atom-seed indices are explicitly
+  mapped. Under UKS, electron/spin output channels remain coupled.
+- method_profile.ngrids_selection distinguishes effective orbital basis policy from
+  a whole-system workflow lock. If whole NGRIDS=5, both fragment inputs emit 5,
+  including subsets whose own basis policy would omit it; otherwise all omit it.
+  This does not verify actual CUBE grid equality or change ordinary defaults.
+- atom_mapping records whole_index, element, fragment A/B, fragment_index and
+  generated position_angstrom. CSV columns are whole_index, element, fragment,
+  fragment_index, x_angstrom, y_angstrom, z_angstrom; coordinates have eight decimals.
+- write_input retains (whole_path, nullable_combined_json_path, warnings). Use
+  density_workflow.bundle_paths(settings, output) to enumerate all targets.
+  Output must end in .inp: derive -fragment-A.inp, -fragment-B.inp and -atom-map.csv
+  from its stem. The combined JSON is optional, at <whole-output>.json, and adds
+  density_difference.output_paths (absolute paths for this publication).
+- All requested bundle targets are exclusive, preflighted and staged. Ordinary
+  error/interrupt rollback removes only our published inodes; no crash-atomic
+  transaction claim. Existing JSON with JSON disabled is retained and warned.
+  Ordinary single-input replacement permission does not extend to bundles.
+
+The workflow is ENERGY GPW valence density only, charge conserving, without
+ghosts/separate relaxation/centering, spin-density difference inference or native
+execution. Actual reference-state fitness and produced CUBE grids remain unverified.
+See [input generation](input-generation.md#two-fragment-density-difference-inputs-029).
+
 ## Generated input JSON: density extension
 
 Schema 0.1.0 adds channels/optional fields without changing existing result semantics.
-TUI and regular CLI share a manifest; drafts are written only after confirmation.
+TUI and regular CLI share a manifest. Generator-main 0 validates/writes directly;
+w reviews and requires confirmation; category/602 0 returns without writing.
+Complete batch calls write noninteractively.
 Final settings record actual selections, not UI/session histories; schema is unchanged.
-Auto project/max_scf/added_mos resolve to actual values, not null:
+Auto project/multiplicity/max_scf/added_mos resolve to actual values, not null:
+multiplicity uses explicit-electron parity after charge (even 1, odd 2);
 project uses the source basename without suffix; OT inner default 25, diag 128;
 diag+smearing empty orbitals default to `max(30, NINT(atom_count/2))`, otherwise 0.
 max_outer_scf is the OT outer limit (20 default), unused by diag.
@@ -196,7 +256,7 @@ No runtime validation is inferred from a filename, version, hash or successful e
 ## Generated input output policy (0.2.7 follow-up)
 
 JSON is opt-in, not a default file: settings.write_json=false by default;
---write-json or menu 132 enables it. generate_input still returns (text, manifest)
+--write-json or menu 501 enables it. generate_input still returns (text, manifest)
 in memory. write_input returns (input_path, sidecar_path_or_null, warnings).
 Existing regular .inp may be replaced; optional JSON remains exclusive and its
 failure/collision must leave an existing input unchanged. Existing JSON is never

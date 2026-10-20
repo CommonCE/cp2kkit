@@ -8,6 +8,76 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.2.9
+
+- Emit portable BASIS_MOLOPT_UZH / POTENTIAL_UZH names for default UZH-PBE
+  inputs (UZH AE bases only change the basis reference). Keep explicit file
+  overrides and resolved source/hash provenance; record emitted_data_files
+  separately. Runtime generic aliases must resolve to the intended data.
+
+- Suggest <source-stem>-CDD.inp when CDD is enabled with automatic TUI naming,
+  including initially seeded CDD and subsequent source changes. Disabling CDD
+  restores the ordinary name; explicit user paths and bundle collision protection
+  remain unchanged.
+
+- Return from successful input generation immediately without an extra
+  Enter-to-return prompt; the parent application menu resumes automatically.
+
+- Default whole-system multiplicity to electron-parity selection: even -> 1,
+  odd -> 2, with neutral charge still the default. Use selected PP/AE electron
+  counts minus charge; preserve explicit spin requests. Menu 102 supports auto
+  and displays its effective value. Resolved input/JSON records an integer;
+  CDD fragment states remain explicit. This does not predict ground-state spin.
+
+- For all tasks, generator-main 0 directly validates/writes inputs without review
+  or confirmation; optional JSON still follows 501. Category/602
+  0 only returns, and w retains review/confirmation. Make 602 option 1 an immediate
+  on/off toggle without an extra Boolean prompt.
+
+- Make -3/601 a numbered cube selector (0 None, 1 Electron density), limited
+  to implemented types. UKS also prints spin density; None clears both requests.
+  Enabling CDD in 602 automatically enables the shared density request and blocks
+  disabling it while CDD is active; disabling CDD retains density output.
+
+- Simplify 602 option 4 to a single six-integer charge/multiplicity entry for
+  whole/A/B, including the shared total state. Show all three pairs in the menu.
+  Validate integer count, positive multiplicities and charge conservation before
+  updating any values; Enter/back preserve the old values. CLI/schema unchanged.
+- Omit the automatic per-atom listing when selecting fragment A in 602; prompt
+  directly for indices. Explicit mapping reviews remain available through 3/5.
+  Fixed-atom and magnetic editors retain their coordinate tables.
+
+- Implement menu layout v1: compact common shortcuts, category browsing with full
+  IDs, direct access from main/categories, origin-preserving edits and shared
+  applicability. 500 is output/provenance; 600 is properties. Future/empty
+  categories are not shown. No full-screen UI or new dependency.
+- Migrate local 100+ function numbers explicitly. Old 112 ADDED_MOS becomes 341;
+  new 112 is DFT+U. Old numeric TUI scripts need migration; semantic
+  CLI/config/replay names and immutable basis registry v1 numbers are unchanged.
+- Add category editors for existing source/data/cell/output/project/version
+  controls, transactional custom file/alias pairs, and read-only summary 550.
+- Add 602 / --density-difference for ENERGY GPW whole/A/B density input bundles.
+  Require explicit fragment charges/multiplicities, nonempty complementary
+  1-based partitions, charge conservation and component electron-count parity.
+  Keep relative atom order, record CSV mapping and map magnetic atom seeds.
+- Resolve whole-system geometry once; retain a common cell, PBC, origin
+  convention and numerical settings. Freeze whole-system derived SCF defaults
+  and NGRIDS policy across fragments; compare selected per-element basis,
+  potential and data-source identities. Actual output CUBE grids remain unverified.
+- Publish three inputs and mapping together, optional combined JSON, exclusively.
+  Preflight collisions and roll back only our own files on ordinary publication
+  errors/interrupts. No existing bundle target is replaceable; not a crash-atomic
+  multi-file transaction. Ordinary single-input replacement policy is unchanged.
+- Retain 0.2.8 numerical defaults, constraints, restart/comment policy and schema
+  0.1.0. Menu-layout metadata and workflow settings/manifests are additive.
+- No ghost basis, separate relaxation/centering, spin-density difference workflow,
+  AE density semantics, arbitrary multi-fragment partition, CP2K execution,
+  convergence certification, commit or publication is implied.
+- Latest validation: 403 tests passed, none skipped, including new menu/workflow
+  methods, migrated UI regressions and follow-up parity/cube/naming/navigation cases;
+  compileall, CLI version, maintained-text/link and diff checks passed. Includes CLI subprocess and real PTY smoke, data-hash mutation,
+  bundle collision/race/rollback, config/replay and shared-grid geometry checks.
+
 ## 0.2.8
 
 ### Uniform SCF threshold follow-up (version retained)

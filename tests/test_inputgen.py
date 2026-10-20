@@ -40,6 +40,26 @@ class InputGenerationTests(unittest.TestCase):
         self.assertEqual(self.water.positions[0], [0., 0., 0.])
         self.assertEqual((text, manifest), generate_input(self.water, self.settings))
 
+    def test_automatic_multiplicity_even_odd_and_explicit_override(self):
+        self.assertEqual(InputSettings().charge, 0)
+        self.assertIsNone(InputSettings().multiplicity)
+        for charge, expected in ((0, 1), (1, 2), (-1, 2)):
+            text, report = generate_input(self.water, replace(self.settings, charge=charge))
+            self.assertEqual(report['settings']['multiplicity'], expected)
+            self.assertIn(f'MULTIPLICITY {expected}', text)
+        radical = Structure(['H'], [[0., 0., 0.]], None, None, {'path': 'synthetic-radical'})
+        text, report = generate_input(radical, self.settings)
+        self.assertEqual(report['settings']['multiplicity'], 2)
+        self.assertIn('UKS T', text)
+        for basis in ('molopt-sr-dzvp', 'ae-6-31g-star'):
+            _, report = generate_input(self.water, replace(self.settings, basis=basis, charge=1))
+            self.assertEqual(report['settings']['multiplicity'], 2)
+        _, report = generate_input(self.water, replace(self.settings, multiplicity=3))
+        self.assertEqual(report['settings']['multiplicity'], 3)
+        with self.assertRaisesRegex(KitError, 'Charge/multiplicity inconsistent'):
+            generate_input(radical, replace(self.settings, multiplicity=1))
+        self.assertIsNone(self.settings.multiplicity)
+
     def test_readable_eps_formatting_and_custom_precision(self):
         for task, default, eps in (("ENERGY", "1.0E-11", "1.0E-06"),
                                    ("GEO_OPT", "1.0E-12", "1.0E-06")):

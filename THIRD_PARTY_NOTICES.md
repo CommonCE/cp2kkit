@@ -46,9 +46,14 @@ MOTION/CONSTRAINT/FIXED_ATOMS templates; local constraints.py is a bounded Pytho
 parser, not a port of upstream str2arr. Fractional-coordinate semantics and LIST
 repetition were checked against the supplied local CP2K source. No Fortran or
 new numerical payload is bundled; authorization/citation limits are unchanged.
-The local 124/125 U/magnetism extensions are not upstream main-menu IDs;
+The historical local 124/125 U/magnetism extensions (now 112/103) are not upstream main-menu IDs;
 they require explicit parameters and do not reproduce upstream's automatic
 multiplicity-from-local-moments change.
+Software 0.2.9 adds local menu_registry.py category/direct routing and
+density_workflow.py bundle orchestration, reusing the existing generator and
+density-print references. No VASPKIT code, new upstream keyword template or
+numerical payload is bundled. See the feature provenance for the common-grid
+lock, explicit atom mapping and validation boundaries.
 Not distributing original Fortran or requiring the Multiwfn binary does not
 establish strict clean-room implementation or exemption from upstream conditions.
 

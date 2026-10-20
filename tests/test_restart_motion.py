@@ -170,12 +170,12 @@ class RestartMotionTests(unittest.TestCase):
         log = TTY()
         # Hidden -5 in ENERGY; select optimization/format/radius; hide radius for CG,
         # try selecting it (refused), then restore LBFGS and write.
-        lines = '-5\n-1\nGEO_OPT\n-5\nextxyz\n133\n0.13\n10\nCG\n133\n10\nLBFGS\n0\ny\n\n'
+        lines = '-5\n-1\nGEO_OPT\n-5\nextxyz\n400\n403\n0.13\n10\nCG\n403\n10\nLBFGS\n0\n0\ny\n\n'
         run_interactive(str(self.source), -1, str(output), replace(self.settings, write_json=True),
                         stdin=TTY(lines), stdout=log, plain=True)
         self.assertIn('Invalid menu number', log.getvalue())
         self.assertIn('-5. Trajectory format:', log.getvalue())
-        self.assertIn('133. TRUST_RADIUS [angstrom]:', log.getvalue())
+        self.assertIn('403. TRUST_RADIUS [angstrom]:', log.getvalue())
         m = json.loads(Path(str(output)+'.json').read_text())
         self.assertEqual(m['settings']['trajectory_format'], 'EXTXYZ')
         self.assertEqual(m['settings']['trust_radius'], .13)

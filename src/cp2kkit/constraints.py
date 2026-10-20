@@ -1,4 +1,4 @@
-"""Explicit fixed-atom selections; no source-constraint inheritance or atom remapping."""
+"""Shared bounded atom selections and fixed constraints; no identity remapping."""
 import re
 
 from .errors import KitError
@@ -44,6 +44,23 @@ def parse_fixed_atoms(raw):
                     for first, last in _ranges(raw)) or 'off'
 
 
+def _expand_ranges(ranges, atom_count, label):
+    if ranges and ranges[-1][1] > atom_count:
+        raise KitError(f'{label} index exceeds the loaded structure ({atom_count} atom{"s" if atom_count != 1 else ""}); '
+                       'indices refer to the selected frame/expanded geometry, starting at 1')
+    return tuple(index for first, last in ranges for index in range(first, last+1))
+
+
+def resolve_atom_indices(raw, atom_count):
+    """Resolve a generic whole-system selection without a constraint/version gate."""
+    try:
+        selection = parse_fixed_atoms(raw)
+        ranges = _ranges(selection)
+    except ValueError as exc:
+        raise KitError(str(exc)) from exc
+    return selection, _expand_ranges(ranges, atom_count, 'Atom')
+
+
 def resolve_fixed_atoms(raw, atom_count, optimizing, target):
     """Expand only active, in-bounds ranges; hidden requests are never applied."""
     try:
@@ -55,7 +72,4 @@ def resolve_fixed_atoms(raw, atom_count, optimizing, target):
         return selection, ()
     if target != '2026.2':
         raise KitError('Fixed-atom constraints are currently keyword-checked only for target CP2K 2026.2')
-    if ranges[-1][1] > atom_count:
-        raise KitError(f'Fixed-atom index exceeds the loaded structure ({atom_count} atom{"s" if atom_count != 1 else ""}); '
-                       'indices refer to the selected frame/expanded geometry, starting at 1')
-    return selection, tuple(index for first, last in ranges for index in range(first, last+1))
+    return selection, _expand_ranges(ranges, atom_count, 'Fixed-atom')

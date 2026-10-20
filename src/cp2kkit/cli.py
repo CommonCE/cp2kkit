@@ -77,7 +77,8 @@ def build_parser():
                      help='User assertion that target CP2K was built with Libxc, required for RPBE; not detected')
     gen.add_argument("--dispersion", choices=["none", "d3", "d3bj"], default="none")
     gen.add_argument("--charge", type=int, default=0)
-    gen.add_argument("--multiplicity", type=int, default=1)
+    gen.add_argument("--multiplicity", type=int, default=None,
+                     help='Default auto: even electron count -> 1, odd -> 2; explicit values override')
     gen.add_argument("--periodic", type=str.upper, choices=PERIODICITIES,
                      help="Default: source PBC; plain XYZ requires explicit selection")
     gen.add_argument("--cell", type=float, nargs=3, metavar=("A", "B", "C"), help="Override orthorhombic lengths (angstrom)")
@@ -94,6 +95,12 @@ def build_parser():
     gen.add_argument("--smearing", type=float, help="Fermi-Dirac electronic temperature (K); requires diag")
     gen.add_argument("--added-mos", type=int, help="Auto: max(30, NINT(atom_count/2)) with diag+smearing, otherwise 0")
     gen.add_argument("--optimizer", type=str.upper, choices=["BFGS", "LBFGS", "CG"], default="BFGS")
+    gen.add_argument("--density-difference", action="store_true", help="ENERGY GPW: exclusive whole/A/B density-input bundle and atom map")
+    gen.add_argument("--fragment-a-indices", type=parse_fixed_atoms, default="off", help="1-based whole-system indices/ranges; B is the complement")
+    gen.add_argument("--fragment-a-charge", type=int)
+    gen.add_argument("--fragment-a-multiplicity", type=int)
+    gen.add_argument("--fragment-b-charge", type=int)
+    gen.add_argument("--fragment-b-multiplicity", type=int)
     gen.add_argument("--fixed-atoms", type=parse_fixed_atoms, default="off",
                      help="Optimization, target 2026.2: 1-based atoms/ranges, e.g. 1,3-5; off or 0 clears; fixes fractional XYZ")
     gen.add_argument("--trust-radius", type=float, default=0.2, help="Angstrom; BFGS/LBFGS optimization only")
@@ -190,7 +197,8 @@ def execute(args):
         output, sidecar, warnings = write_input(structure, InputSettings(**values), args.output)
         for warning in warnings:
             print(f"WARNING: {warning}", file=sys.stderr)
-        print(f"Wrote {output}"+(f" and {sidecar}" if sidecar is not None else ""), file=sys.stderr)
+        from .density_workflow import bundle_paths
+        print("Wrote "+", ".join(map(str, bundle_paths(InputSettings(**values), output))), file=sys.stderr)
         return 0
     if args.command == "discover":
         emit({"schema_version": SCHEMA_VERSION, "projects": [p.to_dict() for p in discover(args.path)]}, args.output)

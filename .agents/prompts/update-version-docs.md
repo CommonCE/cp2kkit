@@ -37,7 +37,10 @@ Requirements:
 5. Update README, `docs/roadmap.md`, and affected feature documents.
    Recheck architecture/schema for interface/data changes; update third-party
    provenance/terms when references change. Preserve historical versions/test counts.
-   Check English-language consistency and local links.
+   Check English-language consistency and local links. For generator changes,
+   reconcile README, menu guide and `.agents` with the actual navigation/write policy,
+   automatic defaults and naming. Keep planned allocations distinct from implemented
+   registry entries; do not replace historical validation counts with current totals.
 6. Check version consistency; run focused tests, full regression, compileall,
    `git diff --check`, and `python -m cp2kkit --version`. Use counts from the
    actual run; state checks not run.

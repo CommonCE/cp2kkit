@@ -70,7 +70,7 @@ GROUPS = (
         Field('libxc_available', 'Assert target CP2K was built with Libxc (required for RPBE; not detected by this tool)', 'bool'))),
     ("Charge and spin", (
         Field("charge", "Total charge [e] (not inherited from restart)", "int"),
-        Field("multiplicity", "Spin multiplicity (>1 enables UKS; magnetic state not inherited)", "int", minimum=1))),
+        Field("multiplicity", "Spin multiplicity (auto: even electrons 1, odd 2; >1 enables UKS)", "int", optional=True, minimum=1))),
     ("Periodicity and cell", (
         Field("periodic", "Periodicity (auto: source PBC; explicitly select if XYZ PBC is unknown)",
               choices=PERIODICITIES, optional=True),
@@ -93,6 +93,13 @@ GROUPS = (
     ("Hubbard U and magnetism", (
         Field('dft_plus_u', 'DFT+U: Element:L:Ueff_eV; separate entries with semicolons; off disables (e.g. Fe:2:4.0)', 'hubbard'),
         Field('magnetism', 'Magnetism: uks or Element=moment; @atom=moment (1-based); e.g. Fe=4; @2=-4; auto restores multiplicity-based spin. Moments are initial alpha-beta electron numbers.', 'magnetic'))),
+    ("Density-difference workflow", (
+        Field("density_difference", "Generate whole/A/B density inputs", "bool"),
+        Field("fragment_a_indices", "Fragment A whole-system atom indices/ranges; B is the complement", "fixed_atoms"),
+        Field("fragment_a_charge", "Fragment A charge [e] (explicit confirmation required)", "int", optional=True),
+        Field("fragment_a_multiplicity", "Fragment A multiplicity", "int", optional=True, minimum=1),
+        Field("fragment_b_charge", "Fragment B charge [e] (explicit confirmation required)", "int", optional=True),
+        Field("fragment_b_multiplicity", "Fragment B multiplicity", "int", optional=True, minimum=1))),
     ("Electron/spin density cubes", (
         Field("electron_density", "Electron density (GPW pseudopotential valence density)", "bool"),
         Field("spin_density", "Spin density (alpha-minus-beta; requires UKS)", "bool"),
@@ -118,7 +125,8 @@ def visible_fields(fields, values):
     return tuple(f for f in fields
                  if not (f.name == 'gapw_profile' and not has_ae)
                  and not (f.name == 'pressure' and values['run_type'] != 'CELL_OPT')
-                 and not (f.name in {'trust_radius', 'trajectory_format', 'fixed_atoms'} and values['run_type'] not in {'GEO_OPT', 'CELL_OPT'})
+                 and not (f.name in {'optimizer', 'max_iter', 'trust_radius', 'trajectory_format', 'fixed_atoms'} and values['run_type'] not in {'GEO_OPT', 'CELL_OPT'})
+                 and not (f.name == 'density_difference' and (values['run_type'] != 'ENERGY' or has_ae))
                  and not (f.name == 'trust_radius' and values['optimizer'] not in {'BFGS', 'LBFGS'})
                  and not (f.name == 'vacuum' and periodic != 'NONE')
                  and not (f.name in {'smearing', 'added_mos'} and values['scf'] == 'ot')
@@ -129,6 +137,18 @@ def visible_fields(fields, values):
 
 def field_display(field, values):
     value = values[field.name]
+    if field.name == 'multiplicity' and value is None:
+        try:
+            from .inputgen import automatic_multiplicity
+            structure = read_structure(values['path'], values['frame'])
+            settings = InputSettings(**{name: values[name] for name in InputSettings.__dataclass_fields__})
+            return f'{automatic_multiplicity(structure, settings)} (auto: electron parity)'
+        except (KitError, OSError, TypeError, KeyError):
+            return 'auto (even electrons: 1; odd: 2)'
+    if field.name == 'electron_density':
+        enabled = value or values.get('spin_density') or values.get('density_difference')
+        label = '1 Electron density' if enabled else '0 None'
+        return label + (' (required by CDD 602)' if values.get('density_difference') else '')
     if field.kind == 'basis':
         try:
             option = basis_option(value, require_selectable=False)
@@ -342,7 +362,8 @@ class Menu:
         text, manifest = generate_input(structure, settings)
         self.heading("\n--- Review & write (not runtime/convergence certification) ---")
         self.show(f"Source: {Path(values['path']).resolve()}; frame={values['frame']}")
-        self.show(f"Charge [e]: {settings.charge}; Spin multiplicity: {settings.multiplicity}")
+        self.show(f"Charge [e]: {settings.charge}; Spin multiplicity: {manifest['settings']['multiplicity']}"
+                  + (' (auto: electron parity)' if settings.multiplicity is None else ''))
         if settings.dft_plus_u or settings.magnetism is not None:
             self.show(f"DFT+U [eV]: {format_dft_plus_u(settings.dft_plus_u)}"
                       + ('; projectors: MULLIKEN' if settings.dft_plus_u else ''))
@@ -406,15 +427,28 @@ class Menu:
         for warning in manifest["warnings"]:
             self.show(f"Warning: {warning}")
         self.show(f"Input path: {Path(values['output']).resolve()}")
-        self.show("Existing regular .inp may be replaced; source/data files and other results stay protected.")
+        self.show("Density-difference bundle: all targets must be new." if settings.density_difference else
+                  "Existing regular .inp may be replaced; source/data files and other results stay protected.")
         if settings.write_json:
             self.show(f"Sidecar path: {Path(str(values['output'])+'.json').resolve()} (existing JSON is protected)")
         else:
-            self.show("JSON output: disabled (input only)")
+            self.show("JSON output: disabled (three inputs and atom map)" if settings.density_difference else "JSON output: disabled (input only)")
+        if settings.density_difference:
+            from .density_workflow import bundle_paths
+            workflow = manifest["density_difference"]
+            self.show("Density difference: n_whole - n_fragment_A - n_fragment_B (electron-number density)")
+            for label in ("whole", "fragment_a", "fragment_b"):
+                component = workflow["components"][label]
+                self.show(f"{label}: atoms={len(component['generated_structure']['symbols'])}; charge={component['settings']['charge']}; multiplicity={component['settings']['multiplicity']}; electrons={component['explicit_electron_count']}")
+            self.show("Whole-to-fragment atom mapping: "+str(workflow["atom_mapping"]))
+            self.show("Bundle paths (all exclusive): "+", ".join(map(str, bundle_paths(settings, values["output"]))))
         if full:
             self.show("Reproducible command (current working directory; not executed automatically):")
             self.show(shlex.join(command_arguments(values["path"], values["frame"], values["output"], settings)))
             self.show("\n--- Input preview (not written) ---\n" + text)
+            if settings.density_difference:
+                for label in ("fragment_a", "fragment_b"):
+                    self.show("\n--- "+label+" preview ---\n"+manifest["density_difference"]["components"][label]["input_text"])
         return structure, settings
 
 

@@ -154,7 +154,7 @@ class AllElectronTests(unittest.TestCase):
             output = self.root/f'choice-{number}.inp'
             log = TTY()
             run_interactive(str(path), -1, str(output), self.settings,
-                            stdin=TTY(f'110\n{number}\n110\n\n0\ny\n\n'), stdout=log, plain=True)
+                            stdin=TTY(f'324\n{number}\n324\n\n0\ny\n\n'), stdout=log, plain=True)
             self.assertIn('ALGORITHM '+algorithm, output.read_text())
 
     def test_invalid_algorithm_and_profile_are_not_repaired(self):
@@ -209,7 +209,7 @@ class AllElectronTests(unittest.TestCase):
         self.assertEqual(m['explicit_electron_count'], 9)
         self.assertFalse(m['kinds']['O']['potential_approximation'])
         with self.assertRaisesRegex(KitError, 'Charge/multiplicity inconsistent'):
-            self.generate(charge=1)
+            self.generate(charge=1, multiplicity=1)
 
     def test_semantic_names_replay_and_sidecar_roundtrip(self):
         self.assertEqual(parse_basis('def2-tzvp'), 'ae-def2-tzvp')
@@ -241,17 +241,17 @@ class AllElectronTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn('ALGORITHM STRICT', output.read_text())
 
-    def test_main_menu_110_choices_keep_cancel_auto_and_hidden_value(self):
+    def test_direct_324_choices_keep_cancel_auto_and_hidden_value(self):
         path = self.root/'water.xyz'
         path.write_text('3\nsynthetic\nO 0 0 0\nH .76 0 .58\nH -.76 0 .58\n')
         output = self.root/'menu.inp'
         # Explicit STRICT, switch diag/back, abandoned change, then confirm.
-        lines = '110\nSTRICT\n4\ndiag\n4\not\n110\nback\n0\ny\n\n'
+        lines = '300\n324\nSTRICT\n4\ndiag\n4\not\n324\nback\n0\n0\ny\n\n'
         log = TTY()
         code = run_interactive(str(path), -1, str(output), replace(self.settings, write_json=True),
                                stdin=TTY(lines), stdout=log, plain=True)
         self.assertEqual(code, 0)
-        self.assertIn('110. ALGORITHM:', log.getvalue())
+        self.assertIn('324. ALGORITHM:', log.getvalue())
         self.assertIn('IRAC', log.getvalue())
         self.assertIn('STRICT', log.getvalue())
         self.assertIn('ALGORITHM STRICT', output.read_text())
@@ -259,5 +259,5 @@ class AllElectronTests(unittest.TestCase):
         # Auto restores pob IRAC without altering the stored starting settings.
         other = self.root/'auto.inp'
         run_interactive(str(path), -1, str(other), replace(self.settings, ot_algorithm='STRICT'),
-                        stdin=TTY('110\nauto\n0\ny\n\n'), stdout=TTY(), plain=True)
+                        stdin=TTY('324\nauto\n0\ny\n\n'), stdout=TTY(), plain=True)
         self.assertIn('ALGORITHM IRAC', other.read_text())

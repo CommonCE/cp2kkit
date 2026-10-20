@@ -2,7 +2,7 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.2.8 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.2.9 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 - Analysis remains read-only: no submission/execution or modification of existing
@@ -16,7 +16,32 @@ release certified with actual CP2K runs.
   an existing regular `.inp`; sources, data files and symlinks remain protected.
 - Energies can be extracted from failed jobs without becoming valid scientific results.
 
-## Current version: 0.2.8
+## Current version: 0.2.9
+
+Version **0.2.9** simplifies 602 option 4 to one six-integer line:
+`all_charge all_multiplicity A_charge A_multiplicity B_charge B_multiplicity`.
+All six values update together; invalid input leaves them unchanged.
+Generator-main `0` validates and writes directly; `w` reviews and asks for
+confirmation. Category/602 `0` only returns. Successful generation returns to
+the application menu without an extra Enter prompt.
+
+Whole-system multiplicity defaults to electron parity (even -> 1, odd -> 2),
+not a ground-state spin prediction; explicit requests are preserved. Automatic
+TUI output naming uses `<source-stem>-CDD.inp` while CDD is enabled. Default
+UZH inputs emit portable `BASIS_MOLOPT_UZH` / `POTENTIAL_UZH` references;
+resolved data paths/hashes remain in provenance and explicit file overrides win.
+
+Version **0.2.9** implements the first menu-allocation round: compact common
+shortcuts, category browsing and full-number direct access (menu layout v1),
+plus **602 two-fragment density-difference input preparation**. It creates the
+whole/A/B ENERGY inputs and an atom-mapping CSV, with optional combined JSON;
+all bundle targets must be new. Geometry/cell/grid controls are shared, fragment
+charges/spins require explicit values, and no CP2K execution or automatic cube
+subtraction is performed. Advanced 700-1000 features remain deferred.
+Software/schema/target/menu/basis versions are independent; schema stays 0.1.0.
+See [workflow details](docs/input-generation.md#two-fragment-density-difference-inputs-029)
+and [number migration](docs/menu-numbering-draft.md#14-migration-from-the-028-extension-numbers).
+
 
 Version **0.2.8** adds **9. Fixed atoms** to GEO_OPT/CELL_OPT menus.
 Enter 1-based indices/ranges such as `1,3-5,8`; `off` or `0` clears,
@@ -31,7 +56,7 @@ The retained-version follow-up defaults EPS_SCF to **1e-6 for all tasks**, inclu
 ENERGY; explicit `--eps-scf` overrides still win. EPS_DEFAULT is unchanged.
 
 Version **0.2.7** now writes only the input by default and allows replacing an
-existing regular `.inp`. Use `--write-json` or menu **132** for optional provenance
+existing regular `.inp`. Use `--write-json` or menu **501** for optional provenance
 JSON (still exclusive). Existing JSON is never deleted/updated implicitly.
 Basis/potential filenames, like D3 filenames, are emitted without quotes.
 
@@ -44,7 +69,7 @@ Version **0.2.7** adds all-electron orbital choices **50-59** with automatic
 GAPW/ALL and core-inclusive electron counts. The retained 0.2.8 policy now emits
 NGRIDS 5 only for classic non-SR TZVP/TZV2P/TZV2PX-MOLOPT-GTH; other bases
 omit NGRIDS. GAPW split tolerances and atomic grids use CP2K defaults.
-Main-menu **110 ALGORITHM** appears only for OT: choose IRAC/STRICT, or `auto`
+Full ID **324 ALGORITHM** appears only for OT: choose IRAC/STRICT, or `auto`
 for the basis-aware default; explicit selection wins. CLI: `--ot-algorithm IRAC`.
 The automatic AE setup is a starting profile, not convergence certification;
 both legacy auto/native profile names now default to explicit IRAC for all AE
@@ -55,7 +80,7 @@ See [the AE guide](docs/basis-selection.md#all-electron-automatic-setup-027).
 The retained 0.2.8 follow-up keeps only generator/Multiwfn header comments.
 Restart suggestions follow PROJECT (.wfn for Gamma, .kp otherwise) in metadata/
 review only; no SCF_GUESS or WFN_RESTART_FILE_NAME hint is emitted or enabled.
-Optimizations use explicit BFGS/LBFGS TRUST_RADIUS 0.2 angstrom (menu **133**,
+Optimizations use explicit BFGS/LBFGS TRUST_RADIUS 0.2 angstrom (menu **403**,
 `--trust-radius`), and **-5** / `--trajectory-format pdb|xyz|extxyz` selects
 MOTION position output (XYZ default; EXTXYZ checked for target 2026.2).
 Both SCF wavefunction and MOTION restart backup copies are set to 0; restart
@@ -138,25 +163,28 @@ NO_COLOR=1 cp2kkit crystal.cif
 
 Navigation:
 - Application main menu: `0` or `q` exits; ordinary submenus use `0`/`back` to return.
-- Input generation uses inspected Multiwfn main-menu IDs for corresponding options;
-  `100+` are explicitly local extensions. All applicable fields share one list.
-  **Here `0` reviews/generates after confirmation; `-10`/`back`/`cancel` returns.**
-  `q` exits the entire session. Hidden fields leave gaps without renumbering.
-- Structure path/frame appear in the header; `s` changes the source and `f` changes
-  the XYZ frame. Output path, project and target version are not settings-menu rows.
+- Input generation uses common shortcuts plus category browsing/full IDs.
+  **Generator-main 0 validates/writes directly; w reviews and confirms;
+  category 0/back returns without writing.** Generator-main -10/back/cancel returns; q exits the session.
+  Hidden fields are retained; direct access cannot bypass applicability.
+- Structure/frame remain in the header (s/f or 201/202). Output/project/version
+  are editable in category 500; source/data/results remain protected.
 - Parameter prompts: Enter keeps the value, `back` abandons that edit; literal
   `0` is a value, not navigation, except in the basis chooser where it returns.
   Optional `auto` restores source/default behavior.
-- Use `r` to review, `p` to preview the full input/replay command, or `0`/`w` to
-  review and write with explicit y/yes confirmation. Output defaults to the source
-  stem plus `.inp` in the current directory; CLI overrides remain supported.
-  Existing regular `.inp` targets may be replaced after confirmation. JSON/non-input
-  collisions remain protected; a recovery prompt accepts another path.
+- Use `r` to review or `p` to preview the full input/replay command without writing.
+  Use generator-main `0` to validate/write directly, or `w` to review/write with
+  explicit y/yes confirmation. Automatic output uses the source stem plus `.inp`
+  in the current directory (`-CDD.inp` while CDD is enabled); explicit paths win.
+  Ordinary generation may replace an existing regular `.inp`; CDD bundle targets
+  must all be new. JSON/non-input collisions remain protected; a recovery prompt
+  accepts another path.
 - Ctrl+C cancels an operation back to main; at main it exits. EOF exits cleanly.
   Completed files are retained; unfinished writes use the existing rollback.
 - Result summaries show Success/Warning/Error and full generated paths.
-  Parsing success is distinct from calculation quality. Enter returns to main;
-  `d` optionally shows complete analysis details.
+  Parsing success is distinct from calculation quality. Analysis summaries use
+  Enter to return and `d` for full details; successful input generation returns
+  immediately to the application menu.
 
 These are ordinary line-oriented menus: no clearing, alternate screen, continuous
 redraw, curses, or Textual. Narrow terminals fold text rather than truncate paths.
@@ -227,37 +255,32 @@ cp2kkit generate-input water.xyz -o water.inp --periodic NONE --tui
 cp2kkit generate-input
 ```
 
-All implemented input options appear together, Multiwfn-style, in one scrolling
-numbered menu: task/optimization, method/basis/dispersion,
-charge/spin, cell/PBC, SCF/occupations/k-points, grids, and density outputs.
-There is no Step 1/6 workflow, hidden advanced page, or group-selection submenu.
-Conditional fields are hidden when inapplicable: pressure outside CELL_OPT,
-isolated padding unless effective PBC is NONE, smearing/empty orbitals for OT,
-and outer SCF limits for diag. Unknown PBC is not treated as NONE. Remaining
-numbers do not change. Hidden values are retained, never silently reset; switch
-to the applicable mode to edit conflicting overrides. Selecting a field shows its full prompt
-and choices, then returns to the same settings menu with edits retained.
-Use `r` for review, `p` for full preview/replay, and `0`/`w` for review plus explicit
-y/yes writing. `-10`/`back`/`cancel` returns; `q` exits the session. Matching IDs include
-`-7` PBC, `-3` density cube, `-1` task, `1–4` method/basis/dispersion/SCF, `6` smearing,
-`8` k-points, `10` optimizer, and `12` pressure. Unsupported upstream options are
-omitted. Other implemented fields use `100+` extension IDs, not a hidden submenu.
-Source/frame controls are in the header. Project and target-version overrides are
-CLI-only (`--project`, `--cp2k-version`); `-o` remains available to seed an output path.
-Slots **124 / 125** now configure **DFT+U / magnetic initialization**, respectively.
-Cell overrides and data directories remain available through `--cell` / `--data-dir`;
-the basis chooser also has data-source controls (`d`, `b`, `v`) without numbered main-menu rows.
-Complete CLI calls remain noninteractive, and machine-readable JSON/CSV is never
-rendered through Rich. Add `--plain` for unstyled interaction.
-Neither curses nor Multiwfn is a runtime dependency. Version 0.2.8 retains this menu layout, including OT-only 110 ALGORITHM, and adds optimization-only 9 Fixed atoms.
+The scrolling generator shows compact common shortcuts plus unexpanded category
+entrances **100-600**. Open a category to browse full IDs or enter a full ID
+directly, e.g. **101** for charge, **324** for OT ALGORITHM, **501** for JSON,
+**602** for whole/A/B density-difference inputs. Category **500 owns output**;
+**600 owns properties**. Unimplemented future categories are not displayed.
+
+Generator-main 0 validates and writes directly; w reviews and writes only after
+y/yes. Category 0/back returns without writing. Edits return to the originating menu; direct entry shares the same
+applicability and validator as category browsing. Hidden values remain retained.
+Source/frame s/f remain available (201/202); output/project/version also have
+category editors (502/503/504). Common shortcuts, semantic CLI/config/replay
+fields, and the independent immutable basis registry numbers remain supported.
+**Old 100+ TUI scripts must migrate**: old 112 ADDED_MOS becomes 341, while
+new 112 is DFT+U; no ambiguous numeric aliases. See the
+[full numbering/migration guide](docs/menu-numbering-draft.md).
+
+Complete CLI calls remain noninteractive. Rich is optional; --plain/NO_COLOR
+disables styling; neither curses nor Multiwfn is a runtime dependency.
 See [input generation](docs/input-generation.md).
 
 Supported: ENERGY/ENERGY_FORCE/GEO_OPT/CELL_OPT, PBE/BLYP/PBEsol/revPBE/RPBE, MOLOPT-GTH,
 D3/D3(BJ), charge/multiplicity, cell/PBC, OT/diagonalization, and k-points.
 For target CP2K **2026.2**, explicit Hubbard Ueff/L and collinear magnetic initial
 states are also supported, including same-element opposite-spin KIND splitting.
-`124`: enter `Element:L:Ueff_eV` entries separated by semicolons; `off` disables.
-`125`: enter `uks`, or `Element=moment; @atom=moment`; `auto` restores the original
+`112`: enter `Element:L:Ueff_eV` entries separated by semicolons; `off` disables.
+`103`: enter `uks`, or `Element=moment; @atom=moment`; `auto` restores the original
 multiplicity-based spin behavior. Atom selectors are 1-based loaded/expanded order.
 Element seeds apply first; atom seeds override them. Initial moments are alpha-minus-
 beta electron numbers, not fixed moment constraints. No U, charge or multiplicity
@@ -266,7 +289,7 @@ is inferred/adjusted. For example, `Fe:2:4.0` and `Fe=4; @2=-4` illustrate synta
 The matching CLI flags are `--dft-plus-u` and `--magnetism` (quote semicolon lists).
 Without these explicit requests, generated CP2K input text/default physics stays unchanged.
 By default only the input is written; existing regular `.inp` can be replaced.
-`--write-json` / menu 132 adds an exclusively created `<output>.json`. If that
+`--write-json` / menu 501 adds an exclusively created `<output>.json`. If that
 JSON already exists, generation fails before changing the input.
 Structures include XYZ/extXYZ, restart, Cartesian GJF/COM, CIF, and VASP5 POSCAR/CONTCAR.
 PROJECT defaults to the source filename without suffix; grid defaults to 400/55 Ry;
@@ -310,8 +333,8 @@ See [the cube guide](docs/cube.md) for formats, units, physics, AB/A/B examples,
 
 ## Additional GGA and basis profiles (0.2.6)
 
-New CLI/menu controls: `128` / `--basis-overrides`, `129` / `--allow-pbe-potential`,
-`130` / `--libxc-available`. Approval is shown for new GGA profiles; the Libxc
+Current menu IDs for these CLI controls: `221` / `--basis-overrides`, `114` / `--allow-pbe-potential`,
+`113` / `--libxc-available`. Approval is shown for new GGA profiles; the Libxc
 assertion is shown for RPBE. Hidden values are retained, not silently reset.
 
 ```bash

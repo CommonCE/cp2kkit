@@ -185,7 +185,7 @@ class FormatTests(FormatCase):
         output = self.dir/'helium.inp'
         log = TTY()
         run_interactive(str(self.dir/'helium.xyz'), -1, str(output), InputSettings(periodic='NONE'),
-                        stdin=TTY('4\ndiag\n6\n300\n0\ny\n\n'), stdout=log, plain=True)
+                        stdin=TTY('4\ndiag\n6\n300\nw\ny\n\n'), stdout=log, plain=True)
         self.assertIn('33 (auto)', log.getvalue())
         self.assertIn('ADDED_MOS 33', output.read_text())
 
@@ -217,7 +217,7 @@ class MainMenuTests(FormatCase):
         self.read('crystal.cif', CIF)
         output = self.dir/'crystal.inp'
         log, err = TTY(), io.StringIO()
-        lines = '132\ny\n0\ny\n\n0\n'
+        lines = '501\ny\n0\ny\n\n0\n'
         previous = Path.cwd()
         try:
             os.chdir(self.dir)

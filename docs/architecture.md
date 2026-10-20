@@ -4,6 +4,9 @@
 
 The initial analysis MVP baseline is preserved in [the roadmap](roadmap.md).
 Later requirements add an [input-generation](input-generation.md) subset.
+The [numbering/allocation guide](menu-numbering-draft.md) records implemented
+menu layout v1 (software 0.2.9) plus separately labeled provisional future features.
+The current registry contains only implemented entries; no placeholder categories.
 No submission system or deferred Bader/PDOS/NEB post-processing is introduced.
 
 1. **Read-only sources:** analysis never runs external calculations or writes back to sources.
@@ -12,7 +15,8 @@ No submission system or deferred Bader/PDOS/NEB post-processing is introduced.
 4. **Conservative assessment:** null is unknown; unknown/failed/truncated cannot pass.
 5. **No implicit selection/restart merging:** sort candidates by name, not time/size guesses.
 6. **Narrow replacement permission:** analysis/JSON/exports remain exclusive;
-   generation alone may atomically replace regular .inp, never sources/data/symlinks.
+   ordinary single-input generation alone may atomically replace regular .inp,
+   never sources/data/symlinks. Density bundles require all requested targets to be new.
 7. **Minimal dependencies:** standard-library core, isolated optional plotting/Rich presentation, no ASE requirement.
 
 ## Modules and dependency direction
@@ -28,7 +32,7 @@ cli.py
  |-- main_tui.py --- input_tui.py / structure.py / export.py (menu/load/direct operations)
  |-- structure_formats.py (strict GJF/CIF/POSCAR; lazy dispatch from structure.py)
  |-- input_tui.py -- input_editor.py / inputgen.py / structure.py (TTY navigation/fields)
- |-- input_editor.py (single numbered settings menu, drafts, review; same generator/writer)
+ |-- input_editor.py -- menu_registry.py (category/direct routing, aliases, drafts; same generator/writer)
  |-- presentation.py (scrolling text, optional Rich; no batch rendering)
  |-- inputgen.py --- structure.py / spin_settings.py / method_profiles.py / models.py / io.py
  |-- method_profiles.py -- basis_resolution.py / data_catalog.py (XC, approvals, per-element resolution)
@@ -41,6 +45,7 @@ cli.py
  |-- all_electron_catalog.py (audited AE subsets, local reference identity; no parameters)
  |-- gapw.py (versioned derived numerical setup; explicit OT overrides win)
  |-- constraints.py (compact fixed-atom parsing, bounded active expansion, keyword evidence)
+ |-- density_workflow.py -- inputgen.py / io.staged_files (whole/A/B bundle, shared generator, explicit mapping)
  |-- spin_settings.py (explicit Ueff/L parsing, collinear atom seeds, stable KIND splitting)
  `-- cube.py ------- models.py / io.py / structure.py (units; streaming checks/differences)
 
@@ -52,6 +57,25 @@ __main__.py / pyproject.toml: module/console-script entry points
 
 Conventional src layout. No plugins, database, workflow engine, or configuration
 framework yet; avoid complexity exceeding MVP value.
+
+## Density input bundle (0.2.9)
+
+inputgen dispatches enabled workflows to density_workflow; that module calls the
+same generator for each component with the workflow flag disabled. It does not
+contain another chemistry parser/renderer. Resolve the whole geometry and derived
+numerical defaults once, then select fragment subsets without centering or cell
+reconstruction. Filter per-element requests to present atoms and explicitly map
+magnetic @whole selectors to local indices. Compare selected per-element basis,
+potential and source identities. Lock whole NGRIDS=5 when applicable; requested
+common grids are not proof of matching produced CUBEs.
+
+The ordinary generator manifest remains complete, extended with component manifests
+and mapping; settings/replay/config remain semantic. CSV mapping is mandatory for
+the bundle, JSON optional. bundle_paths is shared by writer, CLI and TUI. The
+workflow reuses io.staged_files to preflight, stage and publish exclusively, rolling
+back only owned inodes on ordinary errors/interrupts. No existing bundle input is
+replaceable; no crash-atomic multi-file guarantee, calculation or subtraction.
+See [workflow/schema](schema.md#generated-input-json-menuworkflow-additions-software-029).
 
 ## Result pipeline
 
@@ -113,9 +137,14 @@ This is not the deferred ARC-3 prepared-state/render/manifest separation.
 Do not inherit original electronic settings. Unknown PBC, electron/spin conflicts,
 and unsupported combinations are rejected. Element presets explicitly match
 basis/potential valence counts; optional local data checks verify names/hashes.
+Omitted whole-system multiplicity resolves from selected PP/AE electron-count parity
+minus charge (even 1, odd 2); explicit values are preserved. This is not a prediction
+of ground-state spin. Default UZH references use portable BASIS_MOLOPT_UZH /
+POTENTIAL_UZH aliases, while resolved paths/hashes and emitted_data_files remain
+separate manifest evidence. Explicit data-file overrides are preserved.
 No calculation or Multiwfn/adjacent-source dependency.
 
-The registry-v1 follow-up remains software 0.2.6 by explicit user request. Basis
+The initial registry-v1 follow-up retained software 0.2.6 by explicit user request. Basis
 numbers are permanent allocated IDs, not tuple positions; stable strings are
 persisted in settings/replay. Legacy names are normalized at boundaries, numeric
 migration needs explicit legacy version information, and registry-v1 configs never
@@ -130,17 +159,21 @@ recognized reference pairs are separate from native acceptance and scientific fi
 
 The line-oriented input editor maintains drafts, performs local type/range checks,
 and rechecks changes through the shared generator without repairing physical conflicts.
-Applicable fields are directly selectable in one list. FIELD_IDS records inspected
-Multiwfn main-menu IDs and explicit 100+ local extensions; unsupported IDs are not
-repurposed. Source/frame controls are in the header, while output/project/version
-are no longer numbered fields. Automatic output follows the source stem; CLI seeds
-remain honored. The shared visible_fields rules filter both
-rendering and selection. Numbers stay fixed, leaving gaps for hidden fields when
-task/SCF/PBC changes; hidden values remain in the validated draft. Presenter handles folding
-and optional Rich styling; Menu handles input/navigation; editor/application dispatch
-existing business APIs. Review/previews do not write; 0/w plus explicit y/yes uses the
-staged input writer; -10/back/cancel returns from the generator. Collisions have a
-new-target recovery prompt, not a permanent path setting.
+menu_registry owns full IDs, category, aliases, semantic key, label and editor;
+shared visible_fields rules provide applicability. Main, category and direct
+routes all dispatch the same entry/editor/state, including source/data/output
+controls. Category 0/back returns without publication; edits and read-only previews
+return to their origin. Generator-main 0 invokes the shared validator/writer directly,
+without review/confirmation; w reviews first and requires explicit y/yes. Successful
+generation returns immediately without a pause. Automatic TUI output naming follows
+the source stem and CDD toggle (.inp / -CDD.inp), unless explicitly overridden.
+Function layout v1 is independent of immutable basis registry v1 and atom indices;
+value prompts do not dispatch function IDs. Old 0.2.8 extension numbers migrate
+explicitly, without ambiguous aliases or changes to semantic CLI/config fields.
+Hidden requests remain retained and scientifically validated. Presenter handles
+folding/optional Rich, Menu handles prompts, and editor/application dispatch the
+existing business APIs. Source/frame changes warn about retained atom selections,
+never remap identities. Collision recovery can choose a new target.
 Complete batch calls stay noninteractive; stdin/stdout TTY are required for menus.
 Bare cp2kkit/cp2kkit STRUCTURE opens the grouped application menu. cli.menu_request
 handles this syntax separately from batch parsing; command names come from actual
@@ -150,20 +183,20 @@ leading hyphens; invalid mixed arguments still go through argparse usage errors.
 Both streams must still be TTY. --plain/NO_COLOR
 disable styling. EOF/q exits the session; Ctrl+C cancels an operation (exits at main).
 Default physical settings are unchanged. Library filenames are now unquoted;
-JSON is opt-in (132/--write-json), existing regular .inp replacement is permitted.
+JSON is opt-in (501/--write-json), existing regular .inp replacement is permitted.
 write_input returns (input_path, nullable_json_path, warnings). Optional JSON is
 completed before input publication, so its collision/failure preserves old input.
-Sources/data/symlinks and all other output workflows remain protected. Slots 124/125 now request
-explicit Ueff/L and collinear magnetic initialization; --cell remains CLI-only,
-while data sources are also editable inside the basis chooser without main-setting numbers. spin_settings validates and maps element/atom selectors without changing
+Sources/data/symlinks and all other output workflows remain protected. IDs 112/103 request
+explicit Ueff/L and collinear magnetic initialization; 210 edits orthorhombic cell
+lengths, 230-234 edit data sources, also accessible in the basis chooser. spin_settings validates and maps element/atom selectors without changing
 charge/multiplicity or source geometry. Split KIND labels retain ELEMENT-specific
 basis/potential/U. Only target 2026.2 is checked for these opt-in features. The 0.2.6 GGA/basis profiles
-also require target 2026.2. Menu 128 configures explicit element basis overrides;
-129 approves unmatched-functional PBE potentials; 130 asserts target Libxc support.
-129/130 follow functional applicability while preserving hidden values. NGRIDS uses
+also require target 2026.2. Menu 221 configures explicit element basis overrides;
+114 approves unmatched-functional PBE potentials; 113 asserts target Libxc support.
+114/113 follow functional applicability while preserving hidden values. NGRIDS uses
 shared resolve_ngrids over actual effective basis IDs: only classic non-SR
 TZVP/TZV2P/TZV2PX emit 5; others omit it and record null.
-Menu 110 configures OT IRAC/STRICT (hidden/retained for diag); 131 selects the
+Menu 324 configures OT IRAC/STRICT (hidden/retained for diag); 225 selects the
 legacy AE auto/native names (same explicit IRAC default). PP OT explicitly
 emits STRICT; manual selections override either model. Electron-model classification precedes spin validation.
 AE uses Z rather than PP valence, with null PP q/valence fields. Effective GAPW
@@ -175,7 +208,7 @@ KIND mapping, method/catalog/file identity and reference metadata.
 
 Restart hints, motion output and radius handling also live in inputgen, not in
 CLI/TUI forks. Trajectory format (-5) is visible for GEO_OPT/CELL_OPT; radius
-(133) only for BFGS/LBFGS optimization. Hidden requests persist in settings/replay;
+(403) only for BFGS/LBFGS optimization. Hidden requests persist in settings/replay;
 restart_template and motion_output distinguish hints/raw requests from emitted
 controls. Restart filenames derive from resolved PROJECT and Gamma/non-Gamma
 naming, not the .inp output path. Suggestions remain metadata/review only, not

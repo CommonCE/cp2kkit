@@ -168,7 +168,7 @@ class ConstraintTests(unittest.TestCase):
         self.assertFalse(Path(str(output2)+'.json').exists())
 
     def test_menu_shows_atom_table_and_preserves_enter_and_back(self):
-        output, log = self.session('9\n3,1\n9\n\n9\nback\n0\ny\n\n', write_json=True)
+        output, log = self.session('9\n3,1\n9\n\n9\nback\nw\ny\n\n', write_json=True)
         self.assertIn('  1: O ', log)
         self.assertIn('  2: H ', log)
         self.assertIn('  3: H ', log)
@@ -184,7 +184,7 @@ class ConstraintTests(unittest.TestCase):
         self.assertNotIn('&CONSTRAINT', output.read_text())
 
     def test_menu_retries_bad_syntax_and_reports_bounds_without_clearing(self):
-        output, log = self.session('9\n1,1\n5\n0\n9\n2\n0\ny\n\n')
+        output, log = self.session('9\n1,1\n5\nw\n9\n2\nw\ny\n\n')
         self.assertIn('Invalid input:', log)
         self.assertIn('5', log)
         self.assertIn('3 atoms', log)
@@ -194,7 +194,7 @@ class ConstraintTests(unittest.TestCase):
     def test_source_change_warns_and_revalidates_retained_indices(self):
         other = self.root/'one.xyz'
         other.write_text('1\nsynthetic\nHe 0 0 0\n')
-        output, log = self.session(f'9\n3\ns\n{other}\n0\n9\noff\n0\ny\n\n')
+        output, log = self.session(f'9\n3\ns\n{other}\nw\n9\noff\nw\ny\n\n')
         self.assertIn('not remapped', log)
         self.assertIn('1 atom', log)
         self.assertIn('Fixed atoms: 3', log)

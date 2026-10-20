@@ -1,6 +1,6 @@
 # CP2K input generation
 
-This guide describes cp2kkit **0.2.8**. Older defaults and migration notes are in
+This guide describes cp2kkit **0.2.9**. Older defaults and migration notes are in
 [the changelog](../CHANGELOG.md). AE automatic setup is described in
 [the basis guide](basis-selection.md#all-electron-automatic-setup-027).
 The [registry-v1 basis guide](basis-selection.md) defines permanent numbering toward
@@ -28,8 +28,10 @@ The application menu is separate from the settings editor below. Generation or
 cancellation returns to the application menu. Without `--project`, PROJECT is the
 source basename without suffix (POSCAR becomes POSCAR). Safe names contain letters,
 digits, underscores, periods, and hyphens; override names containing unsupported
-characters such as spaces. Edit the new output path before confirming; no files
-are written until confirmation.
+characters such as spaces. Set the output path before generating. Generator-main
+`0` validates/writes directly; `w` reviews first and requires confirmation. Complete
+batch calls write noninteractively. Ordinary single-input generation may replace a
+regular `.inp`; density bundles and requested JSON always require new targets.
 
 ```bash
 # Plain XYZ has unknown PBC: explicitly choose NONE or periodic directions.
@@ -54,8 +56,9 @@ cp2kkit generate-input water.xyz -o checked.inp --periodic NONE \
 cp2kkit generate-input --help
 ```
 
-Default output is `<output>` only; JSON is opt-in with `--write-json` or menu
-**132**. The in-memory review/manifest remains available even with JSON off.
+Ordinary generation writes `<output>` only by default; density bundles additionally
+write both fragment inputs and the atom map. JSON is opt-in with `--write-json` or menu
+**501**. The in-memory review/manifest remains available even with JSON off.
 Existing regular `.inp` (case-insensitive suffix) may be replaced; other existing
 outputs, directories, symlinks, original structure and selected data files are
 protected. There is no `--force`. Parent directories must already exist.
@@ -152,7 +155,7 @@ it is not evidence that a wavefunction file exists or was written successfully.
 
 GEO_OPT and CELL_OPT now write `TRUST_RADIUS [angstrom] 0.2` in the selected
 `&BFGS` or `&LBFGS` subsection. Use `--trust-radius 0.15` or main-menu
-**133** to change this positive finite radius. CG does not use this setting;
+**403** to change this positive finite radius. CG does not use this setting;
 its hidden value is retained. This is an explicit starting value referenced to
 Multiwfn, not a claim of optimality or CP2K's default: the inspected local BFGS
 default is 0.25 angstrom and LBFGS defaults to a disabled radius.
@@ -193,7 +196,7 @@ a completely overridden global choice does not. Custom aliases are not inferred
 from name substrings. This supersedes the earlier universal-five-grid policy.
 
 Every OT block explicitly emits ALGORITHM: STRICT for PP, IRAC for all AE bases,
-including auto/native profiles. Manual menu 110 / --ot-algorithm overrides win;
+including auto/native profiles. Manual menu 324 / --ot-algorithm overrides win;
 diagonalization hides/retains the request and emits no OT block. The all-AE IRAC
 rule is the user's explicit policy, broader than Multiwfn's pob-only IRAC branch.
 Static checks and synthetic tests are not native acceptance or convergence proof.
@@ -214,105 +217,189 @@ only under the policy above. Do not reuse an old calculation's result directory
 without reviewing restart/checkpoint behavior.
 Static source and synthetic regression checks are not native execution evidence.
 
-## Single numbered input-generation menu
+## Categorized input-generation menu (0.2.9)
 
 ```bash
 cp2kkit generate-input --tui
-cp2kkit generate-input --interactive     # Equivalent option.
+cp2kkit generate-input --interactive
 cp2kkit generate-input water.xyz -o water-opt.inp --periodic NONE \
   --run-type GEO_OPT --dispersion d3bj --electron-density --tui --plain
-cp2kkit generate-input                  # Opens menu only when both streams are TTY.
+cp2kkit generate-input   # Both streams must be TTY.
 ```
 
-All applicable settings appear together in one scrolling numbered menu, using
-Multiwfn-style direct selection. There are no sequential steps, hidden advanced
-pages, or group-selection submenus. Corresponding main-menu IDs follow the inspected
-Multiwfn 2026.10.1 source; unsupported entries are omitted, not reassigned.
-The same `InputSettings`, generator and staged writer serve CLI and menus. Version **0.2.8** retains the menu introduced in 0.2.4;
-its explicitly requested follow-ups change defaults as documented above, without
-automatically repairing charge, spin, method or periodicity.
+Menu layout **v1** shows compact common shortcuts and **unexpanded category
+entrances**, not every advanced setting on the main menu. Type a category number
+to browse its applicable implemented entries, or a full function ID directly.
+For example, `100` lists electronic settings; `101` immediately edits total charge.
+Categories show full numbers (101, 102), not another local 1/2 numbering layer.
 
-| ID | Setting/action | Numbering origin |
-|---|---|---|
-| -10 | Return/cancel generation | Multiwfn main menu |
-| -7 | Periodicity | Multiwfn main menu |
-| -5 | Optimization trajectory format: PDB / XYZ / EXTXYZ | Multiwfn trajectory ID; local format/applicability subset |
-| -3 | Electron-density cube | Multiwfn cube entry; supported density subset only |
-| -1 | Task | Multiwfn main menu |
-| 0 | Review and generate, with explicit y/yes confirmation | Multiwfn generate ID; extra safety confirmation |
-| 1 / 2 / 3 / 4 | Functional / basis / dispersion / OT-diag | Multiwfn main menu |
-| 6 / 8 | Smearing temperature / k-points | Multiwfn main menu; local parameter prompts |
-| 9 | Fixed atoms: explicit 1-based indices/ranges; off clears | Multiwfn main menu; optimization subset only |
-| 10 / 12 | Optimizer / CELL_OPT pressure | Multiwfn main menu |
-| 101 / 102 | Charge / multiplicity | Local extensions (upstream Other settings 1/2) |
-| 105 / 106 | CUTOFF / REL_CUTOFF | Local extensions (upstream Other settings 5 combines both) |
-| 110 | OT ALGORITHM: IRAC/STRICT; auto restores basis-aware default | Local extension, OT only |
-| 131 | All-electron automatic setup: auto/native | Local extension, AE only |
-| 132 | Write provenance JSON: off by default | Local extension |
-| 133 | TRUST_RADIUS [angstrom], default 0.2 | Local extension; optimization BFGS/LBFGS only |
-| 107 / 112 | Isolated padding / ADDED_MOS | Local extensions (upstream Other settings 7/12) |
-| 120 / 121 / 122 | EPS_SCF / inner-diag limit / outer limit | Local extensions |
-| 123 / 124 / 125 | Optimization steps / DFT+U / magnetic initialization | Local extensions |
-| 126 / 127 | Spin density / cube stride | Local extensions |
-| 128 / 129 / 130 | Element basis overrides / approve GTH-PBE approximation / target Libxc assertion | Local extensions |
+| Entrance | Implemented scope |
+|---:|---|
+| 100 | Charge/spin, functional, dispersion, U, explicit method assertions |
+| 200 | Source/frame, cell/PBC, basis/overrides, data and custom aliases |
+| 300 | Cutoffs, SCF threshold/limits, k-points, OT algorithm, occupations |
+| 400 | Optimizer/steps/radius, fixed atoms, CELL_OPT pressure |
+| 500 | JSON, output path, PROJECT, target version, trajectory, read-only summary |
+| 600 | Electron/spin density, two-fragment difference inputs, cube stride |
 
-Only corresponding implemented main-menu IDs are reused; this is not full upstream
-menu/choice/default equivalence. In particular, OT outer-limit editing is not the
-upstream outer-SCF enable/disable toggle. The main settings omit unimplemented
-controls; the basis-value list explicitly marks unavailable PBE0 entries and
-reserved ranges, neither of which can be selected.
+Only applicable categories/children appear. The implemented registry is
+`src/cp2kkit/menu_registry.py`; [the allocation guide](menu-numbering-draft.md)
+contains the complete current migration and separately labeled future reservations.
+There are no empty 700-1000 placeholder menus. Existing common shortcuts remain:
+-7 PBC, -5 trajectory, -3 density, -1 task, 1 functional, 2 basis, 3 dispersion,
+4 SCF, 6 smearing, 8 k-points, 9 fixed atoms, 10 optimizer, 12 pressure.
+They and full IDs share one setting, validator and editor.
 
-- Structure path and frame appear above the list, without setting numbers or seed
-  annotations. `s` loads/replaces the structure; `f` selects the XYZ frame.
-  An invalid source/frame preserves the previous selection.
-- Output path, project and target-version rows are removed. Without `-o`, the
-  output is `<source-stem>.inp` in the current directory; a source change updates
-  an automatic target. Explicit CLI `-o`, `--project`, and `--cp2k-version` seeds
-  remain honored. PROJECT still defaults to the source stem; target CP2K stays 2026.2.
-  These values and absolute output paths remain in review/manifest for traceability.
-- Select any displayed number directly; a prompt shows its choices. Numbers remain
-  fixed across task/SCF/PBC changes. Hidden fields cannot be selected.
-  Pressure appears only for CELL_OPT; optimizer/step limits, trajectory format and fixed atoms
-  only for optimization. TRUST_RADIUS appears only for optimization BFGS/LBFGS.
-  Isolated padding requires effective NONE, not Unknown. OT hides smearing/ADDED_MOS;
-  diag hides outer SCF limits and 110 ALGORITHM. Enter keeps the algorithm;
-  `back` abandons the edit, `auto` restores the basis-aware default. All values are retained when fields disappear.
-- Parameter Enter keeps; `back` abandons that edit. **Literal zero remains a value**,
-  including charge, ADDED_MOS and Boolean off. Optional `auto` restores defaults.
-  Enumerations accept names/numbers; triples are space-separated. In the basis
-  chooser only, **0 returns**. Its immutable registry numbers are independent of
-  list order/filtering; CLI/config/replay use stable string IDs.
-- **Input-generation navigation changed:** `0` now reviews/generates, matching
-  Multiwfn. Use `-10`/`back`/`cancel` to return without generation.
-  The application main menu still uses `0` to exit; ordinary submenus retain their
-  own `0`-back behavior. `q` exits the session; Ctrl+C cancels; EOF exits cleanly.
-- `r` reviews effective settings/warnings and full paths; `p` adds full input and
-  the replay command. Neither writes. Enter returns to the same settings list.
-- `0` or its alias `w` reviews and asks for explicit `y`/`yes` before writing.
-  Enter defaults to no. Collision/I/O errors offer a new-path retry prompt
-  (Enter/back returns to settings), without adding a persistent output-path option.
-  The confirmation warns that existing regular `.inp` may be replaced; there is
-  no separate overwrite prompt. The shared writer revalidates and stages before
-  replacement. JSON/non-input collisions offer another target.
-- Bare interactive generation opens the same menu; use `s` to load a source.
-  A missing source gives a recoverable validation message.
+Important migrated IDs: charge/multiplicity 101/102, magnetism 103, functional 110,
+dispersion 111, **DFT+U 112**, approvals 113/114, basis 220, overrides 221,
+GAPW profile 225, cutoffs 301/302, EPS_SCF 303, k-points 310, SCF 320,
+limits 321/322, **OT ALGORITHM 324**, smearing 340, **ADDED_MOS 341**,
+optimizer/steps/radius 401/402/403, fixed atoms 420, pressure 430, JSON 501,
+path/project/version 502/503/504, trajectory 510, summary 550,
+electron density 601, difference inputs 602, spin density 603, stride 605.
+Old 100+ numeric TUI scripts must migrate: old 112 ADDED_MOS is **not** accepted
+as an alias of new 112 DFT+U. Semantic CLI/config/replay names and immutable
+basis registry v1 numbers do not change.
 
-- Type/range errors retry locally. Changed fields are rechecked by the existing
-  generator. Incompatible drafts retain their values with explicit warnings.
-  No charge/spin/SCF/PBC/k-point combination is automatically repaired.
-  Hidden overrides are retained and still validated. For example, switch to diag,
-  remove explicit smearing/nonzero ADDED_MOS, then switch back to OT. No implicit
-  reset is performed when fields disappear.
-- Enter paths literally without shell quotes. Use `./q`, `./cancel`, `./back`,
-  or `./0` for filenames that collide with navigation words.
+- For all tasks, main-menu `0` validates and writes directly, without a settings
+  review or y/yes prompt. Main-menu `w` retains review and explicit y/yes
+  confirmation. Both use the same writer and produce the same files/settings.
+  Category `0`/`back`/`-10` returns to the generator main menu without writing;
+  category `w` explains that writing requires the main menu.
+- Parameter Enter keeps; `back` abandons the current edit. Zero remains a value,
+  except in the basis chooser and navigation contexts. Basis numbers and atom
+  indices are not function IDs; function routing never intercepts value prompts.
+- `s`/`f` remain source/frame shortcuts (201/202); invalid replacements preserve
+  the old source. Automatic output follows source stem until explicitly overridden.
+- Output path, PROJECT and target version now also have category editors.
+  231/232 accept JSON lists of explicit file paths. 233/234 edit file/real-alias
+  pairs transactionally; back abandons the pair and auto clears it. These controls
+  do not select custom basis 900 automatically.
+- Direct access uses the same applicability rules as category rendering. Hidden
+  settings are retained, not reset. Inapplicable direct requests explain the
+  conflict without switching task, SCF, electron model or PBC.
+- `r` reviews; `p` adds all input previews and a replay command. Neither writes.
+  Both return to the originating menu. 550 is a read-only review entrance.
+- Enter defaults to no at confirmation. Collision/I/O recovery offers another path.
+  Ordinary single-input generation alone may replace a regular .inp; **602
+  bundles require entirely new targets**. Sources/data/results remain protected.
+- Type/range errors retry locally. Shared scientific validation retains invalid
+  drafts with warnings; no charge/spin/SCF/PBC repair or index identity remapping.
+- Successful generation returns immediately to the parent application menu (or
+  finishes a standalone generation command), without an extra Enter prompt.
+- Generator-main `-10`/`back`/`cancel` cancels generation; q/EOF exits the session.
+  Ctrl+C cancels. Completed outputs remain intact.
 
-Optional Rich (`.[ui]`) has a standard-library fallback; `--plain` and the presence
-of `NO_COLOR` disable styling. Text folds on narrow terminals without clearing,
-alternate screen, or continuous redraw. Both stdin and stdout must be TTY.
-Redirected/piped sessions fail promptly with batch alternatives rather than waiting.
-Batch remains noninteractive; schema stays 0.1.0. Explicit default changes are
-documented in the restart/output and grid sections above.
-Input-only output and regular .inp replacement are the explicit new write policy; identical structure/settings produce identical text/manifest.
+Optional Rich has a standard-library fallback; `--plain`/`NO_COLOR` disables styling.
+Scrolling text folds without clearing/redrawing the screen. Complete batch calls
+stay noninteractive; both streams must be TTY for menus. Schema stays 0.1.0.
+
+## Two-fragment density-difference inputs (0.2.9)
+
+602 is input preparation, not a CP2K run or cube subtraction. Initial scope:
+**ENERGY, GPW pseudopotential valence electron-number density, exactly two
+complementary nonempty fragments, charge-conserving partition**.
+
+```bash
+# Syntax example: atom selection and fragment states must fit the actual system.
+cp2kkit generate-input AB.extxyz -o AB-density.inp --density-difference \
+  --fragment-a-indices '1-12,15' \
+  --fragment-a-charge 0 --fragment-a-multiplicity 1 \
+  --fragment-b-charge 0 --fragment-b-multiplicity 1 \
+  --cube-stride 1 1 1 --write-json
+```
+
+Whole-system charge/multiplicity remain --charge/--multiplicity (101/102).
+The default charge is 0 (not inherited from the source). When multiplicity is
+omitted, use 1 for an even explicit-electron count and 2 for an odd count,
+using the selected PP valence/AE electron model and subtracting charge.
+An explicit multiplicity is preserved and validated, never repaired automatically.
+Menu 102 accepts `auto` to restore parity selection; the menu shows its effective
+value. Generated input/JSON records the resolved integer. This is only a minimal
+parity-compatible default, not a ground-state spin prediction. The six-integer
+602 electronic-state entry and both fragment states still require explicit values.
+All four fragment charge/multiplicity values must be explicitly supplied, including
+zero and singlet; missing values are null, not inferred neutral singlets.
+Require Q_whole = Q_A + Q_B and valid positive electron counts/parity in each
+component. Fragment spins need not add to the whole spin. Zero-electron fragments
+are outside the current generator subset. Charged fragments warn about reviewing
+boundary/background treatment; no electrostatic correction is inferred.
+
+Select A by 1-based loaded/frame/symmetry-expanded **whole** indices; B is the
+complement. Relative order is preserved. Bounds precede expansion. Source changes
+retain selections and warn to review them; no automatic molecule recognition,
+identity remapping, source charge/spin inheritance, or arbitrary fragmentation.
+
+602 has explicitly local options: 1 enable, 2 select A (direct index entry, no atom listing),
+3 inspect B/mapping, 4 enter all three electronic states, 5 review, 0 return. None publishes.
+Option 1 toggles immediately between True and False without a second prompt.
+With automatic output naming, enabling CDD changes the suggestion to
+`<source-stem>-CDD.inp`; disabling restores `<source-stem>.inp`. Loading another
+source updates the suggestion with the same rule. Explicit output paths (CLI -o,
+menu 502 or collision recovery) are preserved. Existing CDD bundles remain
+protected; the suffix is not an automatic overwrite or unique-run counter.
+After returning to the generator main menu (and leaving any category), `0`
+directly writes the enabled CDD bundle. Invalid settings or collisions still fail
+without replacing existing files. This does not print a configuration JSON;
+a JSON sidecar is written only when explicitly enabled via 501/--write-json.
+Option 4 accepts six whitespace-separated integers in one line:
+`all_charge all_multiplicity A_charge A_multiplicity B_charge B_multiplicity`.
+For example, `0 1 0 1 0 1` sets three neutral singlets;
+`-1 1 1 1 -2 1` sets the whole system to -1, A to +1 and B to -2,
+all singlets. This also updates the shared total charge/multiplicity (101/102).
+All multiplicities must be positive and charges must conserve the total.
+Malformed input leaves all six values unchanged and retries; Enter keeps and
+back abandons the edit. Component electron-count/parity checks still apply at review/generation.
+In the editor, enabling 602 automatically turns on electron-density cube output
+and updates the shared -3/601 display. While CDD is enabled, -3/601 cannot disable
+that output; disable CDD first. Disabling CDD retains the enabled density request.
+CLI/API bundle generation also forces effective density output for all components,
+regardless of the raw global density toggle.
+
+Main-menu **-3** and **601** share a Multiwfn-style numbered cube selector,
+limited to implemented types: **0 None**, **1 Electron density** (UKS also prints
+spin density). Selecting 0 clears both electron/spin requests; Enter keeps and
+back returns unchanged. Other Multiwfn cube types are not offered.
+
+The shared generator resolves the whole-system box/translation **once**, then
+extracts subsets of its generated geometry. Cell, PBC, origin convention, geometry,
+functional, dispersion, cutoff/rel_cutoff, k-points, SCF and stride are common.
+Derived automatic SCF limits/ADDED_MOS are resolved once from the whole system.
+When the whole effective basis policy emits NGRIDS 5, lock that value for both
+fragments, even if one subset alone would omit it; otherwise all three omit it.
+This workflow-specific common-grid lock is recorded, not a new general grid default.
+Actual CUBE grids **must still be checked before subtraction**.
+
+Corresponding per-element basis/potential names, selected files and source hashes
+must match the whole system. Per-element overrides/+U/initial moments follow included
+atoms; @whole magnetic seeds are explicitly mapped to local indices using the same
+atom mapping, and explicit UKS remains enabled even if a fragment has no seeds.
+No automatic spin/moment repair. All magnetic/+U version gates remain in force.
+UKS density-print channels remain coupled; this is not a spin-difference workflow.
+No ghost functions, separate recentering, independent fragment relaxation, new
+GAPW density semantics, BSSE treatment, or convergence guarantee is introduced.
+
+For output `AB-density.inp`, publish together:
+
+- `AB-density.inp`: whole-system input.
+- `AB-density-fragment-A.inp` / `AB-density-fragment-B.inp`.
+- `AB-density-atom-map.csv`: whole index, element, fragment, local index,
+  generated x/y/z in angstrom (eight decimals).
+- Optional `AB-density.inp.json`: settings, all three complete component manifests,
+  source/data hashes, full input texts/hashes, mapping, output paths and warnings.
+
+Output must end in .inp; parent directory must already exist. Component PROJECTs
+derive from the whole PROJECT with unique -fragment-A/-fragment-B suffixes.
+Existing input/map/JSON/symlink/directory collisions fail without replacement.
+Same-directory staging and exclusive publication roll back only this operation's
+published inodes on ordinary errors/interrupts; **not a crash-atomic transaction**.
+JSON off does not delete an existing sidecar; a stale-sidecar warning is returned.
+No existing CUBE, wavefunction, restart or result is touched or reused.
+
+After independently running and checking the three inputs, use
+`cube-diff whole.cube A.cube B.cube -o delta.cube`. The expression is
+n_whole - n_A - n_B: positive means electron accumulation, not positive electric
+charge. Integrals are not fragment net charge transfer. See [cube checks](cube.md).
 
 ## Scope and defaults
 
@@ -324,7 +411,7 @@ Input-only output and regular .inp replacement are the explicit new write policy
 | Basis | DZVP-MOLOPT-SR-GTH (default); SZV-SR, DZVP/TZVP/TZV2P non-SR; target 2026.2 adds TZVP-SR/TZV2P-SR/TZV2PX and explicit element overrides |
 | Potential | Catalog-checked GTH entries with fixed `-qN`; prefer actual matched functional, explicitly approved PBE approximation otherwise |
 | Dispersion | none (default), D3, D3(BJ); dftd3.dat and REFERENCE_FUNCTIONAL |
-| Charge/spin | 0/1; explicit valence-electron parity check; UKS for multiplicity > 1 or explicit magnetic request |
+| Charge/spin | Default charge 0; automatic multiplicity: even electrons 1, odd electrons 2; explicit values override; UKS for multiplicity > 1 or explicit magnetic request |
 | SCF | OT+FULL_ALL/DIIS+outer SCF (default), or diagonalization+Broyden mixing |
 | EPS_SCF | 1e-6 for all tasks, including ENERGY; explicit override allowed |
 | SCF limits | OT inner/outer 25/20; diag 128; `--max-scf`/`--max-outer-scf` overrides |
@@ -413,7 +500,7 @@ Standard-library readers preserve original hashes and do not run Gaussian/VASP/M
 New functional names, new families, UCL coverage extensions and nonempty element
 overrides are restricted to target **2026.2**. Existing PBE/BLYP/core basis requests
 retain their older target profiles. Defaults remain PBE / DZVP-MOLOPT-SR-GTH,
-charge 0 / multiplicity 1, GPW and no dispersion. No calculation is executed.
+charge 0 / automatic multiplicity (even electrons 1, odd 2), GPW and no dispersion. No calculation is executed.
 
 ### Functional definitions and approval
 
@@ -427,15 +514,15 @@ charge 0 / multiplicity 1, GPW and no dispersion. No calculation is executed.
 RPBE and revPBE are different functionals, not aliases. CLI names are case-insensitive.
 The v2026.2 GTH_POTENTIALS catalog contains matched **B GTH-PBESOL-q3**;
 that entry is preferred even when approximation approval is enabled. For missing
-matches, generation errors until `--allow-pbe-potential` / menu **129** is explicitly
+matches, generation errors until `--allow-pbe-potential` / menu **114** is explicitly
 enabled. Every affected KIND records the actual potential and approximation status,
 and review warns that this is not a matched-functional potential. No unverified
 GTH-RPBE/GTH-REVPBE names are fabricated, and no q values are changed.
 
-RPBE additionally requires `--libxc-available` / menu **130**. This is a user assertion
+RPBE additionally requires `--libxc-available` / menu **113**. This is a user assertion
 about the target CP2K build, not probing, installation, a detected Libxc version, or
 runtime certification. Native PBEsol/revPBE do not require Libxc in these profiles.
-The menu hides 129 outside the new GGA choices and 130 outside RPBE; values remain
+The menu hides 114 outside the new GGA choices and 113 outside RPBE; values remain
 retained for later edits. Selecting a functional never automatically grants approval.
 
 All five profiles explicitly allow none/D3/D3(BJ); the new reference identifiers
@@ -463,7 +550,7 @@ existing Mg-q10 preset; the generator refuses it instead of changing electron co
 Lanthanide/other q entries in the upstream libraries do not expand the generator's
 element/valence policy automatically. No family is an implicit substitute for another.
 
-Use `--basis-overrides 'Element=basis; Element=basis'` or menu **128** for explicit
+Use `--basis-overrides 'Element=basis; Element=basis'` or menu **221** for explicit
 mixed bases. `off`/`auto` clears overrides. Each selector must be a unique present
 element; each family/q must actually exist. Element overrides apply to all of that
 element's split magnetic KINDs; source atom order, +U, charge and multiplicity remain
@@ -513,7 +600,7 @@ and explicit custom pseudopotential ORB files. r2SCAN/meta-GGAs, hybrids/HF/ADMM
 UZH-PBE0 templates, arbitrary q changes, auxiliary and reserved
 families remain unimplemented; see [basis selection](basis-selection.md).
 
-## DFT+U and magnetic initialization (124 / 125)
+## DFT+U and magnetic initialization (112 / 103)
 
 These are real generator features, not renamed placeholders. They are opt-in and
 currently keyword-checked only against CP2K **2026.2**; explicit requests with other
@@ -521,7 +608,7 @@ target profiles are rejected rather than presented as verified. These controls
 were introduced in 0.2.4 and remain compatible with the 0.2.6 method/basis profiles. Schema 0.1.0 retains the
 additive settings/extension metadata.
 
-- **124 — DFT+U:** enter `Element:L:Ueff_eV`, separated by semicolons.
+- **112 — DFT+U:** enter `Element:L:Ueff_eV`, separated by semicolons.
   `L=0/1/2/3` means s/p/d/f; Ueff is finite, nonnegative, in eV, and equals U-J.
   `off`/`auto` clears the correction. One entry per present element is supported.
   No element-specific U values or orbital channels are guessed.
@@ -529,7 +616,7 @@ additive settings/extension metadata.
   `SUBSYS/KIND/DFT_PLUS_U` sections with `L` and `U_MINUS_J [eV]`.
   User-selected U/L must be justified for the functional, basis and projector
   definition; no native runtime/shell-suitability validation has been performed.
-- **125 — magnetic initialization:** `uks` explicitly enables UKS without local seeds;
+- **103 — magnetic initialization:** `uks` explicitly enables UKS without local seeds;
   `Element=moment; @index=moment` enables UKS and supplies atomic initial guesses.
   `auto` (also `off`/`none`) clears explicit magnetic requests and restores the
   original multiplicity-based UKS rule; it does not force RKS when multiplicity > 1.

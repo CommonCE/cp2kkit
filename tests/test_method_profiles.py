@@ -274,7 +274,7 @@ class MethodProfileTests(unittest.TestCase):
         self.assertEqual(json.loads(Path(str(self.output)+'.json').read_text()), json.loads(json.dumps(expected)))
 
     def test_interactive_rpbe_requires_both_manual_assertions(self):
-        code, log = self.session('1\nRPBE\n129\ny\n130\ny\n0\ny\n\n')
+        code, log = self.session('1\nRPBE\n114\ny\n113\ny\nw\ny\n\n')
         self.assertEqual(code, 0)
         self.assertIn('--allow-pbe-potential', log)
         self.assertIn('--libxc-available', log)
@@ -284,14 +284,14 @@ class MethodProfileTests(unittest.TestCase):
         self.assertEqual(self.output.read_text(), generate_input(self.structure, settings)[0])
 
     def test_interactive_mixed_basis_edit_and_clear(self):
-        _, log = self.session('2\nTZV2P-MOLOPT-GTH\n128\nFe=bogus\nFe=TZV2P-MOLOPT-SR-GTH\n0\ny\n\n')
+        _, log = self.session('2\nTZV2P-MOLOPT-GTH\n221\nFe=bogus\nFe=TZV2P-MOLOPT-SR-GTH\n0\ny\n\n')
         self.assertIn('Invalid input', log)
         self.assertIn('BASIS_MOLOPT_UCL', log)
         self.assertEqual(self.output.read_text(), generate_input(self.structure, self.mixed())[0])
         other = self.dir/'clear.inp'
         log = TTY()
         run_interactive(str(self.path), -1, str(other), self.mixed(),
-                        stdin=TTY('128\noff\n2\nDZVP-MOLOPT-SR-GTH\n0\ny\n\n'), stdout=log, plain=True)
+                        stdin=TTY('221\noff\n2\nDZVP-MOLOPT-SR-GTH\n0\ny\n\n'), stdout=log, plain=True)
         self.assertNotIn('BASIS_MOLOPT_UCL', other.read_text())
 
     def test_hidden_approvals_are_retained_without_changing_backend(self):

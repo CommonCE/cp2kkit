@@ -1,9 +1,10 @@
-# Orbital basis registry (0.2.7, registry v1)
+# Orbital basis registry (software 0.2.9, registry v1)
 
 The registry establishes the numbering contract **toward 1.0.0**; it does not
-release 1.0.0 or certify calculations. The main editor still has one scrolling
-settings list. Selecting its field **2** opens one grouped basis-value list,
-not a category-selection page. No full-screen UI is used.
+release 1.0.0 or certify calculations. The generator uses compact shortcuts and
+category browsing with full function IDs. Selecting **2** or **220** opens one
+grouped basis-value list, not a second basis category-selection page. Basis
+registry numbers do not migrate with function IDs. No full-screen UI is used.
 
 ## Permanent number contract
 
@@ -12,7 +13,7 @@ separate. Assigned numbers never change meaning and are never recycled, even if
 an entry becomes unavailable or retired. New families use unallocated numbers
 within their intended range; tombstones retain their IDs/numbers. Sorting and
 `/text` filtering never renumber entries. Number **0** returns without changing
-the basis; Enter keeps it. This differs from main-editor 0 (review/generate).
+the basis; Enter keeps it. This differs from generator-main 0 (validate/write directly).
 CLI/config/replay use semantic string IDs, not menu positions. Legacy family
 names remain accepted on input. The default remains DZVP-MOLOPT-SR-GTH.
 
@@ -66,7 +67,7 @@ JSON list the derived settings. Global/element basis choices must resolve to one
 electron model; AE basis families may be mixed explicitly with other AE families.
 There is no automatic charge, multiplicity, magnetic-state or functional repair.
 
-The default `gapw_profile=auto` (menu **131**) now uses numerical profile **v4**:
+The default `gapw_profile=auto` (menu **225**) now uses numerical profile **v4**:
 
 | Location | Effective setup |
 |---|---|
@@ -90,7 +91,7 @@ the inspected ordinary Multiwfn AE output style, but does not certify the defaul
 for any property. Converge basis, uniform/atomic grids and hard/soft tolerances as
 needed; automatic setup is not automatic convergence.
 
-Main-menu **110 ALGORITHM** is visible only for OT. Choose IRAC or STRICT by
+Full function ID **324 ALGORITHM** is visible only for OT. Choose IRAC or STRICT by
 name/number; Enter keeps, `back` abandons, `auto` restores the basis-aware default.
 An explicit `--ot-algorithm STRICT` or IRAC overrides either AE profile. Diag hides
 and retains the request without emitting it into OT or replacing diagonalization's
@@ -196,6 +197,16 @@ cp2kkit generate-input water.xyz -o new-checked.inp --periodic NONE \
   --potential-file /path/to/potentials.dat
 ```
 
+Default generated UZH basis references use the portable runtime name
+`BASIS_MOLOPT_UZH`; paired UZH-PBE pseudopotentials use `POTENTIAL_UZH`,
+without version suffixes. UZH all-electron bases use the same basis filename
+but retain their nuclear `POTENTIAL` file (not UZH pseudopotentials).
+Explicit basis/potential file overrides remain literal. Actual resolved source
+paths/hashes stay in provenance; `emitted_data_files` records the input references.
+The runtime CP2K data search path must provide the generic aliases with the
+intended contents. A generation-time --data-dir check does not configure the
+runtime search path, and an alias on another installation may target other bytes.
+
 Versioned and generic UZH library filenames are searched within a directory;
 symlinks resolve to real targets. Names, aliases, q suffixes, potential occupations,
 selected basis exponent/contraction blocks and supported GTH channel/matrix
@@ -269,12 +280,14 @@ Explicit numeric migration supports inspected legacy 0.2.4/0.2.5/0.2.6 tables; a
 unsupported numeric versions are errors. CLI `--basis 3` is rejected; use an ID
 or legacy name. New JSON/replay never depends on display positions.
 
-Before interactive write confirmation, review shows every KIND, final basis and
+The r/p/550 review and the confirmed w route show every KIND, final basis and
 potential, basis/occupation-derived potential q, source path/line/hash/version,
 approximation and pairing status. Source evidence includes requested paths,
 resolved real paths, raw-byte SHA-256/size and entry fingerprint. A data version is
 identified only by exact pinned reference bytes, **not a filename or symlink name**;
 otherwise it is null/unknown. Provenance stays in JSON/review, not verbose input comments.
+Generator-main 0 validates/writes directly without showing this review; inspect
+r/p/550 or use w when an explicit pre-publication review is needed.
 
 `basis_validation.status` is `data_checked` only when both selected files and q
 matching (or the separate AE nuclear-charge check below) have been checked, otherwise `unverified_template`. This covers selected

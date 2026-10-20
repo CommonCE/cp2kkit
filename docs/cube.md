@@ -34,6 +34,17 @@ spin density is `rho_alpha - rho_beta`.
 
 ## 2. Density output with generate-input
 
+Software 0.2.9 adds **602 / --density-difference** for preparing the whole/A/B
+ENERGY GPW inputs together. Select A by whole-system indices, B is the complement,
+explicitly set both fragment charges/spins, and preserve whole geometry/cell/grid
+controls. It writes three inputs and an atom map, with optional combined provenance
+JSON, only to entirely new targets. No calculation or subtraction is triggered.
+See [the input-bundle workflow](input-generation.md#two-fragment-density-difference-inputs-029)
+for flags, filenames, common NGRIDS lock and magnetic-seed mapping. Use --write-json
+to retain complete source/data identity and all component settings for review.
+This does not replace checking actual output CUBE grids and reference states.
+
+
 ```bash
 export PYTHONPATH="$PWD/src"
 python -m cp2kkit generate-input AB.extxyz -o AB.inp --project AB \

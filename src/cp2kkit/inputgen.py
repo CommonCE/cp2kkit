@@ -77,7 +77,7 @@ class InputSettings:
     basis: str = DEFAULT_BASIS
     dispersion: str = "none"
     charge: int = 0
-    multiplicity: int = 1
+    multiplicity: int | None = None
     periodic: str | None = None
     cell: tuple[float, float, float] | None = None  # orthorhombic, angstrom
     vacuum: float = 5.0  # each side, angstrom; only for isolated cell construction
@@ -115,6 +115,12 @@ class InputSettings:
     trust_radius: float = 0.2  # angstrom; GEO_OPT/CELL_OPT BFGS/LBFGS only
     trajectory_format: str = 'XYZ'  # MOTION position trajectory, optimization only
     fixed_atoms: str = 'off'  # 1-based indices/ranges in loaded geometry; fractional XYZ
+    density_difference: bool = False
+    fragment_a_indices: str = 'off'
+    fragment_a_charge: int | None = None
+    fragment_a_multiplicity: int | None = None
+    fragment_b_charge: int | None = None
+    fragment_b_multiplicity: int | None = None
 
     @classmethod
     def from_config(cls, values, source_version=None):
@@ -140,6 +146,17 @@ class InputSettings:
         return cls(**values)
 
 
+def automatic_multiplicity(structure, settings):
+    """Minimal parity-compatible default, not a ground-state spin prediction."""
+    if type(settings.charge) is not int:
+        raise KitError(f'Invalid integer charge: {settings.charge}')
+    _, counts = electron_model(settings, sorted(set(structure.symbols)), VALENCE)
+    electrons = sum(counts[symbol] for symbol in structure.symbols) - settings.charge
+    if electrons <= 0:
+        raise KitError('Automatic multiplicity requires a positive electron count')
+    return 1 + electrons % 2
+
+
 def positive(value, name):
     if not math.isfinite(value) or value <= 0:
         raise KitError(f"{name} must be finite and positive")
@@ -161,8 +178,15 @@ def geometry_number(value):
     return 0.0 if rounded == 0.0 else rounded
 
 
-def generate_input(structure: Structure, settings: InputSettings):
-    """Return (complete input text, deterministic provenance/settings manifest)."""
+def generate_input(structure: Structure, settings: InputSettings, *, _common_ngrids=None):
+    """Return complete input/manifest; optional workflow includes fragment manifests."""
+    if type(settings.density_difference) is not bool:
+        raise KitError("density_difference must be Boolean")
+    if settings.density_difference:
+        from .density_workflow import generate_difference
+        return generate_difference(structure, settings)
+    if _common_ngrids not in (None, 5):
+        raise KitError("Invalid internal common-grid lock")
     if type(settings.write_json) is not bool:
         raise KitError('write_json must be Boolean')
     project = settings.project
@@ -176,6 +200,8 @@ def generate_input(structure: Structure, settings: InputSettings):
                 max_scf=settings.max_scf if settings.max_scf is not None else (25 if settings.scf == 'ot' else 128),
                 added_mos=settings.added_mos if settings.added_mos is not None else
                 (max(30, (len(structure.symbols)+1)//2) if settings.scf == 'diag' and settings.smearing is not None else 0))
+    if s.multiplicity is None:
+        s = replace(s, multiplicity=automatic_multiplicity(structure, s))
     if s.cp2k_version not in CP2K_VERSIONS:
         raise KitError("CP2K target version must be one of the checked 2024.1–2026.2 profiles")
     if not isinstance(s.project, str) or not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*", s.project):
@@ -242,7 +268,7 @@ def generate_input(structure: Structure, settings: InputSettings):
     s = replace(s, basis_overrides=basis_overrides)
     gapw = resolve_gapw(s, element_records) if all_electron else None
     ot_algorithm = (gapw['ot_algorithm'] if gapw else (s.ot_algorithm or 'STRICT')) if s.scf == 'ot' else None
-    ngrids = resolve_ngrids(element_records)
+    ngrids = _common_ngrids if _common_ngrids is not None else resolve_ngrids(element_records)
     electrons = sum(electron_counts[symbol] for symbol in structure.symbols) - s.charge
     unpaired = s.multiplicity - 1
     if electrons <= 0 or unpaired > electrons or (electrons - unpaired) % 2:
@@ -385,8 +411,17 @@ def generate_input(structure: Structure, settings: InputSettings):
     if s.run_type == "CELL_OPT":
         lines.append("  STRESS_TENSOR ANALYTICAL")
     restart_filename = s.project+'-RESTART'+('.wfn' if s.kpoints == (1, 1, 1) else '.kp')
-    lines += ['  &DFT', *(f'    BASIS_SET_FILE_NAME {cp2k_long_path(file)}' for file in basis_files),
-              f'    POTENTIAL_FILE_NAME {cp2k_long_path(files["potential"])}', f"    CHARGE {s.charge}",
+    # Portable UZH runtime aliases; resolved source paths/hashes stay in provenance.
+    emitted_basis_files = sorted({
+        'BASIS_MOLOPT_UZH' if not s.basis_files and
+        all(r['basis_protocol'] == 'uzh-pbe' or r['basis_id'].startswith('ae-uzh-')
+            for r in element_records.values() if r['basis_file'] == file)
+        else file for file in basis_files})
+    emitted_potential = ('POTENTIAL_UZH' if not s.potential_files and
+                         all(r['basis_protocol'] == 'uzh-pbe' for r in element_records.values())
+                         else files['potential'])
+    lines += ['  &DFT', *(f'    BASIS_SET_FILE_NAME {cp2k_long_path(file)}' for file in emitted_basis_files),
+              f'    POTENTIAL_FILE_NAME {cp2k_long_path(emitted_potential)}', f"    CHARGE {s.charge}",
               f"    MULTIPLICITY {s.multiplicity}", f"    UKS {'T' if uks else 'F'}",
               "    &QS", f"      METHOD {qs_method}", f"      EPS_DEFAULT {scientific_number(1e-11 if s.run_type == 'ENERGY' else 1e-12)}",
               *(f"      {key} {scientific_number(value)}" for key, value in (gapw['qs'] if gapw else {}).items()), "    &END QS",
@@ -465,7 +500,9 @@ def generate_input(structure: Structure, settings: InputSettings):
     text = "\n".join(lines) + "\n"
     effective = Structure(structure.symbols.copy(), positions, [row.copy() for row in cell],
                           [axis in periodic for axis in "XYZ"], structure.source, structure.frame)
-    manifest = {"schema_version": SCHEMA_VERSION, "generator": {"name": "cp2kkit", "version": __version__},
+    from .menu_registry import MENU_LAYOUT_VERSION
+    manifest = {"schema_version": SCHEMA_VERSION, "generator": {"name": "cp2kkit", "version": __version__,
+                                                              "menu_layout_version": MENU_LAYOUT_VERSION},
                 "target_software": "CP2K", "target_version": s.cp2k_version,
                 "runtime_version": None, "runtime_validated": False,
                 "references": {"Multiwfn": list(MULTIWFN_CITATIONS),
@@ -519,12 +556,15 @@ def generate_input(structure: Structure, settings: InputSettings):
                 'explicit_electron_count': electrons,
                 'electron_count_model': 'all_electron' if all_electron else 'pseudopotential_valence',
                 "kinds": kinds, "data_sources": data_sources,
+                "emitted_data_files": {"basis": emitted_basis_files, "potential": emitted_potential,
+                                       "dispersion": files['dispersion'] if s.dispersion != 'none' else None},
                 "source_structure": structure.to_dict(), "generated_structure": effective.to_dict(),
                 "coordinates_translated": translated, "warnings": warnings,
                 "input_text": text, "input_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
     manifest['method_profile'] = {
         'functional': s.functional, 'qs_method': qs_method, 'gapw': gapw,
         'ot_algorithm': (ot_algorithm or 'STRICT') if s.scf == 'ot' else None, 'ngrids': ngrids,
+        'ngrids_selection': 'whole-system workflow lock' if _common_ngrids is not None else 'effective orbital basis policy',
         'xc_backend': 'Libxc' if method_profile.libxc else 'CP2K-native',
         'libxc_required': method_profile.libxc, 'libxc_user_asserted': s.libxc_available,
         'build_verified': False, 'dispersion_reference': s.functional if s.dispersion != 'none' else None,
@@ -552,6 +592,9 @@ def write_input(structure, settings, output):
     Optional JSON keeps exclusive creation. A pre-publication failure leaves
     the old input intact; normal staging failures clean only our own files.
     """
+    if settings.density_difference:
+        from .density_workflow import write_difference
+        return write_difference(structure, settings, output)
     text, manifest = generate_input(structure, settings)
     output = Path(output)
     sidecar = Path(str(output)+".json") if settings.write_json else None

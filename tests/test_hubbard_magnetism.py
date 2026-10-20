@@ -40,12 +40,12 @@ class HubbardMagnetismTests(unittest.TestCase):
                                stdin=TTY(lines), stdout=log, plain=True)
         return code, log.getvalue()
 
-    def test_slot_replacement_and_cli_only_legacy_controls(self):
-        self.assertEqual(dict(FIELD_IDS)[124], 'dft_plus_u')
-        self.assertEqual(dict(FIELD_IDS)[125], 'magnetism')
-        _, log = self.session('-10\n')
-        self.assertIn('124. DFT+U [eV]: off', log)
-        self.assertIn('125. Magnetic initialization: auto', log)
+    def test_method_category_and_retained_cli_controls(self):
+        self.assertEqual(dict(FIELD_IDS)[112], 'dft_plus_u')
+        self.assertEqual(dict(FIELD_IDS)[103], 'magnetism')
+        _, log = self.session('100\n0\n-10\n')
+        self.assertIn('112. DFT+U [eV]: off', log)
+        self.assertIn('103. Magnetic initialization: auto', log)
         self.assertNotIn('Cell override A B C', log)
         self.assertNotIn('CP2K data directory:', log)
         args = build_parser().parse_args(['generate-input', '--cell', '10', '11', '12', '--data-dir', 'data'])
@@ -144,7 +144,7 @@ class HubbardMagnetismTests(unittest.TestCase):
                 self.generate(**kwargs)
 
     def test_charge_spin_and_version_conflicts_never_auto_repaired(self):
-        for kwargs in (dict(magnetism=(), charge=1), dict(magnetism=(), multiplicity=2),
+        for kwargs in (dict(magnetism=(), charge=1, multiplicity=1), dict(magnetism=(), multiplicity=2),
                        dict(magnetism=(), cp2k_version='2024.1'),
                        dict(dft_plus_u=(('Fe', 2, 4.),), cp2k_version='2025.2')):
             with self.subTest(kwargs=kwargs), self.assertRaises(KitError):
@@ -178,7 +178,7 @@ class HubbardMagnetismTests(unittest.TestCase):
         self.assertEqual(generate_input(self.structure, api), generate_input(self.structure, replay))
 
     def test_interactive_edit_retry_review_and_write(self):
-        _, log = self.session('124\nFe:2:nan\nFe:2:4\n125\nFe=4; @2=-4\n0\ny\n\n')
+        _, log = self.session('112\nFe:2:nan\nFe:2:4\n103\nFe=4; @2=-4\nw\ny\n\n')
         self.assertIn('Invalid input:', log)
         self.assertIn('@2: Fe', log)
         self.assertIn('Initial MAGNETIZATION: -4', log)
@@ -189,14 +189,14 @@ class HubbardMagnetismTests(unittest.TestCase):
         self.assertEqual(self.out.read_text(), generate_input(self.structure, settings)[0])
 
     def test_clear_and_cancel_never_write(self):
-        _, log = self.session('124\noff\n125\nauto\np\n\n-10\n',
+        _, log = self.session('112\noff\n103\nauto\np\n\n-10\n',
                               dft_plus_u=(('Fe', 2, 4.),), magnetism=())
         preview = log.split('--- Input preview (not written) ---')[1]
         self.assertNotIn('&DFT_PLUS_U', preview)
         self.assertIn('UKS F', preview)
         self.assertFalse(self.out.exists())
         with patch('cp2kkit.input_editor.write_input') as writer:
-            self.session('125\nFe=4; @2=-4\ncancel\n')
+            self.session('103\nFe=4; @2=-4\ncancel\n')
             writer.assert_not_called()
 
     def test_magnetic_input_replacement_and_json_collision_protection(self):

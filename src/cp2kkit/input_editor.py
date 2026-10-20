@@ -1,48 +1,20 @@
-"""Single numbered generation menu with inspected Multiwfn main-menu IDs."""
+"""Scrolling category/direct-access editor; all routes share semantic state."""
 import sys
 from dataclasses import asdict
 from pathlib import Path
 
 from .errors import KitError
-from .input_tui import Cancelled, SessionExit, Menu, GROUPS, field_display, visible_fields
+from .input_tui import (Cancelled, SessionExit, Menu, GROUPS, field_display,
+                        parse_value, visible_fields)
 from .inputgen import InputSettings, generate_input, write_input
+from .menu_registry import ENTRIES, BY_TOKEN, CATEGORY_NAMES, MENU_LAYOUT_VERSION
 from .presentation import require_terminal
 from .structure import read_structure
 
 FIELDS = {field.name: field for _, fields in GROUPS for field in fields}
-# Multiwfn 2026.10.1 cp2kmate.f90/outCP2Kinp, main menu at lines 200-365.
-# Only corresponding implemented fields get upstream main-menu IDs. 100+ are
-# explicit local extensions, not flattened/reassigned upstream submenu numbers.
-FIELD_IDS = (
-    (-7, 'periodic'), (-5, 'trajectory_format'), (-3, 'electron_density'), (-1, 'run_type'),
-    (1, 'functional'), (2, 'basis'), (3, 'dispersion'), (4, 'scf'),
-    (6, 'smearing'), (8, 'kpoints'), (9, 'fixed_atoms'), (10, 'optimizer'), (12, 'pressure'),
-    (101, 'charge'), (102, 'multiplicity'), (105, 'cutoff'), (106, 'rel_cutoff'),
-    (107, 'vacuum'), (110, 'ot_algorithm'), (112, 'added_mos'), (120, 'eps_scf'), (121, 'max_scf'),
-    (122, 'max_outer_scf'), (123, 'max_iter'), (124, 'dft_plus_u'), (125, 'magnetism'),
-    (126, 'spin_density'), (127, 'cube_stride'), (128, 'basis_overrides'),
-    (129, 'allow_pbe_potential'), (130, 'libxc_available'), (131, 'gapw_profile'), (132, 'write_json'), (133, 'trust_radius'),
-)
+FIELD_IDS = tuple((entry.number, entry.field) for entry in ENTRIES if entry.field)
 NUMBERED_FIELDS = tuple((number, FIELDS[name]) for number, name in FIELD_IDS)
-LABELS = {
-    'periodic': 'Periodicity', 'electron_density': 'Electron density cube',
-    'run_type': 'Run type', 'functional': 'Functional (GPW/GTH or GAPW/ALL)', 'basis': 'Basis set',
-    'dispersion': 'Dispersion', 'scf': 'SCF algorithm', 'smearing': 'Smearing [K]',
-    'kpoints': 'k-points NX NY NZ', 'optimizer': 'Optimizer', 'pressure': 'CELL_OPT pressure [bar]',
-    'charge': 'Total charge [e]', 'multiplicity': 'Spin multiplicity', 'cutoff': 'CUTOFF [Ry]',
-    'rel_cutoff': 'REL_CUTOFF [Ry]', 'vacuum': 'Isolated box padding [angstrom]',
-    'ot_algorithm': 'ALGORITHM',
-    'added_mos': 'ADDED_MOS', 'eps_scf': 'EPS_SCF', 'max_scf': 'Maximum inner/diag SCF steps',
-    'max_outer_scf': 'Maximum outer SCF steps', 'max_iter': 'Maximum optimization steps',
-    'dft_plus_u': 'DFT+U [eV]', 'magnetism': 'Magnetic initialization',
-    'spin_density': 'Spin density', 'cube_stride': 'Cube stride NX NY NZ',
-    'basis_overrides': 'Element basis overrides', 'allow_pbe_potential': 'Allow GTH-PBE approximation',
-    'libxc_available': 'Target CP2K has Libxc (user assertion)',
-    'gapw_profile': 'All-electron automatic setup',
-    'write_json': 'Write provenance JSON',
-    'fixed_atoms': 'Fixed atoms',
-    'trajectory_format': 'Trajectory format', 'trust_radius': 'TRUST_RADIUS [angstrom]',
-}
+LABELS = {entry.field: entry.label for entry in ENTRIES if entry.field}
 
 
 def settings_from(values):
@@ -59,27 +31,49 @@ def compatibility(menu, values):
         menu.show(f'Warning: draft needs attention: {exc}. Values retained; no automatic changes.')
 
 
-def show_settings(menu, values):
-    visible = set(visible_fields(tuple(field for _, field in NUMBERED_FIELDS), values))
-    selectable = {number: field for number, field in NUMBERED_FIELDS if field in visible}
-    if values['run_type'] not in {'GEO_OPT', 'CELL_OPT'}:
-        selectable = {n: f for n, f in selectable.items() if f.name not in {'optimizer', 'max_iter'}}
-    menu.heading('\n=== CP2K input generation: all settings ===')
-    menu.show(f"Structure: {values['path'] or 'No structure loaded'}; frame: {values['frame']}")
-    menu.show('s: Load/change structure; f: Change XYZ frame')
-    menu.show(' -10. Back / cancel generation')
-    for number, field in NUMBERED_FIELDS:
-        if number == 1:
-            menu.show('   0. Review & generate input file')
-        if number == 101:
-            menu.heading('Additional settings (100+ are cp2kkit extensions)')
-        if number not in selectable:
-            continue
-        origin = 'user edit' if field.name in values['_edited'] else values['_origins'][field.name]
-        menu.show(f' {number:3}. {LABELS[field.name]}: {field_display(field, values)} [{origin}]')
-    menu.show('  r. Review effective settings\n  p. Preview full input and replay command\n'
-              '  w. Review & write files (alias for 0)')
-    return selectable
+def applicable_entries(values):
+    visible = {f.name for f in visible_fields(tuple(FIELDS.values()), values)}
+    return tuple(e for e in ENTRIES if e.field is None or e.field in visible)
+
+
+def _show_entry(menu, entry, number, values):
+    if entry.field is None:
+        menu.show(f' {number:3}. {entry.label}')
+        return
+    field = FIELDS[entry.field]
+    origin = 'user edit' if field.name in values['_edited'] else values['_origins'].get(field.name, 'source/output control')
+    value = field_display(field, values)
+    if entry.editor in {'custom_basis', 'custom_potential'}:
+        value += '; alias='+str(values[entry.editor+'_name'])
+    menu.show(f' {number:3}. {entry.label}: {value} [{origin}]')
+
+
+def show_settings(menu, values, category=None):
+    entries = applicable_entries(values)
+    categories = {e.category for e in entries if e.category is not None}
+    if category is None:
+        menu.heading('\n=== CP2K input generation: common settings ===')
+        menu.show(f"Structure: {values['path'] or 'No structure loaded'}; frame: {values['frame']}")
+        menu.show('s: Load/change structure (201); f: Change XYZ frame (202)')
+        menu.show(' -10. Back / cancel generation\n   0. Generate input files directly')
+        common = sorted(((e.aliases[0] if e.aliases else e.number, e) for e in entries
+                         if e.number == -1 or e.aliases), key=lambda pair: pair[0])
+        for number, entry in common:
+            _show_entry(menu, entry, number, values)
+        menu.heading('Categories (open to browse; full IDs also work directly)')
+        for number, label in CATEGORY_NAMES.items():
+            if number in categories:
+                menu.show(f' {number}. {label}')
+        menu.show('  r. Review effective settings\n  p. Preview all inputs and replay command\n'
+                  '  w. Review & write files (with confirmation)')
+    else:
+        menu.heading(f'\n=== {category}. {CATEGORY_NAMES[category]} ===')
+        for entry in entries:
+            if entry.category == category:
+                _show_entry(menu, entry, entry.number, values)
+        menu.show('   0. Back to input-generator main menu (no files written)\n'
+                  '  r/p. Review / full preview; full IDs can access other categories')
+    return entries, categories
 
 
 def review(menu, values, full=False):
@@ -92,8 +86,15 @@ def review(menu, values, full=False):
         return None
 
 
+def automatic_output(values):
+    if not values.get('path'):
+        return None
+    suffix = '-CDD.inp' if values['density_difference'] else '.inp'
+    return Path(values['path']).stem + suffix
+
+
 def edit_source(menu, values, name):
-    """Source controls live in the structure header, not the numbered settings."""
+    """Source edits are validated before replacing the loaded geometry selection."""
     new = menu.edit(FIELDS[name], values[name])
     if new == values[name]:
         return
@@ -108,11 +109,174 @@ def edit_source(menu, values, name):
         return
     values[name] = new
     if name == 'path' and values['_auto_output']:
-        values['output'] = Path(new).stem+'.inp'
+        values['output'] = automatic_output(values)
     if values['fixed_atoms'] != 'off':
         menu.show('Warning: Fixed-atom indices were retained, not remapped to the changed structure/frame. '
-                  'Review selection 9 against the loaded/expanded atom order before generation.')
-    compatibility(menu, values)
+                  'Review selection 420 / shortcut 9 against the loaded/expanded atom order before generation.')
+    if values['fragment_a_indices'] != 'off':
+        menu.show('Warning: Fragment atom indices were retained, not remapped to the changed structure/frame. '
+                  'Review 602 against the loaded/expanded atom order; fragment charges/spins were not inferred.')
+
+
+def atom_table(menu, values, magnetic=False, coordinates=True):
+    try:
+        if not values['path']:
+            raise KitError('Load a structure first')
+        structure = read_structure(values['path'], values['frame'])
+        units = ' [angstrom]' if coordinates else ''
+        menu.show(f'Atom indices below refer to loaded/expanded geometry, not CIF site labels{units}:')
+        for index, (element, position) in enumerate(zip(structure.symbols, structure.positions), 1):
+            label = f'@{index}' if magnetic else str(index)
+            suffix = ' ' + ' '.join(f'{x:.8f}' for x in position) if coordinates else ''
+            menu.show(f'  {label}: {element}{suffix}')
+    except (KitError, OSError) as exc:
+        menu.show(f'Warning: Atom list unavailable: {exc}')
+
+
+def edit_pair(menu, values, prefix):
+    """Keep file/alias controls transactional; back never leaves half an edit."""
+    draft = {}
+    for suffix in ('_file', '_name'):
+        name = prefix+suffix
+        while True:
+            raw = menu.ask(f'{FIELDS[name].label} [{values[name]}]; Enter keeps; auto clears pair; back returns: ')
+            if raw.lower() == 'back':
+                return
+            if raw.lower() == 'auto':
+                values.update({prefix+'_file': None, prefix+'_name': None})
+                return
+            try:
+                draft[name] = parse_value(FIELDS[name], raw) if raw else values[name]
+                break
+            except ValueError as exc:
+                menu.show(f'Invalid input: {exc}')
+    values.update(draft)
+
+
+def show_partition(menu, values):
+    from .density_workflow import partition
+    try:
+        if not values['path']:
+            raise KitError('Load a structure first')
+        structure = read_structure(values['path'], values['frame'])
+        _, a, b = partition(values['fragment_a_indices'], len(structure.symbols))
+        menu.show(f'Fragment A whole indices: {list(a)}; B complement: {list(b)}')
+        for label, indices in (('A', a), ('B', b)):
+            for local, index in enumerate(indices, 1):
+                menu.show(f'  whole {index} ({structure.symbols[index-1]}) -> {label}:{local}')
+    except (KitError, OSError) as exc:
+        menu.show(f'Error: Cannot resolve partition: {exc}; selection retained.')
+
+
+def edit_difference_states(menu, values):
+    """Edit all three charge/multiplicity pairs as one transaction."""
+    names = ('charge', 'multiplicity', 'fragment_a_charge', 'fragment_a_multiplicity',
+             'fragment_b_charge', 'fragment_b_multiplicity')
+    while True:
+        current = ' '.join(str(values[name]) for name in names)
+        raw = menu.ask('Charges/multiplicities: all_Q all_M A_Q A_M B_Q B_M '
+                       f'[{current}]; e.g. 0 1 0 1 0 1; Enter keeps; back returns: ')
+        if not raw or raw.lower() == 'back':
+            return
+        try:
+            tokens = raw.split()
+            if len(tokens) != 6:
+                raise ValueError('Enter exactly six integers: all_Q all_M A_Q A_M B_Q B_M')
+            # int() deliberately rejects auto/None/floats for explicit states.
+            draft = {name: parse_value(FIELDS[name], str(int(token)))
+                     for name, token in zip(names, tokens)}
+            if draft['charge'] != draft['fragment_a_charge'] + draft['fragment_b_charge']:
+                raise ValueError('Whole-system charge must equal A charge + B charge')
+        except ValueError as exc:
+            menu.show(f'Invalid input: {exc}. All six values unchanged.')
+            continue
+        values.update(draft)
+        return
+
+
+def edit_cube_output(menu, values):
+    """Multiwfn-style cube selector limited to implemented output types."""
+    while True:
+        menu.heading('\n--- Cube output ---')
+        menu.show('0. None\n1. Electron density (also spin density for unrestricted calculations)')
+        menu.show('Only implemented output types are listed. CDD (602) requires electron density.')
+        raw = menu.ask('Cube output [0/1]; Enter keeps; back returns: ').lower()
+        if not raw or raw == 'back':
+            return
+        if raw not in {'0', '1'}:
+            menu.show('Invalid input: select 0 or 1. Settings unchanged.')
+            continue
+        if raw == '0' and values['density_difference']:
+            menu.show('Cannot disable electron density while CDD (602) is enabled; disable CDD first.')
+            continue
+        values['electron_density'] = raw == '1'
+        if raw == '0':
+            values['spin_density'] = False
+        return
+
+
+def edit_difference(menu, values):
+    """Explicitly local 602 options; no generation or global-number interception."""
+    while True:
+        menu.heading('\n--- 602. Charge-density difference inputs (local options) ---')
+        menu.show(f"1. Enable/disable: {values['density_difference']}\n"
+                  f"2. Fragment A whole-system indices: {values['fragment_a_indices']}\n"
+                  '3. Review fragment B complement and atom mapping\n'
+                  f"4. Charges/spin multiplicities (all A B): all={values['charge']}/{values['multiplicity']}; "
+                  f"A={values['fragment_a_charge']}/{values['fragment_a_multiplicity']}; "
+                  f"B={values['fragment_b_charge']}/{values['fragment_b_multiplicity']}\n"
+                  '5. Review mapping and common settings\n0. Back (no files written)' )
+        menu.show('ENERGY/GPW only; density output is enabled for all three inputs. '
+                  'B is the complement; charges/spins require explicit values; no independent recentering or ghosts.')
+        raw = menu.ask('602 local option [0-5]; back returns; cancel cancels; q exits: ').lower()
+        if raw in {'0', 'back'}:
+            return
+        if raw == '1':
+            values['density_difference'] = not values['density_difference']
+            if values.get('_auto_output'):
+                values['output'] = automatic_output(values)
+            if values['density_difference']:
+                values['electron_density'] = True
+                menu.show('Electron density cube output automatically enabled for whole/A/B.')
+        elif raw == '2':
+            values['fragment_a_indices'] = menu.edit(FIELDS['fragment_a_indices'], values['fragment_a_indices'], values)
+        elif raw == '3':
+            show_partition(menu, values)
+        elif raw == '4':
+            edit_difference_states(menu, values)
+        elif raw == '5':
+            show_partition(menu, values)
+            if values['density_difference']:
+                review(menu, values)
+            else:
+                menu.show('Workflow is disabled; enable it to review validated common geometry/grid and all component states.')
+        else:
+            menu.show('Error: Invalid local option; global function IDs are not active inside 602.')
+
+
+def edit_entry(menu, values, entry):
+    if entry.editor == 'source':
+        edit_source(menu, values, entry.field)
+    elif entry.editor in {'custom_basis', 'custom_potential'}:
+        edit_pair(menu, values, entry.editor)
+    elif entry.editor == 'difference':
+        edit_difference(menu, values)
+    elif entry.editor == 'cube':
+        edit_cube_output(menu, values)
+    else:
+        field = FIELDS[entry.field]
+        if field.name in {'magnetism', 'fixed_atoms'}:
+            atom_table(menu, values, magnetic=field.name == 'magnetism')
+            if field.name == 'magnetism':
+                menu.show('An explicit magnetic request enables UKS. Charge/multiplicity stay unchanged. '
+                          'Element seeds apply first; @atom seeds override them. This is an initial guess, not a moment constraint.')
+            else:
+                menu.show('Fix fractional XYZ components; CELL_OPT can still move atoms with the cell. '
+                          'Source constraints are not inherited. Enter keeps; off or 0 clears the selection.')
+        old = values[field.name]
+        values[field.name] = menu.edit(field, old, values)
+        if field.name == 'output' and values[field.name] != old:
+            values['_auto_output'] = False
 
 
 def run_editor(path, frame, output, settings, stdin=None, stdout=None, plain=False,
@@ -127,86 +291,93 @@ def run_editor(path, frame, output, settings, stdin=None, stdout=None, plain=Fal
     values = {**asdict(settings), 'path': path, 'frame': frame,
               'output': output or (Path(path).stem+'.inp' if path else None),
               '_edited': set(), '_origins': origins, '_auto_output': output is None}
+    if values['_auto_output']:
+        values['output'] = automatic_output(values)
+    if values['density_difference']:
+        values['electron_density'] = True
+    category = None
     try:
-        menu.show('Creates new files only; no calculations. Source supplies geometry, not charge/spin/method.')
-        menu.show('Implemented main-menu IDs follow Multiwfn 2026.10.1; 100+ are local extensions. '
-                  'Inapplicable fields are hidden, not reset.')
+        menu.show('No calculations. Source supplies geometry, not charge/spin/method; source/data/results stay protected.')
+        menu.show(f'Menu layout v{MENU_LAYOUT_VERSION}: common shortcuts plus categories; full IDs work directly. '
+                  '0.2.8 extension numbers have migrated; see the numbering guide. '
+                  'Basis registry numbers are unchanged. Inapplicable fields are hidden, not reset.')
         menu.show('Parameter Enter keeps; back abandons an edit; literal 0 is a value (basis chooser: 0 returns). '
-                  'Menu 0 generates after confirmation; -10/back/cancel returns; q exits.')
+                  'Main-menu 0 writes input files directly; w reviews and confirms first. '
+                  'Category/602 0 returns; -10/back returns; q exits.')
         while True:
-            selectable = show_settings(menu, values)
-            raw = menu.ask('Select a displayed number, s/f, r/p/w; -10/back returns: ').lower()
-            if raw in {'-10', 'back'}:
+            applicable, categories = show_settings(menu, values, category)
+            raw = menu.ask('Select shortcut/category/full ID, s/f, r/p/w; -10/back returns: ').lower()
+            if raw in {'-10', 'back'} or raw == '0' and category is not None:
+                if category is not None:
+                    category = None
+                    continue
                 raise Cancelled
-            if raw in {str(number) for number in selectable}:
-                field = selectable[int(raw)]
-                old = values[field.name]
-                if field.name in {'magnetism', 'fixed_atoms'}:
-                    try:
-                        structure = read_structure(values['path'], values['frame']) if values['path'] else None
-                        if structure is not None:
-                            menu.show('Atom indices below refer to loaded/expanded geometry, not CIF site labels [angstrom]:')
-                            for index, (element, position) in enumerate(zip(structure.symbols, structure.positions), 1):
-                                label = f'@{index}' if field.name == 'magnetism' else str(index)
-                                menu.show(f'  {label}: {element} ' + ' '.join(f'{x:.8f}' for x in position))
-                    except (KitError, OSError) as exc:
-                        menu.show(f'Warning: Atom list unavailable: {exc}')
-                    if field.name == 'magnetism':
-                        menu.show('An explicit magnetic request enables UKS. Charge/multiplicity stay unchanged. '
-                                  'Element seeds apply first; @atom seeds override them. This is an initial guess, not a moment constraint.')
-                    else:
-                        menu.show('Fix fractional XYZ components; CELL_OPT can still move atoms with the cell. '
-                                  'Source constraints are not inherited. Enter keeps; off or 0 clears the selection.')
-                previous_sources = tuple(values[name] for name in ('data_dir', 'basis_files', 'potential_files',
-                                         'custom_basis_file', 'custom_basis_name', 'custom_potential_file', 'custom_potential_name'))
-                values[field.name] = menu.edit(field, old, values)
-                if values[field.name] != old or previous_sources != tuple(values[name] for name in (
-                        'data_dir', 'basis_files', 'potential_files', 'custom_basis_file', 'custom_basis_name',
-                        'custom_potential_file', 'custom_potential_name')):
-                    values['_edited'].add(field.name)
+            if raw in {str(n) for n in CATEGORY_NAMES}:
+                number = int(raw)
+                if number in categories:
+                    category = number
+                else:
+                    menu.show('Error: Category has no applicable implemented entries; draft retained.')
+                continue
+            direct_generate = raw == '0' and category is None
+            entry = BY_TOKEN.get({'s': '201', 'f': '202'}.get(raw, raw))
+            if entry is not None:
+                if entry not in applicable:
+                    menu.show(f'Error: Invalid menu number for this state: {entry.number} ({entry.label}) is not applicable. '
+                              'Check task, SCF, method and periodicity. Values retained; no automatic changes.')
+                    continue
+                if entry.editor == 'review':
+                    review(menu, values)
+                    menu.ask('Enter to return to the originating menu; q exits: ')
+                    continue
+                before = {name: values[name] for name in (*InputSettings.__dataclass_fields__, 'path', 'frame', 'output')}
+                edit_entry(menu, values, entry)
+                changed = {name for name, value in before.items() if values[name] != value}
+                if changed:
+                    values['_edited'].update(changed)
                     compatibility(menu, values)
-            elif raw in {'s', 'f'}:
-                edit_source(menu, values, 'path' if raw == 's' else 'frame')
-            elif raw in {'r', 'p', 'w', '0'}:
-                validated = review(menu, values, full=raw == 'p')
+                continue
+            if raw in {'r', 'p', 'w', '0'}:
+                if category is not None and raw == 'w':
+                    menu.show('Return to the main menu before generation; category 0/back never writes files.')
+                    continue
+                validated = review(menu, values, full=raw == 'p') if not direct_generate else True
                 if validated is None:
                     continue
                 if raw in {'r', 'p'}:
-                    menu.ask('Enter to return to all settings; q exits: ')
+                    menu.ask('Enter to return to the originating menu; q exits: ')
                     continue
-                answer = menu.ask('Write input (existing .inp may be replaced)'+(' and new JSON' if values['write_json'] else '')+'? [y/N]; back returns; cancel cancels; q exits: ').lower()
+                policy = 'new whole/A/B inputs and atom map (all targets exclusive)' if values['density_difference'] else 'input (existing .inp may be replaced)'
+                answer = 'yes' if direct_generate else menu.ask('Write '+policy+(' and new JSON' if values['write_json'] else '')+'? [y/N]; back returns; cancel cancels; q exits: ').lower()
                 if answer not in {'y', 'yes'}:
-                    menu.show('Not confirmed; no files written. Returning to all settings.')
+                    menu.show('Not confirmed; no files written. Returning to common settings.')
                     continue
                 try:
-                    # Re-read/revalidate; the shared writer stages before input replacement.
-                    result = write_input(read_structure(values['path'], values['frame']),
-                                         settings_from(values), values['output'])
+                    result = write_input(read_structure(values['path'], values['frame']), settings_from(values), values['output'])
                 except (KitError, OSError) as exc:
                     menu.show(f'Error: {exc}. No unfinished output retained.')
-                    # A collision/I/O recovery prompt, not a persistent output-path setting.
                     new = menu.ask('New input path for retry; Enter/back returns to settings; cancel/q: ')
                     if new and new.lower() != 'back':
                         try:
-                            from .input_tui import parse_value
                             values['output'] = parse_value(FIELDS['output'], new)
                             values['_auto_output'] = False
                         except ValueError as error:
                             menu.show(f'Error: {error}. Target unchanged.')
                     continue
-                menu.show('Success: Input'+(' and provenance sidecar' if result[1] is not None else '')+' generated; no calculation was run.')
-                for target in (p for p in result[:2] if p is not None):
-                    menu.show(f'Generated path: {Path(target).resolve()}')
+                menu.show('Success: Input'+(' bundle' if values['density_difference'] else '')+
+                          (' and provenance sidecar' if result[1] is not None else '')+' generated; no calculation was run.')
+                from .density_workflow import bundle_paths
+                for target in bundle_paths(settings_from(values), result[0]):
+                    menu.show(f'Generated path: {target.resolve()}')
                 menu.show(f"Task: {values['run_type']}; functional: {values['functional']}; "
                           f"basis: {values['basis']}; dispersion: {values['dispersion']}")
                 for warning in result[2]:
                     menu.show(f'Warning: {warning}')
-                menu.ask('Enter to return to the menu; q exits: ')
                 return 0
-            elif not raw:
-                menu.show('No files written. Select a field, r/p to inspect, or 0/w to review & write.')
+            if not raw:
+                menu.show('No files written. Select a field, r/p to inspect, main-menu 0 to write directly, or w to review & write.')
             else:
-                menu.show('Error: Invalid menu number or action')
+                menu.show('Error: Invalid menu number or action (unknown/unimplemented; no legacy extension aliases inferred)')
     except (Cancelled, KeyboardInterrupt):
         menu.show('Cancelled; no unfinished files generated. Completed files, if any, are retained.')
         return 0

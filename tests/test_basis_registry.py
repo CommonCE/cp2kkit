@@ -163,8 +163,24 @@ class BasisRegistryTests(unittest.TestCase):
             self.assertEqual(manifest['kinds']['O']['protocol_pairing'],'unverified_pair')
             self.assertEqual(Path(manifest['method_profile']['potential_file']).name,'POTENTIAL_UZH_2026.2')
             self.assertNotIn('GTH_POTENTIALS',text)
+            self.assertIn('BASIS_SET_FILE_NAME BASIS_MOLOPT_UZH\n', text)
+            self.assertIn('POTENTIAL_FILE_NAME POTENTIAL_UZH\n', text)
+            self.assertNotIn('_UZH_2026', text)
+            self.assertEqual(manifest['emitted_data_files']['basis'], ['BASIS_MOLOPT_UZH'])
+            self.assertEqual(manifest['emitted_data_files']['potential'], 'POTENTIAL_UZH')
             self.assertEqual(text.count('POTENTIAL_FILE_NAME'),1)
             self.assertFalse(manifest['method_profile']['runtime_validated'])
+
+    def test_uzh_runtime_aliases_without_data_and_explicit_sources_preserved(self):
+        text, report = self.generate(basis='uzh-pbe-tzvp')
+        self.assertIn('BASIS_SET_FILE_NAME BASIS_MOLOPT_UZH\n', text)
+        self.assertIn('POTENTIAL_FILE_NAME POTENTIAL_UZH\n', text)
+        b, p = map(Path, self.uzh())
+        text, report = self.generate(basis='uzh-pbe-tzvp', basis_files=(str(b),), potential_files=(str(p),))
+        self.assertIn(f'BASIS_SET_FILE_NAME {b.resolve()}\n', text)
+        self.assertIn(f'POTENTIAL_FILE_NAME {p.resolve()}\n', text)
+        self.assertEqual(report['emitted_data_files']['basis'], [str(b.resolve())])
+        self.assertEqual(report['emitted_data_files']['potential'], str(p.resolve()))
 
     def test_uzh_pbe_rejects_wrong_functionals_and_targets(self):
         for kwargs in ({'functional':'BLYP'}, {'functional':'RPBE', 'libxc_available':True, 'allow_pbe_potential':True},
@@ -443,7 +459,7 @@ class BasisRegistryTests(unittest.TestCase):
             out = self.root/(expected+'.inp')
             log = TTY()
             code = run_interactive(source,-1,str(out),replace(self.settings,data_dir=str(self.root)),
-                                   stdin=TTY('2\n'+choice+'0\ny\n\n'),stdout=log,plain=True)
+                                   stdin=TTY('2\n'+choice+'w\ny\n\n'),stdout=log,plain=True)
             self.assertEqual(code,0)
             manifest = json.loads(Path(str(out)+'.json').read_text())
             self.assertEqual(manifest['settings']['basis'],expected)

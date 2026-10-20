@@ -38,6 +38,9 @@ these templates are not a universal automatic-loading entry point.
 - Store reusable rules only: no secrets, personal data, raw conversations, large
   calculation results, or transient logs.
 - Goals/progress follow the [roadmap](../docs/roadmap.md); planned outcomes are not completed results.
+  For generator UI work, inspect the [menu guide](../docs/menu-numbering-draft.md)
+  and `src/cp2kkit/menu_registry.py`: future allocations are not implemented entries,
+  and function IDs, basis registry numbers and atom indices are separate namespaces.
 - Keep third-party authorization/provenance in [notices](../THIRD_PARTY_NOTICES.md)
   and `third_party/`, not here or in ignored directories.
 - Recheck these templates as implementation changes. Do not freeze obsolete test

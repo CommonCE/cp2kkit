@@ -1,6 +1,44 @@
 # Development status and next steps
 
-Current software: **0.2.8** (explicit user version); schema: **0.1.0**.
+Current software: **0.2.9**; schema: **0.1.0**.
+
+### 0.2.9 implemented development scope
+
+- Menu layout v1: compact common shortcuts, unexpanded categories 100-600,
+  full IDs for category/direct access, shared semantic state/applicability/editors
+  and return context. 500 is output, 600 properties; empty/future menus are hidden.
+- Explicit extension-number migration, e.g. old 112 ADDED_MOS -> 341, new 112 U.
+  Existing CLI/config/replay names and immutable basis registry v1 are unchanged.
+- 602: shared ENERGY GPW whole/A/B density inputs and atom-map CSV; explicit
+  fragment charges/spins, charge-conserving complementary partition, original
+  relative order and common generated geometry/grid controls. Map magnetic seeds,
+  filter per-element requests to included atoms, verify basis/potential sources.
+- Exclusive staged bundle publication and optional combined JSON; no existing
+  target replacement. Ordinary single-input writer policy remains unchanged.
+- Generator-main 0 validates/writes directly; w reviews and confirms. Category/602
+  0 returns without writing; successful generation returns without an extra pause.
+- Whole-system multiplicity defaults to electron parity after charge (even 1,
+  odd 2); explicit values are preserved and fragment states remain explicit.
+  This is not a ground-state spin prediction.
+- Shared -3/601 cube selector (0 None / 1 Electron density); CDD enables density
+  output and blocks disabling it while active. 602 option 4 edits six whole/A/B
+  state integers transactionally; option 2 prompts directly for atom indices.
+- Automatic TUI output naming follows the source stem with -CDD.inp while CDD is
+  active, .inp otherwise; explicit paths win. Default UZH runtime references use
+  BASIS_MOLOPT_UZH / POTENTIAL_UZH while provenance retains resolved sources.
+- [Numbering/allocation guide](menu-numbering-draft.md) distinguishes this
+  implemented subset from provisional unimplemented electronic/property models
+  and categories 700-1000. [Workflow guide](input-generation.md) records limitations.
+- Latest validation: **403 tests passed, none skipped**, including menu/workflow
+  tests, migrated UI regressions and follow-up parity/cube/naming/navigation cases;
+  compileall, CLI version, maintained-text/link and diff checks passed. Synthetic
+  generation and PTY/CLI smoke only.
+- Actual CUBE grids, CP2K native acceptance/convergence and scientific reference
+  fitness remain unverified. No calculations, new dependencies, commit/push or
+  publication authorized by input generation.
+
+### 0.2.8 implementation (historical baseline)
+
 Latest retained-version policy supersedes the historical universal grid/OT/hint
 defaults below: only effective classic non-SR TZVP/TZV2P/TZV2PX emit NGRIDS 5;
 all others omit it (null metadata). OT always emits PP STRICT / AE IRAC in both
@@ -18,7 +56,7 @@ Malformed/overlapping/active out-of-bounds selections fail before publication;
 inactive requests remain compact and hidden. No source constraints are inherited.
 CELL_OPT can move fixed fractional positions with the cell. Existing defaults,
 protected-result writes and native-validation boundaries are retained.
-Current validation: **346 tests passed, none skipped**, including 22 fixed-atom
+Historical 0.2.8 validation: **346 tests passed, none skipped**, including 22 fixed-atom
 methods and nine latest-policy regressions; compileall, CLI version, documentation links/text and diff checks passed.
 No calculations, submissions, new dependencies, publication, commit or push in this round.
 

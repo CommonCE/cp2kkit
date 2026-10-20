@@ -15,7 +15,8 @@ Read the materials relevant to the task:
 - [README](../README.md) and [project configuration](../pyproject.toml).
 - [Architecture](../docs/architecture.md) and [roadmap](../docs/roadmap.md).
 - [Schema](../docs/schema.md) for data exchange; [input generation](../docs/input-generation.md)
-  for input generation.
+  for input generation; [menu numbering/allocation](../docs/menu-numbering-draft.md)
+  for implemented routing/migration and separately labeled future reservations.
 - [Third-party notices](../THIRD_PARTY_NOTICES.md), [Multiwfn terms](../third_party/multiwfn/TERMS.md),
   and [provenance](../third_party/multiwfn/PROVENANCE.md) for third-party references.
 - Git status, relevant source, tests, and fixture provenance; identify existing user changes.
@@ -52,8 +53,11 @@ port or evidence of validation with the actual software.
 - Analysis is read-only; generation creates new files only and never submits or runs CP2K.
 - Do not overwrite/delete sources, data libraries, restart files, outputs,
   wavefunctions, cubes, checkpoints, or other expensive results. Explicit 0.2.7
-  permission: input generation alone may replace a regular .inp target (not a
-  source/data file or symlink), using staged publication. JSON is opt-in and exclusive.
+  permission: ordinary single-input generation alone may replace a regular .inp
+  target (not a source/data file or symlink), using staged publication. JSON is
+  opt-in and exclusive. 0.2.9 density bundles require entirely new inputs/maps/JSON;
+  reuse exclusive staged publication and roll back only owned inodes, without a
+  crash-atomic multi-file transaction claim.
 - Reuse `io.new_file` for exclusive outputs; preserve the shared generator's
   narrowly scoped staged .inp writer. Test collisions
   and rollback for multi-file outputs.
@@ -84,6 +88,30 @@ port or evidence of validation with the actual software.
 - Synthetic fixtures are not calculations; their version strings do not certify CP2K support.
 - Missing completion/convergence evidence cannot become passed. Normal termination
   or a single energy value is not proof of complete convergence.
+- 0.2.9 menu layout v1 uses compact shortcuts plus unexpanded category entrances,
+  full IDs for category/direct access, shared applicability and semantic editors.
+  Category/602 0 returns without writing. Generator-main 0 validates/publishes
+  directly; w reviews and requires explicit y/yes confirmation. Successful generation
+  returns immediately, without an extra Enter prompt. Basis registry v1 and atom
+  indices remain independent namespaces;
+  old 100+ function numbers require explicit migration, never ambiguous aliases.
+- Whole-system multiplicity auto resolves from selected PP/AE electron counts
+  minus charge: even -> 1, odd -> 2. Preserve explicit values; parity is not a
+  ground-state spin prediction. Fragment states remain explicit. TUI -3/601 is
+  the shared 0 None / 1 Electron density selector (UKS also prints spin density);
+  CDD enables density output and prevents disabling it until CDD is off.
+- Default UZH runtime references use BASIS_MOLOPT_UZH / POTENTIAL_UZH; keep
+  resolved source paths/hashes separate in provenance and record emitted_data_files.
+  Explicit file overrides win; generic aliases must resolve to the intended data.
+- 602 density inputs: ENERGY/GPW, complementary nonempty fragments, explicit
+  charges/multiplicities and charge conservation/parity. Resolve whole geometry
+  once, preserve subsets/cell/PBC, map magnetic seeds explicitly and record CSV
+  indices. No ghosts, separate centering, spin inference or automatic execution.
+  Lock the whole-system NGRIDS policy across components; actual CUBE grids and
+  reference-state fitness still need independent checks before subtraction.
+  Local state option 4 updates six integers (whole/A/B charge/multiplicity) together;
+  invalid input must not partially update them. Automatic output uses -CDD.inp
+  while enabled, follows source changes, and never replaces an explicit path.
 - 0.2.8 fixed atoms: optimization menu 9 / --fixed-atoms uses explicit 1-based
   indices/ranges, default off; no source inheritance or identity remapping.
   Bounds precede active expansion; fractional XYZ is not Cartesian pinning

@@ -4,6 +4,50 @@ This records facts, not permission inferred from labels such as "reference-based
 or "rewritten in another language". Prefer version/file/subroutine/SHA-256;
 line numbers are auxiliary. Do not invent upstream commits, inspection dates, or grants.
 
+## Numbered cube selector and CDD linkage (retained 0.2.9)
+
+- Inspected Multiwfn 2026.9.20 `cp2kmate.f90`, -3 selection branch at lines
+  816-841; SHA-256:
+  `1a4bfe0a49df6ac4950e48e35b4efef00aa489f2469a917830fb47f746dd4d18`.
+- Reference: numbered cube-output selection, specifically 0 None and 1 electron
+  density with spin density for unrestricted calculations. Local Python menu
+  implements only these existing output types; other upstream types are omitted.
+  No new Fortran implementation or CP2K keyword template was copied.
+- CDD auto-enable/disable guard is local UI orchestration using existing density
+  generation. Existing citations/terms apply; no new permission is claimed and
+  no CP2K runtime validation is implied.
+
+## Categorized menus and two-fragment density inputs (0.2.9)
+
+- Local modules: menu_registry.py, input_editor.py, input_tui.py,
+  density_workflow.py, inputgen.py and shared bounded selections in constraints.py.
+- Function-category/full-ID allocation and compact main-menu design follow the
+  user-discussed local plan, not a VASPKIT code port or copied menu registry.
+  Common corresponding Multiwfn-style shortcuts remain; historical local 100+
+  extension IDs undergo an explicit migration. Immutable basis registry v1 and
+  atom indices are independent namespaces. This is menu layout v1.
+- No new upstream Fortran/keyword template or parameter payload is bundled.
+  Existing generation and density-print references/citations below remain in use;
+  category navigation and bundle orchestration reuse those existing generators.
+  No newly inspected external algorithm/source or new permission is claimed.
+- 602 defines complementary whole-system atom subsets with explicit fragment
+  charges/multiplicities, source/frame mapping, charge conservation and parity
+  checks. Resolve whole geometry once; preserve subsets without centering or
+  ghosts, map explicit magnetic atom seeds, and inherit corresponding element
+  basis/potential/U settings. Selected data-source identities must match.
+- The common NGRIDS lock is a local workflow policy: if whole-system effective
+  basis policy selects five grids, fragments inherit five even where their subset
+  alone would omit the keyword. Ordinary generation policy is unchanged. Requested
+  matching grid controls do not certify actual produced CUBE grids.
+- Reuse exclusive staged publication for three inputs and an atom-map CSV, optional
+  combined JSON, without extending ordinary single-input replacement permission.
+  No CP2K/Multiwfn execution, automatic subtraction, spin-density workflow,
+  convergence or physical-reference validation. Synthetic tests are not native
+  acceptance evidence.
+- Existing required 2012/2024 papers remain in generated headers/manifests and
+  notices. Authorization status and custom terms are unchanged; this work grants
+  no separate relicensing or paid-distribution permission.
+
 ## CP2K input generation
 
 ### Location and fixed source

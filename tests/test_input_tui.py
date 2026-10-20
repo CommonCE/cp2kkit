@@ -22,7 +22,7 @@ from cp2kkit.presentation import Presenter
 from cp2kkit.structure import Structure, read_structure
 
 FIXTURES = Path(__file__).parent / 'fixtures'
-WRITE = '0\ny\n\n'
+WRITE = '0\n\n'
 
 
 class TTY(io.StringIO):
@@ -75,30 +75,29 @@ class MenuTests(unittest.TestCase):
         self.assertEqual(self.output.read_text(), text)
         self.assertEqual(self.manifest(), json.loads(json.dumps(expected)))
         self.assertIn('Success:', log)
-        self.assertIn('Explicit valence electrons', log)
+        self.assertIn('Success:', log)
         self.assertIn(str(self.output.resolve()), log)
         self.assertIn(str(Path(str(self.output)+'.json').resolve()), log)
 
-    def test_applicable_options_on_one_menu_without_steps_or_advanced_pages(self):
-        from cp2kkit.input_editor import NUMBERED_FIELDS, LABELS
+    def test_compact_common_shortcuts_and_unexpanded_categories(self):
+        from cp2kkit.input_editor import NUMBERED_FIELDS
         _, log = self.session('-10\n')
         self.assertNotIn('Step 1/', log)
         self.assertNotIn('Enter for next', log)
-        self.assertNotIn('Common/advanced options', log)
-        rendered = log.split('Select a displayed number')[0]
-        for number, field in NUMBERED_FIELDS:
-            if field.name in {'pressure', 'smearing', 'added_mos', 'optimizer', 'max_iter', 'allow_pbe_potential', 'libxc_available', 'gapw_profile', 'trust_radius', 'trajectory_format', 'fixed_atoms'}:
-                self.assertNotIn(f'{number:3}. {LABELS[field.name]}:', rendered)
-            else:
-                self.assertIn(f'{number:3}. {LABELS[field.name]}:', rendered)
-        self.assertEqual({f.name for _, f in NUMBERED_FIELDS}, set(InputSettings.__dataclass_fields__) - {
-            'project', 'cp2k_version', 'cell', 'data_dir', 'basis_files', 'potential_files',
-            'custom_basis_file', 'custom_basis_name', 'custom_potential_file', 'custom_potential_name'})
+        rows = re.findall(r'^\s+(-?\d+)\. (.*)', log, re.M)
+        self.assertEqual({int(number) for number, _ in rows},
+                         {-10, 0, -7, -3, -1, 1, 2, 3, 4, 8, 100, 200, 300, 500, 600})
+        self.assertNotIn('101. Total charge', log)
+        self.assertNotIn('602. Charge-density', log)
+        self.assertEqual({f.name for _, f in NUMBERED_FIELDS},
+                         (set(InputSettings.__dataclass_fields__) | {'path', 'frame', 'output'}) - {
+                             'custom_basis_name', 'custom_potential_name', 'fragment_a_indices',
+                             'fragment_a_charge', 'fragment_a_multiplicity', 'fragment_b_charge', 'fragment_b_multiplicity'})
         self.assertIn('generator default', log)
         self.assertFalse(self.output.exists())
 
     def test_edit_task_method_charge_spin_and_density(self):
-        lines = '-1\nGEO_OPT\n101\n1\n102\n2\n1\nBLYP\n126\ny\n127\n2 3 4\n'+WRITE
+        lines = '-1\nGEO_OPT\n101\n1\n102\n2\n1\nBLYP\n603\ny\n605\n2 3 4\n'+WRITE
         self.assertEqual(self.session(lines)[0], 0)
         expected = replace(self.settings, run_type='GEO_OPT', functional='BLYP', charge=1,
                            multiplicity=2, spin_density=True, cube_stride=(2, 3, 4))
@@ -106,7 +105,7 @@ class MenuTests(unittest.TestCase):
         self.assertFalse(self.manifest()['runtime_validated'])
 
     def test_conflict_is_reported_after_edit_and_fix_is_explicit(self):
-        _, log = self.session('126\ny\nw\n101\n1\n102\n2\n'+WRITE)
+        _, log = self.session('603\ny\nw\n101\n1\n102\n2\n'+WRITE)
         self.assertIn('Spin density requires UKS', log)
         self.assertIn('Values retained; no automatic changes', log)
         self.assertEqual(self.manifest()['settings']['charge'], 1)
@@ -146,7 +145,7 @@ class MenuTests(unittest.TestCase):
     def test_hidden_conflicting_overrides_are_retained_until_explicitly_removed(self):
         self.settings = replace(self.settings, smearing=300, added_mos=30)
         # Hidden choices cannot be selected; switch to diag to remove the overrides.
-        _, log = self.session('6\n112\n4\ndiag\n6\nauto\n112\n0\n4\not\n'+WRITE)
+        _, log = self.session('6\n341\n4\ndiag\n300\n6\nauto\n341\n0\n4\not\n0\n'+WRITE)
         self.assertGreaterEqual(log.count('Invalid menu number'), 2)
         self.assertIn('Smearing [K]: 300', log)
         self.assertIn('ADDED_MOS: 30', log)
@@ -155,18 +154,17 @@ class MenuTests(unittest.TestCase):
         self.assertEqual(self.manifest()['settings']['added_mos'], 0)
 
     def test_field_numbers_stay_fixed_after_task_and_scf_changes(self):
-        from cp2kkit.input_editor import LABELS, NUMBERED_FIELDS
-        _, log = self.session('-1\nCELL_OPT\n4\ndiag\n-10\n')
-        displays = log.split('=== CP2K input generation: all settings ===')[1:]
+        _, log = self.session('300\n-1\nCELL_OPT\n4\ndiag\n0\n400\n0\n-10\n')
+        displays = log.split('=== 300. Numerical accuracy and SCF ===')[1:]
         self.assertEqual(len(displays), 3)
         for index, display in enumerate(displays):
-            hidden = ({12, 6, 112, 9, 10, 123, -5, 133}, {6, 112}, {110, 122})[index] | {129, 130, 131}
-            for number, field in NUMBERED_FIELDS:
-                text = f'{number:3}. {LABELS[field.name]}:'
-                if number in hidden:
-                    self.assertNotIn(text, display)
-                else:
-                    self.assertIn(text, display)
+            display = display.split('===')[0]
+            self.assertIn('301. CUTOFF [Ry]:', display)
+            self.assertEqual('324. ALGORITHM:' in display, index < 2)
+            self.assertEqual('322. Maximum outer SCF steps:' in display, index < 2)
+            self.assertEqual('341. ADDED_MOS:' in display, index == 2)
+        self.assertIn('420. Fixed atoms:', log)
+        self.assertIn('430. CELL_OPT pressure [bar]:', log)
 
     def test_conditional_fields_follow_task_pbc_and_scf(self):
         for task in ('ENERGY', 'GEO_OPT', 'CELL_OPT'):
@@ -174,22 +172,22 @@ class MenuTests(unittest.TestCase):
                 for scf in ('ot', 'diag'):
                     with self.subTest(task=task, periodic=periodic, scf=scf):
                         self.settings = InputSettings(run_type=task, periodic=periodic, scf=scf, write_json=True)
-                        _, log = self.session('-10\n')
+                        _, log = self.session('200\n300\n0\n-10\n')
                         self.assertEqual('12. CELL_OPT pressure' in log, task == 'CELL_OPT')
-                        self.assertEqual('107. Isolated box padding' in log, periodic == 'NONE')
+                        self.assertEqual('212. Isolated box padding' in log, periodic == 'NONE')
                         self.assertEqual('6. Smearing' in log, scf == 'diag')
-                        self.assertEqual('112. ADDED_MOS' in log, scf == 'diag')
-                        self.assertEqual('122. Maximum outer SCF' in log, scf == 'ot')
+                        self.assertEqual('341. ADDED_MOS' in log, scf == 'diag')
+                        self.assertEqual('322. Maximum outer SCF' in log, scf == 'ot')
         # Auto inherits actual source PBC, rather than assuming NONE for a missing cell.
         for periodic, padding in ((None, False), ('NONE', True)):
             log = TTY()
             run_interactive(str(FIXTURES/'water.restart'), -1, str(self.output),
-                            InputSettings(periodic=periodic), stdin=TTY('-10\n'), stdout=log, plain=True)
-            self.assertEqual('107. Isolated box padding' in log.getvalue(), padding)
+                            InputSettings(periodic=periodic), stdin=TTY('200\n0\n-10\n'), stdout=log, plain=True)
+            self.assertEqual('212. Isolated box padding' in log.getvalue(), padding)
         # Applicability updates in the same session; inactive values are not reset.
-        _, log = self.session('-7\nNONE\n-7\nXYZ\n-7\nNONE\n-10\n')
-        displays = log.split('=== CP2K input generation: all settings ===')[1:]
-        self.assertEqual(['107. Isolated box padding' in d for d in displays], [False, True, False, True])
+        _, log = self.session('200\n211\nNONE\n211\nXYZ\n211\nNONE\n0\n-10\n')
+        displays = log.split('=== 200. Structure, boundary and basis ===')[1:]
+        self.assertEqual(['212. Isolated box padding' in d for d in displays], [False, True, False, True])
 
     def test_review_omits_ot_only_inapplicable_occupations(self):
         _, log = self.session('r\n\n-10\n')
@@ -203,12 +201,12 @@ class MenuTests(unittest.TestCase):
 
     def test_optional_auto_and_diag_smearing_defaults(self):
         self.settings = replace(self.settings, scf='diag', eps_scf=1e-8, smearing=300)
-        self.session('120\nauto\n6\nauto\n'+WRITE)
+        self.session('303\nauto\n6\nauto\n'+WRITE)
         self.assertIsNone(self.manifest()['settings']['eps_scf'])
         self.assertIsNone(self.manifest()['settings']['smearing'])
 
     def test_bad_local_values_retry(self):
-        _, log = self.session('99\n105\nnan\n-5\n450\n-10\n')
+        _, log = self.session('99\n300\n301\nnan\n-5\n450\n0\n-10\n')
         self.assertGreaterEqual(log.count('Invalid'), 3)
         self.assertIn('450.0', log)
         self.assertFalse(self.output.exists())
@@ -248,11 +246,13 @@ class MenuTests(unittest.TestCase):
         self.assertFalse(self.output.exists())
         self.assertFalse(Path(str(self.output)+'.json').exists())
 
-    def test_source_header_and_removed_setting_rows(self):
+    def test_source_header_and_direct_only_setting_rows(self):
         from cp2kkit.input_editor import NUMBERED_FIELDS
         _, log = self.session('-10\n')
         names = {f.name for _, f in NUMBERED_FIELDS}
-        self.assertFalse({'path', 'frame', 'output', 'project', 'cp2k_version'} & names)
+        self.assertTrue({'path', 'frame', 'output', 'project', 'cp2k_version'} <= names)
+        self.assertNotIn('502. Input output path:', log)
+        self.assertNotIn('503. PROJECT name:', log)
         self.assertIn(f'Structure: {self.path}; frame: -1', log)
         self.assertNotIn('Project name:', log)
         self.assertNotIn('Target CP2K version:', log)
@@ -272,20 +272,45 @@ class MenuTests(unittest.TestCase):
         self.assertIn('Previous source retained', log)
         self.assertIn(f'Structure: {self.path}; frame: -1', log)
 
-    def test_upstream_main_menu_ids_and_explicit_local_extensions(self):
-        from cp2kkit.input_editor import FIELD_IDS
-        self.assertEqual(dict(FIELD_IDS), {
-            -7: 'periodic', -5: 'trajectory_format', -3: 'electron_density', -1: 'run_type',
-            1: 'functional', 2: 'basis', 3: 'dispersion', 4: 'scf', 6: 'smearing',
-            8: 'kpoints', 9: 'fixed_atoms', 10: 'optimizer', 12: 'pressure',
-            101: 'charge', 102: 'multiplicity', 105: 'cutoff', 106: 'rel_cutoff',
-            107: 'vacuum', 110: 'ot_algorithm', 112: 'added_mos', 120: 'eps_scf', 121: 'max_scf',
-            122: 'max_outer_scf', 123: 'max_iter', 124: 'dft_plus_u', 125: 'magnetism',
-            126: 'spin_density', 127: 'cube_stride', 128: 'basis_overrides',
-            129: 'allow_pbe_potential', 130: 'libxc_available', 131: 'gapw_profile', 132: 'write_json', 133: 'trust_radius'})
-        _, log = self.session('0\n\n-10\n')
+    def test_common_aliases_and_new_full_function_ids(self):
+        from cp2kkit.menu_registry import BY_TOKEN
+        expected = {-7: 'periodic', -5: 'trajectory_format', -3: 'electron_density', -1: 'run_type',
+                    1: 'functional', 2: 'basis', 3: 'dispersion', 4: 'scf', 6: 'smearing',
+                    8: 'kpoints', 9: 'fixed_atoms', 10: 'optimizer', 12: 'pressure',
+                    101: 'charge', 102: 'multiplicity', 112: 'dft_plus_u', 324: 'ot_algorithm', 341: 'added_mos'}
+        for number, name in expected.items():
+            self.assertEqual(BY_TOKEN[str(number)].field, name)
+        for old in ('105', '124', '125', '126', '128', '132', '133'):
+            self.assertNotIn(old, BY_TOKEN)
+        _, log = self.session('w\n\n-10\n')
         self.assertIn('Not confirmed', log)
         self.assertFalse(self.output.exists())
+
+    def test_main_zero_writes_without_confirmation_or_review(self):
+        _, log = self.session('0\n\n')
+        self.assertTrue(self.output.exists())
+        self.assertNotIn('? [y/N]', log)
+        self.assertNotIn('Sidecar path:', log)
+        self.assertNotIn('Enter to return to the menu; q exits:', log)
+        self.assertIn('Success:', log)
+
+    def test_direct_zero_and_review_write_generate_identical_input(self):
+        self.session('0\n\n')
+        direct = self.output.read_text()
+        self.settings = replace(self.settings, write_json=False)
+        _, log = self.session('w\ny\n\n')
+        self.assertEqual(self.output.read_text(), direct)
+        self.assertIn('? [y/N]', log)
+
+    def test_automatic_spin_display_and_manual_override(self):
+        self.path.write_text('1\nneutral radical\nH 0 0 0\n')
+        _, log = self.session('100\n0\n0\n\n')
+        self.assertIn('2 (auto: electron parity)', log)
+        self.assertEqual(self.manifest()['settings']['multiplicity'], 2)
+        self.settings = replace(self.settings, write_json=False)
+        _, log = self.session('102\n2\n102\nauto\n100\n0\n0\n\n')
+        self.assertIn('MULTIPLICITY 2', self.output.read_text())
+        self.assertIn('auto: electron parity', log)
 
     def test_nonterminal_stdin_or_stdout_refuses_without_reading(self):
         for stdin, stdout in ((io.StringIO(), TTY()), (TTY(), io.StringIO())):
