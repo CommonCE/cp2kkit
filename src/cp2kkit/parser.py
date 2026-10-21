@@ -8,8 +8,9 @@ from .io import read_text
 from .models import Energy, Evidence, Quantity, Run, SCHEMA_VERSION, Segment
 
 NUMBER = r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[EeDd][+-]?\d+)?"
-# Require a complete numeric token; whitespace-delimited annotations are allowed.
-ENERGY = re.compile(r"ENERGY\|\s+Total FORCE_EVAL\s+\([^)]*\)\s+energy\s+\[a\.u\.\]\s*[:=]?\s*(" + NUMBER + r")(?=\s|$)", re.I)
+# Both explicit unit labels denote hartree; retain complete-token boundaries.
+# Whitespace-delimited annotations are allowed, but adjacent garbage is not.
+ENERGY = re.compile(r"ENERGY\|\s+Total FORCE_EVAL\s+\([^)]*\)\s+energy\s+\[(?:a\.u\.|hartree)\]\s*[:=]?\s*(" + NUMBER + r")(?=\s|$)", re.I)
 STEP = re.compile(r"(?:OPTIMIZATION STEP\s*:|MD\|\s+Step number)\s*(\d+)", re.I)
 SCF_OK = re.compile(r"SCF run converged in\s+(\d+)\s+steps", re.I)
 SCF_FAIL = re.compile(r"SCF run NOT converged|SCF run did not converge|SCF NOT converged", re.I)

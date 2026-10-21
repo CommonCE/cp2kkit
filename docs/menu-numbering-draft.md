@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-**Software 0.3.0 retains the 0.2.9 menu layout v1 and expands XC profiles; distant feature
+**Software 0.3.1 retains the 0.2.9 menu layout v1 and adds GFN-xTB methods; distant feature
 allocations remain a draft, not a frozen future registry or a release claim.**
 
 Schema stays **0.1.0**. The authoritative implemented function registry is
@@ -166,7 +166,7 @@ Owns the electronic state and physical model, not SCF numerical tolerances.
 | 101 | Total charge | Existing |
 | 102 | Spin multiplicity | Existing; auto resolves whole-system electron parity (even 1, odd 2), explicit values override |
 | 103 | Magnetic initialization: auto, UKS, element/atom moment seeds | Existing; moments are initial guesses, not constraints |
-| 110 | XC functional / electronic-structure method | Existing: 15 non-hybrid profiles in 0.3.0; hybrids/xTB remain deferred |
+| 110 | XC functional / electronic-structure method | Existing: 15 non-hybrid profiles plus 30 GFN1-xTB / 31 GFN0-xTB / 32 GFN2-xTB; hybrids deferred |
 | 111 | Dispersion correction | Existing subset; new models need validation |
 | 112 | DFT+U | Existing explicit Ueff/L, MULLIKEN subset |
 | 113 | Target Libxc support assertion | Existing; user assertion, not build detection |
@@ -175,16 +175,28 @@ Owns the electronic state and physical model, not SCF numerical tolerances.
 | 121 | RI-HFX settings | Planned |
 | 122 | ADMM settings | Planned; auxiliary bases belong to 223 |
 | 130 | Constrained DFT target charges/spins | Planned |
-| 140 | Semiempirical / DFTB model settings | Planned; 0.3.x includes the GFN-xTB series: native GFN0/1 and tblite GFN2, not implemented |
+| 140 | DFT / GFN-xTB model | Implemented in 0.3.1: DFT or upstream chooser 30/31/32; other semiempiricals/DFTB deferred |
+| 141 | Target tblite support assertion | Implemented for GFN2 only; not build detection |
+| 142 | tblite ACCURACY | GFN2 on target 2026.2 only; dimensionless; numerical setup with OT, also native SCC convergence with diag |
 | 150 | Classical force-field model selection | Planned; topology/files belong to 241/242 |
 
 The [0.3.x functional/method proposal](functional-roadmap-0.3.md) references
 Multiwfn's functional definitions/assembly while preserving local function IDs.
-It separates XC profiles at 110 from planned xTB model/backend controls at 140.
+It separates XC profiles from the xTB model/backend controls at 140-142.
+The combined 110 / shortcut 1 chooser also accepts xTB choices 30/31/32;
+selecting a DFT functional there explicitly returns to DFT. Existing DFT chooser
+positions are retained; only the new xTB numbers mirror Multiwfn.
 The 0.3.0 non-hybrid expansion changes choices at existing ID 110, not function
 IDs or basis numbers. Build assertion 113 follows Libxc requirements (including
 BEEF-vdW); 114 is available outside PBE/BLYP. Upstream chooser numbers are not
-new local function IDs; planned xTB does not inherit GPW basis/dispersion settings.
+new local function IDs; xTB does not inherit GPW basis/dispersion settings.
+Hidden incompatible requests remain retained and fail validation until explicitly reset.
+GFN1 supports checked targets 2024.2-2026.2; GFN0 requires >=2025.1 and
+GFN2 requires >=2025.2 plus a tblite assertion. GFN1 defaults to OT; GFN2 OT
+is enabled only for target 2026.2. Legacy 2025.2/2026.1 GFN2 drafts retaining OT
+fail shared validation before writing; explicitly choose diag at 320.
+320/324/322 expose the solver/OT algorithm/outer limit without forced changes.
+142 is hidden for legacy targets; unsupported retained requests fail validation.
 
 The charge/multiplicity of a fragment workflow is feature-scoped, not a second
 copy of the overall-system values at 101/102.

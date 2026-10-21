@@ -1,4 +1,4 @@
-"""Conservative GPW and all-electron GAPW input generation.
+"""Conservative GPW, all-electron GAPW and bounded GFN-xTB input generation.
 
 The original GPW subset was inspired by Multiwfn outCP2Kinp.
 
@@ -122,6 +122,9 @@ class InputSettings:
     fragment_a_multiplicity: int | None = None
     fragment_b_charge: int | None = None
     fragment_b_multiplicity: int | None = None
+    method: str = 'DFT'  # xTB is a separate model, not an XC functional.
+    tblite_available: bool = False  # User build assertion, never detected.
+    xtb_accuracy: float = 1.0  # Dimensionless tblite numerical accuracy factor.
 
     @classmethod
     def from_config(cls, values, source_version=None):
@@ -141,6 +144,11 @@ class InputSettings:
             values['functional'] = parse_functional(values.get('functional', 'PBE'))
         except ValueError as exc:
             raise KitError(str(exc)) from exc
+        from .xtb import parse_method
+        try:
+            values['method'] = parse_method(values.get('method', 'DFT'))
+        except ValueError as exc:
+            raise KitError(str(exc)) from exc
         values['basis'] = migrate_basis(values.get('basis', DEFAULT_BASIS), source_version)
         if values.get('basis_overrides'):
             values['basis_overrides'] = tuple((el, migrate_basis(basis, source_version))
@@ -155,7 +163,11 @@ def automatic_multiplicity(structure, settings):
     """Minimal parity-compatible default, not a ground-state spin prediction."""
     if type(settings.charge) is not int:
         raise KitError(f'Invalid integer charge: {settings.charge}')
-    _, counts = electron_model(settings, sorted(set(structure.symbols)), VALENCE)
+    from .xtb import xtb_counts
+    if settings.method != 'DFT':
+        counts = xtb_counts(structure.symbols)
+    else:
+        _, counts = electron_model(settings, sorted(set(structure.symbols)), VALENCE)
     electrons = sum(counts[symbol] for symbol in structure.symbols) - settings.charge
     if electrons <= 0:
         raise KitError('Automatic multiplicity requires a positive electron count')
@@ -183,8 +195,82 @@ def geometry_number(value):
     return 0.0 if rounded == 0.0 else rounded
 
 
+def resolve_geometry(structure, s):
+    """Shared angstrom geometry/PBC resolution, without changing the physical model."""
+    periodic = s.periodic
+    if periodic is None and structure.pbc is not None:
+        if len(structure.pbc) != 3 or any(type(v) is not bool for v in structure.pbc):
+            raise KitError("PBC must contain three boolean flags")
+        periodic = "".join(axis for axis, flag in zip("XYZ", structure.pbc) if flag) or "NONE"
+    if periodic not in PERIODICITIES:
+        raise KitError("Periodicity is unknown: specify --periodic explicitly (NONE for isolated molecules)")
+    if s.run_type == "CELL_OPT" and periodic != "XYZ":
+        raise KitError("CELL_OPT currently requires full XYZ periodicity")
+    positions = [row.copy() for row in structure.positions]
+    cell = structure.cell
+    translated = False
+    if s.cell is not None:
+        if len(s.cell) != 3:
+            raise KitError("cell requires three lengths in angstrom")
+        for value in s.cell:
+            positive(value, "cell length")
+        cell = [[s.cell[0], 0.0, 0.0], [0.0, s.cell[1], 0.0], [0.0, 0.0, s.cell[2]]]
+    if cell is None:
+        if periodic != "NONE":
+            raise KitError("Periodic calculations require a source cell or explicit --cell A B C")
+        lower = [min(row[j] for row in positions) for j in range(3)]
+        upper = [max(row[j] for row in positions) for j in range(3)]
+        lengths = [upper[j] - lower[j] + 2*s.vacuum for j in range(3)]
+        cell = [[lengths[0], 0.0, 0.0], [0.0, lengths[1], 0.0], [0.0, 0.0, lengths[2]]]
+        positions = [[row[j] - lower[j] + s.vacuum for j in range(3)] for row in positions]
+        translated = True
+    if len(cell) != 3 or any(len(row) != 3 or not all(math.isfinite(v) for v in row) for row in cell):
+        raise KitError("Cell must contain three finite angstrom vectors")
+    check_cell(cell)
+    if s.run_type == "CELL_OPT" and any(cell[i][j] != 0.0 for i, j in ((0, 1), (0, 2), (1, 2))):
+        raise KitError("CELL_OPT requires a lower-triangular cell: A along X, B in the XY plane")
+    # Manifest must describe the geometry in the generated text, not the
+    # unrounded values. Original coordinates/cell remain in source_structure.
+    cell = [[geometry_number(v) for v in row] for row in cell]
+    positions = [[geometry_number(v) for v in row] for row in positions]
+    check_cell(cell)  # Rounding must not turn a valid tiny cell into a singular one.
+    return periodic, positions, cell, translated
+
+
+def motion_lines(s, fixed_atoms):
+    """Shared optimization/constraint output; no execution or source inheritance."""
+    def num(value):
+        return format(value, '.17g')
+    lines = []
+    if s.run_type in {"GEO_OPT", "CELL_OPT"}:
+        lines += ["&MOTION", f"  &{s.run_type}", f"    OPTIMIZER {s.optimizer}", f"    MAX_ITER {s.max_iter}",
+                  "    MAX_DR 3E-3", "    RMS_DR 1.5E-3", "    MAX_FORCE 4.5E-4", "    RMS_FORCE 3E-4"]
+        if s.run_type == "GEO_OPT":
+            lines.append("    TYPE MINIMIZATION")
+        else:
+            lines += [f"    EXTERNAL_PRESSURE [bar] {num(s.pressure)}", "    PRESSURE_TOLERANCE [bar] 100"]
+        if s.optimizer in {'BFGS', 'LBFGS'}:
+            lines += [f"    &{s.optimizer}", f"      TRUST_RADIUS [angstrom] {s.trust_radius}", f"    &END {s.optimizer}"]
+        lines.append(f"  &END {s.run_type}")
+        if fixed_atoms:
+            lines += ["  &CONSTRAINT", "    &FIXED_ATOMS",
+                      "      COMPONENTS_TO_FIX XYZ"]
+            lines += ["      LIST "+" ".join(map(str, fixed_atoms[i:i+20])) for i in range(0, len(fixed_atoms), 20)]
+            lines += ["    &END FIXED_ATOMS", "  &END CONSTRAINT"]
+        lines += ["  &PRINT", "    &TRAJECTORY",
+                  f"      FORMAT {s.trajectory_format}", "    &END TRAJECTORY", "    &RESTART",
+                  "      BACKUP_COPIES 0",
+                  "    &END RESTART", "  &END PRINT", "&END MOTION"]
+    return lines
+
+
 def generate_input(structure: Structure, settings: InputSettings, *, _common_ngrids=None):
     """Return complete input/manifest; optional workflow includes fragment manifests."""
+    from .xtb import METHODS, generate_xtb
+    if settings.method not in METHODS:
+        raise KitError(f'Unsupported method: {settings.method}')
+    if settings.method != 'DFT':
+        return generate_xtb(structure, settings)
     if type(settings.density_difference) is not bool:
         raise KitError("density_difference must be Boolean")
     if settings.density_difference:
@@ -283,15 +369,7 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
     if electrons <= 0 or unpaired > electrons or (electrons - unpaired) % 2:
         model = 'all-electron electrons' if all_electron else 'explicit valence electrons'
         raise KitError(f"Charge/multiplicity inconsistent with {electrons} {model}")
-    periodic = s.periodic
-    if periodic is None and structure.pbc is not None:
-        if len(structure.pbc) != 3 or any(type(v) is not bool for v in structure.pbc):
-            raise KitError("PBC must contain three boolean flags")
-        periodic = "".join(axis for axis, flag in zip("XYZ", structure.pbc) if flag) or "NONE"
-    if periodic not in PERIODICITIES:
-        raise KitError("Periodicity is unknown: specify --periodic explicitly (NONE for isolated molecules)")
-    if s.run_type == "CELL_OPT" and periodic != "XYZ":
-        raise KitError("CELL_OPT currently requires full XYZ periodicity")
+    periodic, positions, cell, translated = resolve_geometry(structure, s)
     if s.kpoints != (1, 1, 1) and (periodic != "XYZ" or s.scf != "diag"):
         raise KitError("Non-Gamma kpoints require XYZ periodicity and diagonalization (--scf diag)")
     if s.scf == "ot" and s.added_mos != 0:
@@ -300,34 +378,6 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
         positive(s.smearing, "smearing temperature")
         if s.scf != "diag" or s.added_mos < 1:
             raise KitError("Smearing requires diagonalization and positive added_mos")
-    positions = [row.copy() for row in structure.positions]
-    cell = structure.cell
-    translated = False
-    if s.cell is not None:
-        if len(s.cell) != 3:
-            raise KitError("cell requires three lengths in angstrom")
-        for value in s.cell:
-            positive(value, "cell length")
-        cell = [[s.cell[0], 0.0, 0.0], [0.0, s.cell[1], 0.0], [0.0, 0.0, s.cell[2]]]
-    if cell is None:
-        if periodic != "NONE":
-            raise KitError("Periodic calculations require a source cell or explicit --cell A B C")
-        lower = [min(row[j] for row in positions) for j in range(3)]
-        upper = [max(row[j] for row in positions) for j in range(3)]
-        lengths = [upper[j] - lower[j] + 2*s.vacuum for j in range(3)]
-        cell = [[lengths[0], 0.0, 0.0], [0.0, lengths[1], 0.0], [0.0, 0.0, lengths[2]]]
-        positions = [[row[j] - lower[j] + s.vacuum for j in range(3)] for row in positions]
-        translated = True
-    if len(cell) != 3 or any(len(row) != 3 or not all(math.isfinite(v) for v in row) for row in cell):
-        raise KitError("Cell must contain three finite angstrom vectors")
-    check_cell(cell)
-    if s.run_type == "CELL_OPT" and any(cell[i][j] != 0.0 for i, j in ((0, 1), (0, 2), (1, 2))):
-        raise KitError("CELL_OPT requires a lower-triangular cell: A along X, B in the XY plane")
-    # Manifest must describe the geometry in the generated text, not the
-    # unrounded values. Original coordinates/cell remain in source_structure.
-    cell = [[geometry_number(v) for v in row] for row in cell]
-    positions = [[geometry_number(v) for v in row] for row in positions]
-    check_cell(cell)  # Rounding must not turn a valid tiny cell into a singular one.
     solver = "PERIODIC" if periodic == "XYZ" else "WAVELET" if periodic == "NONE" else "ANALYTIC"
     warnings = ["Generated template is not CP2K-runtime validated; converge basis, cutoff and kpoints for the target property.",
                 "Only geometry/cell/PBC are read from the source; charge, spin, method and per-kind settings are NOT inherited."]
@@ -512,25 +562,7 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
                       f'        U_MINUS_J [eV] {num(energy)}', '      &END DFT_PLUS_U']
         lines.append('    &END KIND')
     lines += ["  &END SUBSYS", "&END FORCE_EVAL"]
-    if s.run_type in {"GEO_OPT", "CELL_OPT"}:
-        lines += ["&MOTION", f"  &{s.run_type}", f"    OPTIMIZER {s.optimizer}", f"    MAX_ITER {s.max_iter}",
-                  "    MAX_DR 3E-3", "    RMS_DR 1.5E-3", "    MAX_FORCE 4.5E-4", "    RMS_FORCE 3E-4"]
-        if s.run_type == "GEO_OPT":
-            lines.append("    TYPE MINIMIZATION")
-        else:
-            lines += [f"    EXTERNAL_PRESSURE [bar] {num(s.pressure)}", "    PRESSURE_TOLERANCE [bar] 100"]
-        if s.optimizer in {'BFGS', 'LBFGS'}:
-            lines += [f"    &{s.optimizer}", f"      TRUST_RADIUS [angstrom] {s.trust_radius}", f"    &END {s.optimizer}"]
-        lines.append(f"  &END {s.run_type}")
-        if fixed_atoms:
-            lines += ["  &CONSTRAINT", "    &FIXED_ATOMS",
-                      "      COMPONENTS_TO_FIX XYZ"]
-            lines += ["      LIST "+" ".join(map(str, fixed_atoms[i:i+20])) for i in range(0, len(fixed_atoms), 20)]
-            lines += ["    &END FIXED_ATOMS", "  &END CONSTRAINT"]
-        lines += ["  &PRINT", "    &TRAJECTORY",
-                  f"      FORMAT {s.trajectory_format}", "    &END TRAJECTORY", "    &RESTART",
-                  "      BACKUP_COPIES 0",
-                  "    &END RESTART", "  &END PRINT", "&END MOTION"]
+    lines += motion_lines(s, fixed_atoms)
     text = "\n".join(lines) + "\n"
     effective = Structure(structure.symbols.copy(), positions, [row.copy() for row in cell],
                           [axis in periodic for axis in "XYZ"], structure.source, structure.frame)

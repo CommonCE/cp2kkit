@@ -1,6 +1,6 @@
 # CP2K input generation
 
-This guide describes cp2kkit **0.3.0**. Older defaults and migration notes are in
+This guide describes cp2kkit **0.3.1**. Older defaults and migration notes are in
 [the changelog](../CHANGELOG.md). AE automatic setup is described in
 [the basis guide](basis-selection.md#all-electron-automatic-setup-027).
 The [registry-v1 basis guide](basis-selection.md) defines permanent numbering toward
@@ -8,7 +8,7 @@ The [registry-v1 basis guide](basis-selection.md) defines permanent numbering to
 legacy list positions; it does not claim a 1.0.0 release or native validation.
 
 `generate-input` is an explicit write entry point added beyond the read-only MVP;
-it neither submits nor runs calculations. It is a Python GPW/GAPW subset developed
+it neither submits nor runs calculations. It is a Python GPW/GAPW/GFN-xTB subset developed
 with reference to Multiwfn's `outCP2Kinp`, not a complete Fortran port or strict
 clean-room implementation. Sources, custom terms, and the two required papers are
 in [third-party notices](../THIRD_PARTY_NOTICES.md), [terms](../third_party/multiwfn/TERMS.md),
@@ -103,7 +103,9 @@ This is not an absolute-Cartesian pinning implementation. The review and warning
 comments except for generator/Multiwfn header citations. Fixing every atom is permitted with a warning,
 not treated as evidence of optimized geometry.
 
-Active nonempty constraints are keyword-checked only for target **2026.2**.
+DFT active nonempty constraints are keyword-checked only for target **2026.2**.
+The 0.3.1 xTB branch has target-specific references for checked releases
+2024.2-2026.2; see [the xTB version matrix](#gfn-xtb-methods-031).
 Out-of-bounds active indices fail before writing or replacing any input. Ranges
 remain compact until checked against the actual atom count, avoiding huge
 unchecked expansion. LIST is emitted in repeated lines of at most 20 indices.
@@ -495,6 +497,124 @@ Standard-library readers preserve original hashes and do not run Gaussian/VASP/M
 - Default cutoff/basis/vacuum/k-points are not converged for the target system.
   Deprecated CELL_OPT TYPE DIRECT_CELL_OPT is not emitted.
 
+## GFN-xTB methods (0.3.1)
+
+xTB is selected by `InputSettings.method` / `--method`, separate from the
+retained DFT `functional`. Old configs default to DFT. Chooser 1/110 preserves
+existing DFT positions and appends exactly Multiwfn's numbers:
+**30 GFN1-xTB**, **31 GFN0-xTB**, **32 GFN2-xTB (tblite)**.
+These are method values, not global functions or basis numbers.
+
+### CP2K version matrix
+
+Version selection is explicit (`--cp2k-version` / menu 504), not detection.
+Tagged-source checks cover the following releases; no installed binary is certified.
+
+| Target CP2K | GFN1 native | GFN0 native | GFN2 via linked tblite |
+|---|---|---|---|
+| 2024.2, 2024.3 | Yes; legacy input/data layout | Not available upstream | Not available upstream |
+| 2025.1 | Yes | Yes; requires D4 build support | No tblite interface upstream |
+| 2025.2, 2026.1 | Yes | Yes; requires D4 build support | Explicit diagonalization only; OT generation blocked |
+| 2026.2 | Yes | Yes; requires D4 build support | Yes; explicit TBLITE backend |
+
+Unavailable models fail before publication with a minimum-version explanation;
+no fallback to another GFN model or rename of parameter files is performed.
+GFN1 on 2024.x omits the unsupported GFN_TYPE keyword and references
+`xTB_parameters`. From 2025.1, native models emit GFN_TYPE 1/0 and reference
+`xTB1_parameters` / `xTB0_parameters`.
+GFN2 on 2025.2/2026.1 activates `&TBLITE T / METHOD GFN2`, without
+GFN_TYPE TBLITE, SCC_MIXER or ACCURACY. Version 2026.2 uses GFN_TYPE TBLITE
+and its TBLITE section. Build availability remains user-asserted, not probed.
+
+140 selects DFT/GFN-xTB; 141 is `--tblite-available` for GFN2.
+142 is `--xtb-accuracy`, available only for GFN2 on target 2026.2
+(finite positive dimensionless factor, default 1.0). A nondefault accuracy
+request on an older target fails rather than being silently discarded.
+
+### Solvers and convergence
+
+- **GFN1:** OT by default, or explicit diagonalization. OT emits
+  FULL_SINGLE_INVERSE (not DFT FULL_ALL), DIIS and STRICT unless overridden,
+  25/20 inner/outer steps and EPS_SCF 1e-6. These OT defaults follow the inspected
+  Multiwfn GFN1/Gamma branch, except the retained local ordinary-ENERGY EPS_SCF
+  policy (1e-6 rather than 5e-6). Diagonalization defaults to 128 steps/Broyden.
+- **GFN0:** non-SCC diagonalization. No EPS_SCF/iteration/mixing/OT controls;
+  explicit SCC overrides fail. The retained raw SCF selector is inactive.
+- **GFN2:** OT generation is enabled only for target **2026.2**, on the supported
+  isolated Gamma/no-smearing subset. OT uses the same FULL_SINGLE_INVERSE/DIIS/STRICT
+  and 25/20 EPS_SCF controls as native GFN1, without a separate SCC mixer.
+  For legacy targets **2025.2/2026.1**, select `--scf diag` explicitly (menu 320).
+  Omitted/default OT, explicit OT and retained OT configs all fail before writing;
+  no solver, target version or physical setting is automatically changed.
+  The 2026.1 local build crashed in the tblite OT density-update path even at one
+  MPI rank and with IRAC. The 2025.2 restriction is conservative, not a claim of
+  a tested crash. Enabling 2026.2 generation does not certify the installed binary;
+  changing a target string cannot repair or upgrade an older executable.
+- **GFN2 legacy diagonalization (2025.2/2026.1):** CP2K DIRECT_P_MIXING,
+  ALPHA 0.2, 128 steps and EPS_SCF 1e-6. No new tblite controls are invented.
+- **GFN2 diagonalization (2026.2):** SCC_MIXER AUTO selects native tblite SCC;
+  ACCURACY controls SCC convergence, distinct from emitted CP2K EPS_SCF.
+  With **OT**, ACCURACY controls tblite numerical setup only: EPS_SCF controls
+  the orbital optimization. Metadata/review record this solver-dependent role.
+
+All explicit supported solver choices are retained. Multiwfn's chooser only
+forces OT for GFN1 at Gamma, not for every GFN selection; GFN2 can retain a prior
+solver state. No external xtb/tblite/reference CLI is invoked; atomic-charge
+checks are not disabled automatically.
+
+### Geometry, state and data boundaries
+
+The generator subset is H-Rn, isolated PERIODIC NONE, Gamma, closed-shell
+multiplicity 1, ENERGY/ENERGY_FORCE/GEO_OPT; these are not CP2K-wide limitations.
+Charge is explicit; auto multiplicity uses model reference electron parity,
+not GTH q (e.g. Na=1, Mg=2, Fe=8). Odd-electron/open-shell states fail, not repaired.
+Native counts were checked across all six tagged sources; tblite 0.6.0 GFN2
+reference occupations are reference evidence, not a detected backend version.
+
+Intrinsic D3(BJ)/GFN1 and D4/GFN0/GFN2 are retained. No MOLOPT/GTH/KIND, XC,
+MGRID, GPW Poisson or additional VDW section is emitted. dispersion=none means
+no extra DFT-D correction, not removal of model dispersion. Nondefault DFT
+functional/basis/grid/file/Libxc/PBE-approval requests, +U/magnetic seeds,
+density cubes/CDD, smearing/extra orbitals, non-Gamma, periodic and CELL_OPT
+fail explicitly. Hidden values remain retained until explicitly reset.
+
+Geometry/box generation, optimization thresholds, XYZ/PDB trajectories, fixed
+atoms and staged writing reuse the existing paths. Fixed-atom keyword references
+are target-specific for xTB on all six releases; the DFT constraint gate is
+unchanged. EXTXYZ requires target 2026.1 or newer for xTB; it is rejected on
+older targets instead of being emitted as an unsupported format.
+
+GFN1 also references dftd3.dat. With --data-dir or CP2K_DATA_DIR, require the
+pinned bytes for the selected target, record source paths/SHA-256, and protect
+them from replacement. In particular, the inspected 2024.2-2026.1 D3 file hash
+differs from 2026.2. Missing/modified/wrong-version data fail before writing;
+custom refits remain outside this subset. Without a data root filenames are
+unchecked runtime requirements. PARAMETER filenames are char_t fields: quote
+paths with spaces, unlike DFT whole-line filenames. GFN2 uses tblite built-in
+parameters and records backend_version=null/backend_unchecked.
+
+Examples (generation only):
+
+```bash
+cp2kkit generate-input water.xyz -o water-gfn1-2024.inp --periodic NONE \
+  --method GFN1-xTB --cp2k-version 2024.2
+cp2kkit generate-input water.xyz -o water-gfn2-2025.inp --periodic NONE \
+  --method GFN2-xTB --cp2k-version 2025.2 --scf diag --tblite-available
+cp2kkit generate-input water.xyz -o water-gfn2-diag.inp --periodic NONE \
+  --method GFN2-xTB --cp2k-version 2026.2 --scf diag --tblite-available \
+  --xtb-accuracy 0.1 --write-json
+```
+
+Earlier user-authorized water diagnostics separately established normal termination
+and electronic/geometry convergence for GFN2 diagonalization on local CP2K
+2026.1/git:5e54ba2 and OT on local 2026.2/git:c92cc08. The latter emits a
+Gamma/no-smearing warning and ignores SCC_MIXER under OT. Build/compiler/backend
+identities differ and unmodified official-release equivalence is unverified;
+these checks are not general version, element or force-accuracy certification.
+Source-byte/keyword checks alone do not establish a linked build, native syntax
+acceptance, convergence, forces or scientific validity. Exact tagged-source
+references are in xtb_versions.py and [provenance](../third_party/multiwfn/PROVENANCE.md).
+
 ## Non-hybrid XC profiles (0.3.0)
 
 Version 0.3.0 implements **15 non-hybrid profiles** from Multiwfn 2026.10.1's
@@ -705,7 +825,8 @@ energies/forces/stress, recommended bases/U, or validation of an adsorption mode
 
 The registry follow-up enables paired UZH-PBE DZVP/TZVP/TZV2P for target 2026.2
 and explicit custom pseudopotential ORB files. Version 0.3.0 adds the bounded
-meta-GGA/nonlocal subset above. Hybrids/HF/ADMM, xTB, UZH-PBE0 templates,
+meta-GGA/nonlocal subset above; 0.3.1 adds the separate bounded xTB branch.
+Hybrids/HF/ADMM, UZH-PBE0 templates,
 arbitrary q changes, auxiliary and reserved
 families remain unimplemented; see [basis selection](basis-selection.md).
 

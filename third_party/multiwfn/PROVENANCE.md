@@ -4,6 +4,194 @@ This records facts, not permission inferred from labels such as "reference-based
 or "rewritten in another language". Prefer version/file/subroutine/SHA-256;
 line numbers are auxiliary. Do not invent upstream commits, inspection dates, or grants.
 
+## GFN-xTB implementation (0.3.1)
+
+The initial audit below describes the first 2026.2-only implementation. The
+compatibility/OT follow-up below supersedes its diag-only/version policy, not
+its historical source identity or validation evidence.
+
+- Local: xtb.py model registry/counts/native parameter-byte identities and rendering;
+  inputgen.py dispatch/shared geometry/motion/writer; CLI/TUI/editor/menu registry;
+  tests/test_xtb.py synthetic fixtures. No external calculation executable is used.
+- Rechecked source: Multiwfn 2026.10.1, supplied
+  `../Multiwfn_2026.10.1_src_Linux/cp2kmate.f90`, outCP2Kinp, SHA-256
+  `f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402`.
+  Actual references: chooser 952 and mapping 1034-1036 (30 GFN1 / 31 GFN0 /
+  32 GFN2); QS/XTB 1815-1841 (native 1/0, TBLITE GFN2 for 2026.2);
+  omission of basis/potential/XC/grid 1511/1688/1992/2403;
+  non-SCC GFN0 and semiempirical OT preconditioning 2432-2505.
+- Reference-based Python assembly, not clean-room or a full Fortran port.
+  Differences: preserve existing DFT chooser positions/global function/basis IDs;
+  separate method state, explicit diag requirement for GFN2 and tblite assertion,
+  native tblite SCC AUTO/ACCURACY rather than copying upstream direct-P mixing;
+  no automatic solver change, no CHECK_ATOMIC_CHARGES F, no periodic/open-shell/
+  CELL_OPT/density/CDD/+U/refits, no extra dispersion, no direct writes or restart
+  reads. Retain local EPS_SCF 1e-6 policy for self-consistent profiles. Shared
+  geometry/motion/writer and explicit conflicting-request errors remain authoritative.
+- CP2K evidence: supplied `/home/xwp/soft/cp2k-2026.2`, REVISION git:c92cc08.
+  This is the actual local tree identity, not inferred official-release/binary
+  equivalence. Inspected source SHA-256:
+  - src/input_cp2k_tb.F (create_xtb_section, create_xtb_parameter_section,
+    create_xtb_tblite_section): backend/model/mixer/ACCURACY/char_t path definitions,
+    `695ae4fc6f92b20c5cfbb10f0619fd35ffd2c9f2d58aee6dd3f8760c19ea5c7a`.
+  - src/cp_control_utils.F: model parameter filenames, native dispersion choices
+    and SCC routing,
+    `da04a34bb800c6ccc9314a9e434abca7b0f1482a250f1672bb0cd27adff6aa39`.
+  - src/xtb_parameters.F: H-Rn zval/reference occupation sums,
+    `2c270f3fa0157a0dc9ee1a24857847028fd55ad6ce4f7d9855762f78e20b7b4c`.
+  - src/qs_force.F: native/tblite calculate_forces paths at 294-299,
+    `ad1c3faee83409cf39913fd8935dac537e77c02b9799ae22ca1de0fca5a4bff0`.
+  - src/tblite_interface.F: linked-backend/force interfaces,
+    `ffc8387c8d1b7a71dd8710a30443200e799846532a9147dd6cb4b8466d60b374`.
+  - src/qs_dispersion_d4.F: compile-time native D4 dependency and missing-build abort,
+    `3699c01defd8dd4c13cb57542a04eda0c832a2276af2e5d75e31115de4038097`.
+- tblite reference only: supplied CP2K toolchain build/tblite-0.6.0/
+  src/tblite/xtb/gfn2.f90 reference_occ sums, SHA-256
+  `ad3809ccfe5dde50890ea8e8f365de2541db0c2e27338a29bb812cf0709c7a8a`.
+  No coefficients are copied. Backend version in generated manifests stays null;
+  this reference does not establish the user's linked library version.
+- Header/count/file-byte evidence only; native CP2K data files are not bundled:
+  data/xTB0_parameters SHA-256
+  `278461cabbf89b14379aedc78ef3e141c8cef1f911f3a3c72530aec7a52b6d34`;
+  data/xTB1_parameters
+  `81a9d7afdee31f5d8fd67a4d8ec966179317c7b100261c9c82d724bafb460399`;
+  data/dftd3.dat
+  `4aa1e246a1661bb875590a67229cbc0747e9ad5e11ec1b8e47bce30db866dd1d`.
+  Supplying data_dir checks these identities and protects source files; it does
+  not validate scientific suitability or permit parameter refits.
+- Target-version manuals rechecked:
+  [xTB tutorial](https://manual.cp2k.org/cp2k-2026_2-branch/methods/semiempiricals/xtb.html),
+  [XTB](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/QS/XTB.html),
+  [TBLITE](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/QS/XTB/TBLITE.html).
+  Preserve their method references, including Grimme2017/GFN1 and
+  Bannwarth2019/GFN2; native parameter-file original DOI headers stay upstream.
+- Existing Multiwfn author/copyright/custom terms and both 2012/2024 papers remain
+  in code/generated headers/manifests/notices. No separate grant, relicensing,
+  paid-distribution authorization or whole-project compatibility is inferred.
+- Validation boundary: synthetic model/task/count/nesting/CLI/TUI/config/replay/
+  geometry/protection checks; synthetic parameter fixtures patch only expected
+  hashes to exercise plumbing. No CP2K/Multiwfn/tblite execution or native syntax/
+  convergence/scientific-equivalence claim. Source derivative paths do not prove
+  force accuracy or optimized structures. Read-only source comparison confirmed
+  all 86 electron counts against both native zval and tblite reference_occ sums,
+  and both native parameter files contain H-Rn entries. Read-only water assembly
+  checked native GFN0/GFN1/D3 bytes; GFN2 built-ins remain backend_unchecked.
+  DFT input text matched the pre-change Python generator in 45/45 water profile/
+  task cases. These comparisons are not native calculations.
+
+### GFN-xTB compatibility and OT follow-up (retained 0.3.1)
+
+- User-requested target range: CP2K 2024.2 through 2026.2. Keep the explicitly
+  selected software version 0.3.1 within this uncommitted feature round.
+  Local xtb_versions.py/xtb.py now use a tagged-source capability/data registry,
+  not a version-string-only acceptance change.
+- Actual inspected tags: v2024.2, v2024.3, v2025.1, v2025.2, v2026.1, v2026.2.
+  Fixed locator pattern:
+  `https://raw.githubusercontent.com/cp2k/cp2k/v<VERSION>/<FILE>`.
+  [xtb_versions.py](../../src/cp2kkit/xtb_versions.py) SOURCE_FILES/SOURCE_HASHES
+  records exact per-tag bytes for input_cp2k_tb.F, cp_control_utils.F,
+  xtb_parameters.F, qs_force.F, input_cp2k_scf.F, input_cp2k_constraints.F,
+  input_cp2k_motion_print.F and start/input_cp2k_motion.F; supported tblite
+  tags also record tblite_ks_matrix.F and qs_scf_initialization.F.
+  Generated metadata records these actual tagged URLs/hashes, not guessed manual
+  addresses or detected binary identities.
+- Native GFN1 is available across all six tags. 2024.x has no GFN_TYPE keyword
+  and uses xTB_parameters. Native GFN0 first appears in the checked v2025.1
+  tag with GFN_TYPE 0/xTB0_parameters; GFN1 then uses xTB1_parameters.
+  v2025.2 is the first checked tag with TBLITE, activated by a logical section
+  parameter (T), METHOD GFN2. It has no GFN_TYPE TBLITE, SCC_MIXER or ACCURACY;
+  v2026.1 retains this contract. v2026.2 has the explicit TBLITE backend enum
+  and the newer mixer/accuracy interface. Missing upstream methods fail with
+  minimum-version diagnostics, never fall back to another GFN model.
+- Source input-definition hashes, in target order:
+  - 2024.2/2024.3:
+    `852f5a1c2d0bb569cb329d80a84c1078af159d60a1dee12361436c521ab44744`.
+  - 2025.1:
+    `02c4769530ae03ac9595a6521b2eba5da94ceafdbd3618a219d3a956bc004465`.
+  - 2025.2:
+    `892d4b40cf8a6e4b053f3be0883f15624f9c9d8943939b0242074b5f9f84a76d`.
+  - 2026.1:
+    `e2d7616e33160e117946c39ecc17c30d3099875e51ed30a0dd390b78ffed72e8`.
+  - 2026.2:
+    `695ae4fc6f92b20c5cfbb10f0619fd35ffd2c9f2d58aee6dd3f8760c19ea5c7a`.
+- Tagged native data identities: 2024.2/2024.3 data/xTB_parameters SHA-256
+  `d9f11fa6411d203135d88a21178f8a87353449dc3d151b42ce9727054dc8fa45`.
+  xTB0/1 parameter hashes for 2025.1-2026.2 match the initial audit above.
+  data/dftd3.dat for 2024.2-2026.1:
+  `1f5041914fb3a7fa6c97602d82da6cb9129c1c1dba675db23522de9c2837dafd`,
+  different from the already recorded 2026.2 hash. No file renaming, payload
+  copying or automatic data replacement. All six native zval tables agree
+  for H-Rn; this is not proof of identical method energies across releases.
+- Same rehashed Multiwfn 2026.10.1 source/hash as the initial audit.
+  Reinspected outCP2Kinp 79 (initial idiagOT=1/diag, iouterSCF=1),
+  1034-1042 (GFN1 at Gamma switches to OT, not every GFN method;
+  GFN2 changes mixing but can retain prior solver state),
+  1815-1841 (backend selection), 2432-2505 (non-SCC GFN0, OT preconditioner,
+  inner/outer limits, explicit STRICT and legacy GFN2 direct-P/alpha 0.2).
+  GFN1 default OT/FULL_SINGLE_INVERSE/DIIS/STRICT and 25/20 agree;
+  local ordinary ENERGY EPS_SCF stays 1e-6 versus upstream 5e-6.
+  Local atomic-charge sanity checks remain enabled instead of copying GFN1's F.
+- Historical policy, superseded for legacy targets by the crash-protection
+  follow-up below: remove the initial local GFN2 diag-only gate. Tagged tblite_ks_matrix.F
+  on v2025.2/v2026.1/v2026.2 includes the MO derivative path for Gamma OT.
+  v2026.2 qs_scf_initialization.F 963-967 explicitly describes OT at Gamma
+  without smearing, with SCC variables updated from OT density and SCC_MIXER
+  ignored (SHA-256
+  `cf50756a032cde1389b7e80f06cb8d500a38c4eaabe001fbea7f1ab3d82407e7`).
+  Emit no SCC mixer for OT: EPS_SCF controls convergence. 2026.2 ACCURACY then
+  controls numerical setup only; with diag/native SCC it also controls SCC
+  convergence. Legacy GFN2 diag uses CP2K direct-P mixing, alpha 0.2.
+  Default OT and explicit diag are preserved, with no automatic state repair.
+- Shared fixed-atom resolver accepts an evidenced target reference for xTB;
+  tagged constraints retain fractional XYZ/repeatable LIST on all six releases.
+  Default DFT gate is unchanged. Tagged trajectory definitions contain EXTXYZ
+  starting at v2026.1, so older requests fail explicitly. Geometry/motion/writer
+  reuse, citations, no-refit policy and other bounded physical scope remain.
+- Manuals opened as cross-checks:
+  [2024.2 XTB](https://manual.cp2k.org/cp2k-2024_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/QS/XTB.html),
+  [2025.2 XTB](https://manual.cp2k.org/cp2k-2025_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/QS/XTB.html),
+  [2026.1 TBLITE](https://manual.cp2k.org/cp2k-2026_1-branch/CP2K_INPUT/FORCE_EVAL/DFT/QS/XTB/TBLITE.html).
+  Tagged source is the version contract, not the manuals' master-branch edit links.
+- Validation: 39 read-only real-data model/version/task assemblies passed
+  (ENERGY/ENERGY_FORCE/GEO_OPT for each available pair); no output inputs or
+  calculations were run. Source/data/hash checks are separate from synthetic
+  CLI/menu/config/replay/negative/protection regressions. CP2K/Multiwfn/tblite
+  were not executed. No native acceptance, convergence, optimization or scientific
+  validation is claimed. Existing custom terms/citations/unknown grants remain;
+  no bundled Fortran/parameter payload or additional licensing grant.
+
+### GFN2 OT native crash-protection follow-up (retained 0.3.1)
+
+- Local changes: xtb_versions.py gfn2_ot_enabled generation-policy flag and shared
+  xtb.py validation. GFN2 OT is enabled only for target 2026.2; legacy
+  2025.2/2026.1 requires explicitly selected diagonalization. Do not silently
+  replace OT, change the target or infer installed-build capabilities. The
+  2025.2 gate is conservative; no native 2025.2 failure is claimed.
+- Earlier authorized local diagnostics: CP2K 2026.1/git:5e54ba2, water charge 0,
+  multiplicity 1, Gamma/no smearing. Default OT at one rank and IRAC at four ranks
+  crashed with SIGSEGV/139, consistent with the previous default four-rank run.
+  Diagonalization ENERGY at one/four ranks, ENERGY_FORCE and GEO_OPT converged.
+  Local 2026.2/git:c92cc08 OT passed that four-case task/rank matrix. Different
+  compilers/backends and absent source Git metadata prevent claims of official
+  unmodified-release equivalence or isolation of a single upstream fix.
+- Inspected local 2026.1 source: qs_scf_initialization.F 420-425 and 721-727
+  nullifies mixing storage under OT; qs_scf.F 526-529 calls tb_update_charges
+  with use_rho=false; tblite_interface.F 939-949 reads p_mix_new before the
+  ao_charges call at 981, matching mulliken.F:776 in the crash backtrace.
+  Local qs_scf.F SHA-256:
+  `a1076210b6e8497ac51e4e759cd8c2ed14283cb609fb7b7cb1c6c69e3130ab23`;
+  local tblite_interface.F SHA-256:
+  `6520c7a9ee5a3ff2d0a0969d9cdd96f60f333d6dff93a9a9376c6aeab6c23337`.
+  Local 2026.2 qs_scf.F 553-562 instead selects use_rho=true for OT, SHA-256:
+  `ec0540cec56c37f47eadaf14c9672c26bd059921609f2190538e2a2a4a384d7b`.
+  These are local-source identities, not the tagged hashes above; no debugger
+  pointer-state measurement or patched-binary experiment was performed.
+- Complete diagnostic inputs/logs, build/library identities and source excerpts
+  are local under `test-workspace/gfn2-ot-diagnosis-20261021-124634-mJ9t2F/`,
+  not bundled test fixtures. The current guard adds synthetic regression only;
+  no new native calculation, source patch, parameter payload or Fortran port.
+  Existing citations/custom terms/unknown grants remain unchanged.
+
 ## Non-hybrid XC implementation (0.3.0)
 
 - Local: functional_registry.py shared definitions/aliases; method_profiles.py,

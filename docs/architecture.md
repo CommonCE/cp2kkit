@@ -1,11 +1,11 @@
-# cp2kkit v0.3 architecture
+# cp2kkit v0.3.1 architecture
 
 ## Design principles
 
 The initial analysis MVP baseline is preserved in [the roadmap](roadmap.md).
 Later requirements add an [input-generation](input-generation.md) subset.
 The [numbering/allocation guide](menu-numbering-draft.md) records implemented
-menu layout v1 (introduced in 0.2.9, retained in 0.3.0) plus separately labeled provisional future features.
+menu layout v1 (introduced in 0.2.9, retained in 0.3.1) plus separately labeled provisional future features.
 The current registry contains only implemented entries; no placeholder categories.
 No submission system or deferred Bader/PDOS/NEB post-processing is introduced.
 
@@ -35,6 +35,7 @@ cli.py
  |-- input_editor.py -- menu_registry.py (category/direct routing, aliases, drafts; same generator/writer)
  |-- presentation.py (scrolling text, optional Rich; no batch rendering)
  |-- inputgen.py --- structure.py / spin_settings.py / method_profiles.py / models.py / io.py
+ |-- xtb.py -- xtb_versions.py (GFN model/backend/count/data policy; tagged-version syntax and sources)
  |-- functional_registry.py (shared non-hybrid XC definitions/aliases, nonlocal/build/dispersion/scope policy)
  |-- method_profiles.py -- functional_registry.py / basis_resolution.py / data_catalog.py (XC, approvals, per-element resolution)
  |-- basis_registry.py (immutable allocated numbers/string IDs, roles/status, explicit legacy migration)
@@ -89,7 +90,9 @@ output/directory -> deterministic selection -> line format matching -> Run/Segme
 
 - Start markers/non-increasing optimization/MD steps split segments.
 - Energies retain record indices and nullable calculation steps.
-- ENERGY values require a complete numeric token followed by whitespace or line end.
+- ENERGY records accept explicit `[a.u.]` or `[hartree]` labels (case-insensitive);
+  both are stored as hartree without numerical conversion. Other units remain
+  unsupported. Values require a complete numeric token followed by whitespace or line end.
   Whitespace-delimited annotations are accepted; adjacent garbage/incomplete exponents
   are not prefix-parsed. Evidence retains the entire original line and byte hash.
 - Associate each energy with the preceding SCF summary, never the previous step's success.
@@ -231,6 +234,34 @@ loaded structure; repeated LIST lines keep emitted input bounded. Source/frame
 changes retain indices with a warning, never infer identity remapping. Explicit
 fractional XYZ constraints and inactive requests are distinguished in metadata.
 No source/POSCAR constraints are implicitly inherited.
+
+## GFN-xTB dispatch (0.3.1)
+
+InputSettings.method defaults to DFT, preserving old configs/default text.
+generate_input dispatches xTB to xtb.py before GPW/GAPW electron/basis resolution;
+xTB never calls BasisResolver or GPW density generation. resolve_geometry and
+motion_lines remain shared with DFT; write_input retains its source/data/staged
+publication protections. Model electron counts, intrinsic dispersion, native
+parameter hashes and tblite build assertion/accuracy are explicit, not a second
+interpretation of GTH q. xtb_versions.py pins tagged 2024.2-2026.2 capabilities
+and source hashes; unsupported model/version pairs fail before publication.
+Legacy/new parameter filenames and tblite activation/mixer/accuracy layouts stay
+separate. OT remains available for GFN1; GFN2 OT generation is gated by the shared
+version profile to target 2026.2 only after a native 2026.1 crash. Legacy targets
+2025.2/2026.1 require explicit diag; unsupported default/explicit/retained OT fails
+in the shared generator before publication, without changing SCF choices.
+The 2025.2 gate is conservative, not native validation. gfn2_ot_enabled records
+generator policy, not build detection. convergence_control/accuracy_role describe
+OT versus native SCC semantics.
+No parameter coefficients or external process is used.
+
+Chooser 1/110 appends upstream xTB 30/31/32 while retaining old DFT positions.
+140/141/142 share semantic model/build/accuracy fields, CLI and replay. Hiding an
+inapplicable field never clears it; generation rejects conflicting nondefault
+DFT/density requests. xTB review uses model semantics, never claims a GPW basis,
+Poisson solver or installed backend version. Initial scope and manifest branch
+are described in [generation](input-generation.md#gfn-xtb-methods-031) and
+[schema](schema.md#generated-input-json-gfn-xtb-branch-software-031).
 
 ## Cube pipeline
 

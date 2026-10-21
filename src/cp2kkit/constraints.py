@@ -61,7 +61,7 @@ def resolve_atom_indices(raw, atom_count):
     return selection, _expand_ranges(ranges, atom_count, 'Atom')
 
 
-def resolve_fixed_atoms(raw, atom_count, optimizing, target):
+def resolve_fixed_atoms(raw, atom_count, optimizing, target, *, reference=CONSTRAINT_REFERENCE):
     """Expand only active, in-bounds ranges; hidden requests are never applied."""
     try:
         selection = parse_fixed_atoms(raw)
@@ -70,6 +70,6 @@ def resolve_fixed_atoms(raw, atom_count, optimizing, target):
         raise KitError(str(exc)) from exc
     if not optimizing or not ranges:
         return selection, ()
-    if target != '2026.2':
-        raise KitError('Fixed-atom constraints are currently keyword-checked only for target CP2K 2026.2')
+    if target != reference['target']:
+        raise KitError(f'Fixed-atom constraints are currently keyword-checked only for target CP2K {reference["target"]}')
     return selection, _expand_ranges(ranges, atom_count, 'Fixed-atom')

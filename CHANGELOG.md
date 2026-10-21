@@ -8,6 +8,57 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.3.1
+
+- GFN2 OT crash-protection follow-up (version retained): reject OT generation
+  for legacy CP2K targets 2025.2/2026.1 before publication; require explicit
+  --scf diag/menu 320 instead of silently changing the solver. Shared version
+  policy adds gfn2_ot_enabled; target 2026.2 retains OT generation without any
+  runtime-certification claim. Native crash evidence is from local 2026.1;
+  2025.2 is conservatively restricted without native execution. Prior authorized
+  water tests found diagonalization converged on local 2026.1 and OT converged
+  on local 2026.2/git:c92cc08, not necessarily an unmodified official release.
+  Add API/config/replay/CLI/TUI and no-publication regressions; schema stays 0.1.0.
+  No new native calculation, CP2K patch or automatic resubmission in this fix.
+- Parser compatibility follow-up, retaining 0.3.1 by explicit user request:
+  accept `[hartree]` as well as `[a.u.]` on total FORCE_EVAL energy records.
+  Preserve hartree values, source text/lines/hashes, complete numeric-token
+  boundaries, malformed/non-finite handling and conservative quality rules.
+  Add synthetic unit/boundary/segmentation and CLI regressions. This follow-up
+  rechecks existing local native output only; no new calculation is run and no
+  GFN2 runtime fix or non-SCC quality-rule change is implied. Schema stays 0.1.0.
+- Add a distinct DFT/GFN-xTB method dispatch, not three fake XC functionals:
+  30 GFN1-xTB, 31 GFN0-xTB and 32 GFN2-xTB match the inspected Multiwfn
+  chooser. Keep existing DFT positions, function IDs and basis registry stable.
+  Method chooser 1/110, model selector 140, tblite assertion 141 and accuracy 142
+  share CLI/API/config/replay generation. Hybrids remain deferred.
+- Expand compatibility within the user-designated 0.3.1 round: GFN1 supports
+  2024.2/2024.3/2025.1/2025.2/2026.1/2026.2, GFN0 starts at 2025.1, and GFN2
+  starts at 2025.2 with tblite linked. Reject unavailable upstream models without
+  fallback. Emit legacy GFN1 filenames/no GFN_TYPE on 2024.x; legacy TBLITE T
+  activation on 2025.2/2026.1, new backend/mixer/accuracy controls only on 2026.2.
+- Keep H-Rn, isolated Gamma closed-shell ENERGY/ENERGY_FORCE/GEO_OPT. GFN0
+  is non-SCC; GFN1 and target-2026.2 GFN2 support default OT/FULL_SINGLE_INVERSE
+  or explicit diag. The earlier universal removal of the GFN2 diag-only gate is
+  superseded by the legacy-target crash protection above. OT convergence uses EPS_SCF;
+  native tblite SCC with diag on 2026.2 uses ACCURACY. Legacy GFN2 diag uses
+  CP2K direct-P mixing. Unsupported nondefault ACCURACY requests fail explicitly.
+- Pin target-specific parameter/D3 identities and source hashes. Reuse shared
+  fixed-atom resolution with audited target references for xTB without relaxing
+  the existing DFT gate; xTB EXTXYZ output starts at target 2026.1.
+- Retain intrinsic model dispersion, use xTB reference occupations rather than
+  GTH valences, omit DFT basis/potential/XC/grid/Poisson controls. Reject unsupported
+  periodic/open-shell/CELL_OPT/density/CDD/+U, additional pair corrections, DFT
+  overrides and parameter refits without automatically changing requested physics.
+- Check pinned native model/D3 bytes via data_dir/CP2K_DATA_DIR, record/protect
+  sources; unchecked runtime references and tblite built-ins remain unverified.
+  Native PARAMETER filenames are char_t paths (quote when needed), distinct from
+  DFT whole-line filenames. No production numerical parameters are bundled.
+- Reuse geometry, optimization/constraint rendering and staged single-input writing.
+  Keep replacement/JSON/symlink/data protection, default DFT physics and schema 0.1.0.
+  Add synthetic model/invalid-combination/menu/CLI/replay/overwrite regressions.
+  No CP2K/Multiwfn/tblite execution, build detection or scientific validation.
+
 ## 0.3.0
 
 - Add ten non-hybrid XC profiles to the original five: PADE, BP86, TPSS,

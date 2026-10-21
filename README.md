@@ -2,7 +2,7 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.3.0 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.3.1 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 - Analysis remains read-only: no submission/execution or modification of existing
@@ -24,10 +24,55 @@ Multiwfn 2026.10.1's CP2K generator as the primary coverage/assembly reference:
 series (GFN0, GFN1 and GFN2)**. GFN0/1 use CP2K-native implementations; GFN2
 requires tblite. Delivery is staged with target-version/data/combination checks;
 upstream defaults and correlated methods are not enabled automatically.
-Version 0.3.0 implements the 15 non-hybrid DFT profiles below. The remaining
-six hybrids and all GFN-xTB models are still plans, not enabled features.
+Version 0.3.0 implements the 15 non-hybrid DFT profiles below. Version 0.3.1
+adds the three GFN-xTB methods before hybrid work; all six hybrids remain deferred.
 
-## Current version: 0.3.0
+## Current version: 0.3.1
+
+Parser compatibility follow-up (version retained by user request): total-energy
+records accept both `[a.u.]` and `[hartree]`, with values stored in hartree and
+original evidence preserved. Numeric-token boundaries and conservative quality
+rules are unchanged; parsing does not establish convergence or scientific validity.
+
+### GFN-xTB input generation
+
+Method selection **1 / 110** adds the exact Multiwfn xTB chooser numbers:
+**30 GFN1-xTB**, **31 GFN0-xTB**, **32 GFN2-xTB (tblite)**.
+Existing DFT chooser positions, basis registry numbers and global function IDs
+are unchanged. **140** selects DFT/GFN-xTB, **141** asserts tblite availability,
+and **142** edits dimensionless tblite ACCURACY for target 2026.2 only.
+
+```bash
+cp2kkit generate-input water.xyz -o water-gfn1.inp --periodic NONE --method GFN1-xTB
+cp2kkit generate-input water.xyz -o water-gfn0-opt.inp --periodic NONE \
+  --method GFN0-xTB --run-type GEO_OPT
+cp2kkit generate-input water.xyz -o water-gfn2.inp --periodic NONE \
+  --method GFN2-xTB --scf diag --tblite-available --xtb-accuracy 1.0
+```
+
+Target-version coverage: **GFN1 on 2024.2-2026.2**, **GFN0 from 2025.1**,
+**GFN2 from 2025.2 with tblite linked**. Releases checked: 2024.2, 2024.3,
+2025.1, 2025.2, 2026.1, 2026.2. Unavailable upstream model/version pairs fail
+explicitly; no model substitution. GFN1 defaults to OT. GFN2 OT generation is
+enabled only for target **2026.2**; legacy targets **2025.2/2026.1 require explicit
+`--scf diag`** (menu 320). Omitted/default OT is rejected before writing, never
+silently replaced. This guard follows a local 2026.1 tblite/OT crash; 2025.2 is
+conservatively restricted without native validation. GFN0 is non-SCC and needs D4 build support. Legacy tblite
+syntax differs from 2026.2; ACCURACY/native SCC controls are emitted only
+where available. GFN2 OT convergence uses EPS_SCF; 2026.2 native SCC with diag
+uses ACCURACY. Linked-build availability is user-asserted, not detected.
+The bounded scope remains H-Rn, isolated Gamma ENERGY/ENERGY_FORCE/GEO_OPT,
+closed-shell multiplicity 1. Intrinsic D4/GFN0, D3(BJ)/GFN1 and D4/GFN2 are retained;
+no additional DFT-D correction is added. xTB does not use MOLOPT/GTH or the
+DFT valence table. Incompatible nondefault DFT/density requests fail explicitly.
+Periodic/open-shell/CELL_OPT/CDD/+U and custom refits remain outside this subset.
+See [model/data/solver details](docs/input-generation.md#gfn-xtb-methods-031).
+Earlier user-authorized water diagnostics found GFN2 diagonalization converged on
+local 2026.1/git:5e54ba2, while OT crashed; local 2026.2/git:c92cc08 OT converged.
+These narrow build-specific checks are not general CP2K/tblite certification.
+Changing `--cp2k-version` does not upgrade the actual executable.
+
+### Retained non-hybrid DFT profiles
 
 The non-hybrid XC scope follows Multiwfn's actual component/nonlocal assembly,
 with target **CP2K 2026.2** checks:
@@ -52,8 +97,8 @@ Initial meta-GGA/nonlocal scope is GPW, Gamma, ENERGY/ENERGY_FORCE/GEO_OPT,
 without +U. GAPW/non-Gamma/CELL_OPT/+U require separate validation; these are
 cp2kkit scope limits, not CP2K-wide prohibitions. Existing GGA paths, basis IDs,
 CLI/config/replay controls and default PBE input physics remain compatible.
-Schema stays 0.1.0 with additive XC/kernel provenance. No hybrids, xTB, new
-runtime dependency or native calculation is included. See the
+Schema stays 0.1.0 with additive XC/kernel and model provenance. No hybrids, new
+Python runtime dependency or native calculation is included. See the
 [full capability/dispersion matrix](docs/input-generation.md#non-hybrid-xc-profiles-030).
 
 ### Retained 0.2.9 workflows
@@ -421,7 +466,8 @@ Parsing follows explicit output markers, not suffix/version guesses.
 The illustrative "2026.1" is not evidence of compatibility.
 Real fixtures and source-format checks remain a release gate.
 
-- Supports `ENERGY| Total FORCE_EVAL (...) energy [a.u.]`; energy stays in hartree.
+- Supports `ENERGY| Total FORCE_EVAL (...) energy [a.u.]` and `[hartree]` labels;
+  energy stays in hartree without numerical conversion.
   A complete numeric token may be followed by whitespace or whitespace-delimited
   annotations; adjacent garbage/incomplete exponents remain unsupported. Original
   lines/hashes are preserved. Parsing an energy does not infer convergence.

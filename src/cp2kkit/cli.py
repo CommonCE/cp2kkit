@@ -50,7 +50,7 @@ def build_parser():
     structure.add_argument("--format", choices=["extxyz", "xyz"], default="extxyz")
     structure.add_argument("--frame", type=int, default=-1, help="XYZ frame index, default last; negative indices allowed")
     structure.add_argument("--allow-cell-loss", action="store_true", help="Explicitly allow plain XYZ to omit a known cell")
-    gen = sub.add_parser("generate-input", help="Generate a conservative GPW/GAPW CP2K input and provenance JSON")
+    gen = sub.add_parser("generate-input", help="Generate a conservative GPW/GAPW/GFN-xTB CP2K input (optional provenance JSON)")
     gen.add_argument("path", nargs="?", help="XYZ/extXYZ/restart/GJF/CIF/POSCAR structure; prompted in TUI mode")
     gen.add_argument("-o", "--output", help="Input path; existing regular .inp may be replaced; required unless using TUI")
     gen.add_argument("--interactive", "--tui", action="store_true", help="Edit all CLI-seeded settings in one scrolling numbered menu")
@@ -59,6 +59,13 @@ def build_parser():
     gen.add_argument("--write-json", action="store_true", help="Also write exclusive provenance JSON; default writes only input. Existing .inp may be replaced, JSON may not.")
     gen.add_argument("--project", help="Default: structure filename without its suffix")
     gen.add_argument("--run-type", type=str.upper, choices=RUN_TYPES, default="ENERGY")
+    from .xtb import METHODS, parse_method
+    gen.add_argument('--method', type=parse_method, choices=METHODS, default='DFT',
+                     help='DFT or GFN1-xTB/GFN0-xTB/GFN2-xTB; independent of --functional')
+    gen.add_argument('--tblite-available', action='store_true',
+                     help='Assert target CP2K has tblite linked (required for GFN2); not detected')
+    gen.add_argument('--xtb-accuracy', type=float, default=1.0,
+                     help='CP2K 2026.2 GFN2 tblite accuracy factor: numerical setup; also native SCC convergence with diag, not OT EPS_SCF')
     gen.add_argument("--functional", type=parse_functional, choices=FUNCTIONALS, default="PBE",
                      help="Non-hybrid profile; aliases LDA/PADE, BP/BP86, MN15-L/MN15L, BEEF-vdW/BEEFVDW")
     gen.add_argument("--basis", type=parse_basis, default=DEFAULT_BASIS,
@@ -105,10 +112,10 @@ def build_parser():
     gen.add_argument("--fragment-b-charge", type=int)
     gen.add_argument("--fragment-b-multiplicity", type=int)
     gen.add_argument("--fixed-atoms", type=parse_fixed_atoms, default="off",
-                     help="Optimization, target 2026.2: 1-based atoms/ranges, e.g. 1,3-5; off or 0 clears; fixes fractional XYZ")
+                     help="Optimization: 1-based atoms/ranges, e.g. 1,3-5; off/0 clears; fractional XYZ. DFT target 2026.2; xTB checked targets 2024.2-2026.2")
     gen.add_argument("--trust-radius", type=float, default=0.2, help="Angstrom; BFGS/LBFGS optimization only")
     gen.add_argument("--trajectory-format", type=str.upper, choices=TRAJECTORY_FORMATS, default="XYZ",
-                     help="Optimization position trajectory; EXTXYZ is checked for target 2026.2")
+                     help="Optimization position trajectory; EXTXYZ requires target 2026.2 for DFT, >=2026.1 for xTB")
     gen.add_argument("--max-iter", type=int, default=400)
     gen.add_argument("--pressure", type=float, default=1.01325, help="CELL_OPT external pressure (bar)")
     gen.add_argument('--dft-plus-u', type=parse_dft_plus_u, default=(),

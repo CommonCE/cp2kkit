@@ -256,7 +256,31 @@ def edit_difference(menu, values):
 
 
 def edit_entry(menu, values, entry):
-    if entry.editor == 'source':
+    if entry.editor == 'method':
+        # Keep legacy DFT positions; xTB IDs are exactly upstream 30/31/32.
+        from .xtb import XTB_NUMBERS, METHODS, parse_method
+        field = FIELDS['functional']
+        menu.show('Functional / method (DFT positions retained; xTB numbers match Multiwfn)')
+        for number, name in enumerate(field.choices, 1):
+            menu.show(f'  {number}. {name}')
+        for number, name in XTB_NUMBERS.items():
+            menu.show(f'  {number}. {name}'+(' (via tblite; OT or diag, CP2K >=2025.2)' if number == 32 else ''))
+        while True:
+            raw = menu.ask('Select number/name; Enter keeps; back returns: ')
+            if not raw or raw.lower() == 'back':
+                return
+            try:
+                if raw in {str(n) for n in XTB_NUMBERS}:
+                    values['method'] = XTB_NUMBERS[int(raw)]
+                elif any(raw.casefold() == name.casefold() for name in METHODS[1:]):
+                    values['method'] = parse_method(raw)
+                else:
+                    functional = parse_value(field, raw)
+                    values.update(method='DFT', functional=functional)
+                return
+            except ValueError as exc:
+                menu.show(f'Invalid input: {exc}')
+    elif entry.editor == 'source':
         edit_source(menu, values, entry.field)
     elif entry.editor in {'custom_basis', 'custom_potential'}:
         edit_pair(menu, values, entry.editor)
@@ -374,8 +398,12 @@ def run_editor(path, frame, output, settings, stdin=None, stdout=None, plain=Fal
                 from .density_workflow import bundle_paths
                 for target in bundle_paths(settings_from(values), result[0]):
                     menu.show(f'Generated path: {target.resolve()}')
-                menu.show(f"Task: {values['run_type']}; functional: {values['functional']}; "
-                          f"basis: {values['basis']}; dispersion: {values['dispersion']}")
+                if values['method'] == 'DFT':
+                    menu.show(f"Task: {values['run_type']}; functional: {values['functional']}; "
+                              f"basis: {values['basis']}; dispersion: {values['dispersion']}")
+                else:
+                    menu.show(f"Task: {values['run_type']}; method: {values['method']}; "
+                              'intrinsic model dispersion retained')
                 for warning in result[2]:
                     menu.show(f'Warning: {warning}')
                 return 0

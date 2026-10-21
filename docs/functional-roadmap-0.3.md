@@ -2,9 +2,9 @@
 
 ## Status and direction
 
-**Partially implemented: software 0.3.0 delivers the 15 non-hybrid DFT profiles.**
-The user selected this first release scope; six hybrids and all GFN-xTB models
-remain planned. See the [implemented capability matrix](input-generation.md#non-hybrid-xc-profiles-030).
+**Partially implemented: 0.3.0 delivers 15 non-hybrid DFT profiles; 0.3.1 adds
+all three GFN-xTB models within the bounded initial scope.** The user requested
+xTB before hybrids; all six hybrids remain deferred. See the [implemented capability matrix](input-generation.md#non-hybrid-xc-profiles-030).
 This plan alone authorizes no calculations, installation, further version/default
 changes, commit or push. Later release assignments remain to be agreed.
 
@@ -100,7 +100,13 @@ correction. The CP2K documentation identifies D4/GFN0, D3(BJ)/GFN1 and D4/GFN2.
 xTB uses parameterized bases, reference occupations and interactions, not MOLOPT/
 GTH selection or the current PP valence-count table. Audit element coverage,
 electron counting, charge/spin and applicable convergence controls per model.
-Do not equate tblite ACCURACY with CP2K EPS_SCF. Keep explicit incompatible
+Implemented target checks span 2024.2-2026.2 for GFN1, >=2025.1 for GFN0,
+and >=2025.2 for GFN2/tblite; unavailable upstream interfaces cannot be supplied
+by the generator. GFN1 supports default OT and explicit diag. GFN2 OT generation
+is enabled only for target 2026.2; legacy 2025.2/2026.1 requires explicit diag after
+the native 2026.1 crash investigation (2025.2 remains conservatively restricted,
+not runtime validated). No automatic solver fallback is allowed. Do not equate
+tblite ACCURACY (exposed only on 2026.2) with CP2K EPS_SCF. Keep explicit incompatible
 DFT requests out of xTB output; do not silently disable intrinsic model terms.
 
 Start with nonperiodic Gamma ENERGY, then add ENERGY_FORCE/GEO_OPT after derivative
@@ -113,7 +119,8 @@ not automatic substitution for DFT adsorption/reaction energetics.
 ## 4. Staged delivery
 
 Stages 1-3 are delivered as the bounded 0.3.0 generator subset, not as runtime
-or scientific validation. Stages 4-6 remain future work; the initial capability
+or scientific validation. Stage 5 is delivered in 0.3.1 for isolated closed-shell
+ENERGY/ENERGY_FORCE/GEO_OPT only; broader xTB scope and stages 4/6 remain future work; the initial capability
 matrix is already documented. The list retains the series-level audit goals.
 
 1. **Inventory and registry:** use the fixed upstream menu as the acceptance
@@ -189,4 +196,5 @@ menu entries, arbitrary q changes, external execution or submission in scope.
   model/backend mapping, intrinsic dispersion and self-consistency controls;
   not a probe of the installed build.
 
-New methods remain planned until implemented and tested within explicit limits.
+See [implemented xTB scope](input-generation.md#gfn-xtb-methods-031).
+Unimplemented branches remain plans, not enabled methods or validated calculations.

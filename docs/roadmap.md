@@ -1,6 +1,134 @@
 # Development status and next steps
 
-Current software: **0.3.0**; schema: **0.1.0**.
+Current software: **0.3.1**; schema: **0.1.0**.
+
+## Implemented parser compatibility follow-up (0.3.1 retained)
+
+Version retained by explicit user request. Total FORCE_EVAL energy parsing accepts
+both `[a.u.]` and `[hartree]` labels, preserving hartree values and original
+text/line/hash evidence. Complete-token checks, rejection of unsupported units,
+malformed/non-finite handling, segmentation and conservative quality rules remain
+unchanged. Regression fixtures are synthetic; read-only checks of existing local
+CP2K 2026.1 xTB output are a separate, narrow format check, not version certification.
+Validation: 455 regression tests passed, none skipped, including expanded synthetic
+unit/token-boundary cases and a CLI subprocess check. Read-only re-parsing of the
+10 existing local xTB outputs recovered all reported energies in the seven normally
+terminated runs, matching recorded values/evidence and unchanged source hashes;
+the three crashed GFN2 runs still have no energy records. These logs remain local
+under `test-workspace/xtb-native-20261021-123240-bJMHj1/`, not bundled fixtures.
+No new calculation or submission is part of this parser fix. GFN0 non-SCC quality
+classification and the observed GFN2 OT runtime crash remain outside this fix.
+
+## Implemented GFN2 OT crash protection (0.3.1 retained)
+
+Reject GFN2 OT for legacy targets 2025.2/2026.1 in the shared generator before
+writing; require explicit `--scf diag` / menu 320, without changing saved requests
+or automatically falling back. Target 2026.2 retains OT; version_compatibility
+adds gfn2_ot_enabled as generation policy, not proof of installed build support.
+The 2025.2 restriction is conservative and has no native-run evidence.
+
+Earlier user-authorized diagnostics used isolated H2O, charge 0/multiplicity 1,
+Gamma/no smearing, one/four MPI ranks, one thread and bounded optimization:
+local 2026.1/git:5e54ba2 default OT at one rank and IRAC OT at four ranks crashed
+with exit 139, matching the earlier default four-rank crash. Its diagonalization
+ENERGY (one/four ranks), ENERGY_FORCE and GEO_OPT converged; local
+2026.2/git:c92cc08 OT passed the same four-case task/rank matrix, including
+geometry completion. Local sources show the legacy OT p_mix_new density-update
+path versus the newer use_rho branch. Compiler/backend builds also differ;
+revision strings alone do not prove official-release equivalence or a unique fix.
+Evidence and hashes remain local under
+`test-workspace/gfn2-ot-diagnosis-20261021-124634-mJ9t2F/` (not bundled fixtures).
+No new calculation or submission is part of this generator protection change.
+GFN0/GFN1, default DFT physics and schema 0.1.0 remain unchanged.
+Validation: 458 regression tests passed, none skipped, including 23 xTB tests.
+Read-only replay of 20 prior local input manifests produced byte-identical input
+text for 15 still-supported cases and rejected five legacy GFN2 OT requests;
+source inputs remained unchanged. Version/text/link checks, compileall and
+`git diff --check` passed. No new native run is implied by these checks.
+
+## Planned Agent integration and optional MCP support
+
+Status: **planned, not implemented**. This is a parallel development track to
+scientific feature coverage, not a claim of an available MCP server, registered
+Pi tools, or company-platform compatibility. No release version or delivery date
+is assigned yet.
+
+### Scope and architecture
+
+Support the personal Pi Agent and the company-developed computational Agent
+through a shared deterministic toolkit API. Keep intent interpretation and
+workflow decisions in the host Agent; cp2kkit remains responsible for validated
+input generation, parsing, quality assessment, and evidence-preserving exports.
+
+- Reuse existing domain models, registries, validators, parsers and protected
+  writers. CLI, TUI and Agent adapters must not implement separate scientific rules.
+- Define supported request/result contracts with semantic parameter names, units,
+  index conventions, side effects and compatibility rules. TUI navigation numbers
+  are not an Agent protocol. Preserve existing CLI exit codes and distinguish the
+  tool-contract version from software and scientific-data schema versions.
+- Add MCP as an optional thin adapter, with an optional dependency or separate
+  adapter package; preserve the standard-library core and independent CLI/TUI.
+  Company integration may instead use an existing internal tool protocol over
+  the same API. Do not require a plugin framework, database or workflow engine.
+- Confirm the actual Pi integration mechanism and company tool protocol, file
+  access model and execution ownership before implementing host-specific setup.
+
+### Staged delivery and acceptance
+
+| Stage | Planned scope | Acceptance boundary |
+|---|---|---|
+| AGENT-1: contracts and read-only MVP | Define supported API/error contracts; expose project discovery, output parsing and quality assessment through a local stdio MCP adapter | Test tool discovery, request/result schemas, ambiguity, malformed/truncated output, non-TTY operation and protocol-only stdout; results agree with shared core logic and preserve evidence/unknown values. Host integration is claimed only after an actual client smoke test. |
+| AGENT-2: preview and protected generation | Add structure inspection, input validation/preview and explicit file publication; incrementally advance ARC-3 validation/resolution/render/manifest separation | Preview creates no files; shared defaults, scientific settings and generated text remain consistent with CLI/TUI. Agent writes reject existing targets by default; any replacement requires separately defined explicit authorization. Test collisions, source changes between preview/write, repeated calls, interruption and rollback without changing existing CLI replacement behavior. |
+| AGENT-3: capabilities and enterprise integration | Expose capabilities derived from shared registries/rules; map workspace-relative paths or artifact IDs; add a company adapter and remote MCP transport only when needed | Report target-version, task/model/build/data restrictions and validation levels without duplicating policy. Verify workspace isolation, artifact resolution, bounded responses, authentication/authorization and audit requirements in the agreed deployment. Company compatibility remains unverified until checked there. |
+
+The first MVP does not depend on completing the full ARC-3 refactor. Extend the
+adapter incrementally after read-only contracts are stable; structure export and
+Cube checks/differences are later candidates, not automatically exposed commands.
+Prefer local stdio for the initial personal integration. Evaluate Streamable HTTP
+for remote/shared deployment only after checking client compatibility, the target
+MCP specification/SDK, and service-security requirements.
+
+### Tool contracts, safety and evidence
+
+- Return structured domain errors with stable identifiers, affected fields and
+  explicit candidates or missing information. Preserve ambiguity rather than
+  choosing by file time; request scientific decisions instead of silently changing
+  charge, spin, periodicity, approximations or unsupported combinations.
+- Keep validation/preview separate from publication. Recheck source identity and
+  target protection at write time; reuse staged publication and ownership-aware
+  rollback. Do not imply crash-atomic multi-file writes or blind retry safety.
+- Enforce allowed read/write workspaces, path/symlink checks and resource limits
+  in the tool/service boundary, not merely in prompts or tool descriptions.
+  Define timeouts, cancellation and partial-output behavior. Bound file reads and
+  responses; large logs/Cubes should return summaries and artifact references.
+- Keep content hashes, units, source locations and scientific evidence. Define
+  path/raw-text redaction before external transfer; do not embed secrets or
+  sensitive company structures/results in prompts, fixtures or audit logs.
+  A remote file path alone does not transfer or grant access to an artifact.
+- Distinguish tool completion, input generation, syntax acceptance, actual execution,
+  normal termination, electronic/geometry convergence and scientific validity.
+  Build assertions and source/data checks must not become runtime certification.
+- Exclude arbitrary shell execution, job submission/cancellation, deletion and
+  autonomous repair/reruns from the initial tools. Future execution integration
+  requires separate scope and authorization, stable job identities, duplicate-job
+  prevention and recovery; prefer the company's existing execution system.
+- Review actual third-party authorization for the intended internal use, service
+  deployment or distribution before company rollout. The unresolved boundaries in
+  [third-party notices](../THIRD_PARTY_NOTICES.md) remain; MCP wrapping or a Python
+  rewrite does not establish additional permission.
+
+### Verification and dependencies
+
+Add deterministic contract and adapter tests with synthetic fixtures/mocks for
+normal, invalid, ambiguous and interrupted requests, write protections and host/core
+consistency. Keep stdio protocol output separate from diagnostics. Test installation
+with and without optional MCP dependencies and retain CLI/TUI regression coverage.
+No test may implicitly launch CP2K or submit jobs; real client checks, native CP2K
+validation and scientific validation are separate evidence levels.
+
+Continue the existing real-fixture/version-matrix and packaging/CI priorities below.
+Agent access does not improve parser coverage by itself. This roadmap entry changes
+no current API, schema, dependency, Agent configuration or execution authorization.
 
 ## Proposed 0.3.x scope: functional and method coverage
 
@@ -15,8 +143,38 @@ hybrids; xTB can proceed after method dispatch exists. Audit target-version
 keywords/units, data/model pairing, spin, tasks and build requirements; do not
 copy automatic physical changes, unchecked parameters or direct writes blindly.
 MP2/RPA/GW, double hybrids and other non-XC methods remain separate later scopes.
-The non-hybrid subset is implemented in 0.3.0 below; six hybrids and the xTB
-series remain planned. Default PBE input physics is unchanged.
+The non-hybrid subset is implemented in 0.3.0 below; 0.3.1 adds xTB before
+hybrids at the user's request. Six hybrids remain deferred. Default PBE input
+physics is unchanged.
+
+### 0.3.1 implemented GFN-xTB scope
+
+- Separate method dispatch and model reference electron counts, not XC profiles
+  or GTH q reuse. Exact new chooser IDs: 30 GFN1, 31 GFN0, 32 GFN2 (tblite).
+  140/141/142 expose model, explicit tblite build assertion and numerical accuracy.
+- Checked release targets: 2024.2/2024.3/2025.1/2025.2/2026.1/2026.2 for GFN1;
+  GFN0 starts at 2025.1, GFN2/tblite at 2025.2. Emit legacy/new syntax, filenames
+  and data hashes per target; reject unavailable upstream backends without fallback.
+  Keep H-Rn, nonperiodic Gamma closed-shell ENERGY/ENERGY_FORCE/GEO_OPT.
+  GFN1 defaults to OT; GFN2 OT is now enabled only on target 2026.2, with explicit
+  diag required on legacy targets as documented above. GFN0 is non-SCC. GFN2 OT uses
+  EPS_SCF, 2026.2 native SCC/diag uses ACCURACY. Fixed-atom references are
+  target-specific for xTB; EXTXYZ starts at 2026.1.
+- Shared geometry/motion/constraints and staged input writer; optional JSON,
+  config/replay and menu applicability. Native parameter/D3 files can be read/
+  hash-checked at pinned identity; no model coefficients or Fortran are bundled.
+- Historical compatibility follow-up, before the native crash guard: 450 tests passed (20 xTB-specific tests), none skipped.
+  Earlier 0.3.1 checkpoint: 444 tests/14 xTB tests; no native calculations.
+  Source/data-only assembly passed 39 valid model/version/task cases across
+  all six targets; all native H-Rn electron tables agree. GFN2 built-ins remain
+  backend_unchecked; no linked build is probed. Generated DFT text matched the pre-change
+  generator in all 45 water profile/task comparisons. Read-only native data
+  assembly checked GFN0 model bytes and GFN1 model/D3 bytes; GFN2 built-ins stay
+  backend_unchecked. Synthetic generation/interface/negative/protection tests
+  and static source/data checks only.
+  No CP2K/Multiwfn/tblite execution, linked-build detection or scientific validation.
+  Periodic/open-shell/non-Gamma/CELL_OPT/density/CDD/+U/refits and hybrids remain
+  deferred. See [the xTB guide](input-generation.md#gfn-xtb-methods-031).
 
 ### 0.3.0 implemented non-hybrid scope
 
@@ -47,7 +205,8 @@ series remain planned. Default PBE input physics is unchanged.
   `test-workspace/pure-functional-0.3.0-20261020-155629-SwFpIH/` (ignored, not bundled).
   The executed binary is not the 2026.10.1 development source. No CP2K execution,
   scientific/convergence validation or broader element-coverage claim follows.
-- Hybrids/HFX/ADMM/RI-HFX, UZH-PBE0, GFN-xTB, arbitrary mixtures, D4 and broader
+- At the 0.3.0 checkpoint, hybrids/HFX/ADMM/RI-HFX, UZH-PBE0, GFN-xTB,
+  arbitrary mixtures, extra DFT D4 and broader
   meta-GGA task/model combinations remain future work.
 
 ### 0.2.9 implemented development scope
@@ -257,6 +416,10 @@ A runnable preliminary implementation **does not equal complete production accep
 6. Assess streaming large output files and schema compatibility.
 7. Extend CP2K generation in stages toward full Multiwfn coverage, recording provenance
    and checking versions/parameter combinations.
+8. Develop the parallel [Agent integration and optional MCP track](#planned-agent-integration-and-optional-mcp-support):
+   start with stable contracts and a read-only local adapter, then preview/protected
+   generation and deployment-specific company integration. These are planned features,
+   not existing commands or authorization to execute calculations.
 
 ## Review follow-up backlog
 
@@ -332,6 +495,7 @@ old default, or emitting target-version-unsupported keywords without checking.
 3. **Methods/bases:** 0.2.6 adds PBEsol/revPBE/RPBE and explicit catalog-backed
    MOLOPT/UCL mixed bases; the registry follow-up adds UZH-PBE pairs and custom ORB.
    Version 0.3.0 adds the non-hybrid registry and complete nonlocal methods;
+   0.3.1 adds the bounded GFN-xTB branch before hybrids;
    initial GAPW/all-electron bases were added in 0.2.7. Remaining: broader meta-GGA
    model/task support, native/scientific UZH validation, UZH-PBE0,
    hybrids/HF/ADMM/RI-HFX, auxiliary and additional all-electron bases/families/

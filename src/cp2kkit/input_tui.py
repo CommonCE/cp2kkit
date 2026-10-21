@@ -54,6 +54,9 @@ GROUPS = (
         Field("max_iter", "Maximum optimization steps", "int", minimum=1),
         Field("pressure", "CELL_OPT external pressure [bar]", "float"))),
     ("Method, basis and dispersion", (
+        Field('method', 'DFT / GFN-xTB (30 GFN1; 31 GFN0; 32 GFN2)', choices=('DFT', 'GFN1-xTB', 'GFN0-xTB', 'GFN2-xTB')),
+        Field('tblite_available', 'Assert target CP2K has tblite linked (not detected)', 'bool'),
+        Field('xtb_accuracy', 'CP2K 2026.2 tblite ACCURACY (dimensionless; role depends on solver)', 'float', positive=True),
         Field("functional", "Functional (GPW/GTH or GAPW/ALL)", choices=FUNCTIONALS),
         Field("basis", "Orbital basis (immutable registry number or stable ID/name; 0 returns)", 'basis'),
         Field("dispersion", "Dispersion", choices=("none", "d3", "d3bj")),
@@ -123,8 +126,19 @@ def visible_fields(fields, values):
         has_ae = any(basis_option(b).kind_type == 'all-electron' for b in requested)
     except KitError:
         has_ae = True  # Invalid drafts stay editable; authoritative review gives the error.
+    xtb = values.get('method', 'DFT') != 'DFT'
+    dft_only = {'basis', 'basis_overrides', 'basis_files', 'potential_files', 'custom_basis_file',
+                'custom_basis_name', 'custom_potential_file', 'custom_potential_name', 'gapw_profile',
+                'dispersion', 'libxc_available', 'allow_pbe_potential', 'dft_plus_u', 'magnetism',
+                'cutoff', 'rel_cutoff', 'electron_density', 'spin_density', 'cube_stride', 'density_difference',
+                'kpoints', 'smearing', 'added_mos'}
+    non_scf = values.get('method') == 'GFN0-xTB'
     return tuple(f for f in fields
-                 if not (f.name == 'gapw_profile' and not has_ae)
+                 if not (xtb and f.name in dft_only)
+                 and not (non_scf and f.name in {'scf', 'eps_scf', 'max_scf', 'max_outer_scf', 'ot_algorithm'})
+                 and not (f.name == 'xtb_accuracy' and values.get('cp2k_version') != '2026.2')
+                 and not (f.name in {'tblite_available', 'xtb_accuracy'} and values.get('method') != 'GFN2-xTB')
+                 and not (f.name == 'gapw_profile' and not has_ae)
                  and not (f.name == 'pressure' and values['run_type'] != 'CELL_OPT')
                  and not (f.name in {'optimizer', 'max_iter', 'trust_radius', 'trajectory_format', 'fixed_atoms'} and values['run_type'] not in {'GEO_OPT', 'CELL_OPT'})
                  and not (f.name == 'density_difference' and (values['run_type'] != 'ENERGY' or has_ae))
@@ -139,6 +153,8 @@ def visible_fields(fields, values):
 
 def field_display(field, values):
     value = values[field.name]
+    if field.name == 'functional' and values.get('method', 'DFT') != 'DFT':
+        return values['method'] + ' (DFT functional retained but inactive)'
     if field.name == 'multiplicity' and value is None:
         try:
             from .inputgen import automatic_multiplicity
@@ -220,6 +236,9 @@ def parse_value(field, raw):
         return parse_magnetism(raw)
     if field.optional and raw.lower() == "auto":
         return None
+    if field.name == 'method':
+        from .xtb import XTB_NUMBERS, parse_method
+        return XTB_NUMBERS[int(raw)] if raw in {str(n) for n in XTB_NUMBERS} else parse_method(raw)
     if field.name == "functional" and not raw.isdigit():
         return parse_functional(raw)
     if field.choices:
@@ -327,8 +346,14 @@ class Menu:
             from .basis_ui import edit_basis
             return edit_basis(self, current, values)
         self.show(field.label)
-        for i, choice in enumerate(field.choices, 1):
-            self.show(f"  {i}. {choice}")
+        if field.name == 'method':
+            from .xtb import XTB_NUMBERS
+            self.show('  DFT. Return to the retained DFT functional')
+            for number, choice in XTB_NUMBERS.items():
+                self.show(f'  {number}. {choice}')
+        else:
+            for i, choice in enumerate(field.choices, 1):
+                self.show(f"  {i}. {choice}")
         extra = "; auto restores automatic/disabled optional values" if field.optional else ""
         current_text = (format_basis_overrides(current) if field.kind == 'basis_map' else
                         format_dft_plus_u(current) if field.kind == 'hubbard' else
@@ -370,73 +395,87 @@ class Menu:
         text, manifest = generate_input(structure, settings)
         self.heading("\n--- Review & write (not runtime/convergence certification) ---")
         self.show(f"Source: {Path(values['path']).resolve()}; frame={values['frame']}")
-        self.show(f"Charge [e]: {settings.charge}; Spin multiplicity: {manifest['settings']['multiplicity']}"
-                  + (' (auto: electron parity)' if settings.multiplicity is None else ''))
-        if settings.dft_plus_u or settings.magnetism is not None:
-            self.show(f"DFT+U [eV]: {format_dft_plus_u(settings.dft_plus_u)}"
-                      + ('; projectors: MULLIKEN' if settings.dft_plus_u else ''))
-            self.show(f"UKS: {manifest['electronic_extensions']['uks']}; initial magnetism: {format_magnetism(settings.magnetism)}")
-        self.show(f"Periodicity: {''.join(a for a, flag in zip('XYZ', manifest['generated_structure']['pbc']) if flag) or 'NONE'}; Dispersion: {settings.dispersion}")
-        self.show(f"Project: {field_display(Field('project', ''), values)}")
-        self.show(f"Grid: CUTOFF={settings.cutoff} Ry; REL_CUTOFF={settings.rel_cutoff} Ry")
-        self.show(f"k-points: {display(settings.kpoints)}")
-        self.show(f"SCF limits: inner/diag={field_display(Field('max_scf', ''), values)}"
-                  + (f"; outer={settings.max_outer_scf}" if settings.scf == 'ot' else ''))
-        if settings.scf == 'diag':
-            self.show(f"Smearing: {str(settings.smearing)+' K' if settings.smearing is not None else 'off'}; "
-                      f"ADDED_MOS={field_display(Field('added_mos', ''), values)}")
-        if settings.run_type in {'GEO_OPT', 'CELL_OPT'}:
-            self.show(f"Optimization: {settings.optimizer}; max_iter={settings.max_iter}")
-            self.show(f"Trajectory: {settings.trajectory_format}; MOTION restart backup copies: 0")
-            self.show(f"Fixed atoms (1-based, fractional XYZ): {manifest['settings']['fixed_atoms']}; count={len(manifest['constraints']['fixed_atoms'])}")
-            if manifest['motion_output']['trust_radius_angstrom'] is not None:
-                self.show(f"TRUST_RADIUS: {settings.trust_radius} angstrom")
-        if settings.run_type == 'CELL_OPT':
-            self.show(f"External pressure: {settings.pressure} bar")
-        electron_label = "All electrons (including core)" if manifest['electron_count_model'] == 'all_electron' else "Explicit valence electrons"
-        self.show(f"Atoms: {len(structure.symbols)}; {electron_label}: {manifest['explicit_electron_count']}")
-        self.show(f"Target version: {settings.cp2k_version}; Run type: {settings.run_type}; Method: {manifest['method_profile']['qs_method']}/{settings.functional}")
-        self.show(f"XC backend: {manifest['method_profile']['xc_backend']}; target build verified: False")
-        nonlocal_xc = manifest['nonlocal_correlation']
-        if nonlocal_xc['enabled']:
-            self.show(f"Required nonlocal correlation: {nonlocal_xc['type']}; kernel: {nonlocal_xc['kernel_file']}; "
-                      f"parameters b/C: {nonlocal_xc['parameters']}; source bytes checked: {nonlocal_xc['kernel_source'] is not None}; "
-                      "runtime/physical validation: False")
-        self.show(f"Basis selection: {manifest['basis_selection']['number']} [{manifest['basis_selection']['id']}]; data: {manifest['basis_validation']['status']}; runtime validated: False")
-        gapw = manifest['method_profile']['gapw']
-        if gapw:
-            self.show(f"All-electron automatic setup: {gapw['profile']} v{gapw['profile_version']}; not convergence certification")
-            for item in gapw['automatic_settings']:
-                self.show(f"  {item['setting']} = {item['value']}: {item['reason']}")
-            self.show('Preserved user settings: '+', '.join(gapw['preserved']))
-        self.show(f"Basis files: {', '.join(manifest['method_profile']['basis_files'])}")
-        if settings.basis_overrides:
-            self.show(f"Element basis overrides: {format_basis_overrides(settings.basis_overrides)}")
-        if settings.scf == 'ot':
-            self.show(f"OT ALGORITHM: {manifest['method_profile']['ot_algorithm']}; selection: {settings.ot_algorithm or 'auto'}")
-        self.show("SCF wavefunction restart backups: 0; restart writing is not disabled")
-        self.show(f"Restart suggestion (metadata only, inactive): {manifest['restart_template']['filename']}")
-        self.show(f"SCF: {settings.scf}; Effective EPS_SCF: {manifest['effective_eps_scf']}; Poisson: {manifest['poisson_solver']}")
-        self.show(f"Generated cell [angstrom]: {manifest['generated_structure']['cell']}")
-        self.show(f"Coordinates translated: {manifest['coordinates_translated']}")
-        for element, kind in manifest['kinds'].items():
-            potential_label = "nuclear potential" if kind['basis_kind_type'] == 'all-electron' else "pseudopotential"
-            self.show(f"{element}: basis={kind['basis']}; {potential_label}={kind['potential']}")
-            self.show(f"  Selection: {kind['basis_number']} [{kind['basis_id']}]; ORB; {kind['data_validation']}")
-            if kind['basis_kind_type'] == 'all-electron':
-                self.show(f"  Nuclear charge Z={kind['nuclear_charge']} [{kind['nuclear_charge_source']}]; explicit electrons={kind['explicit_electrons']}; basis/potential q=not applicable")
-            else:
-                self.show(f"  q: basis={kind['basis_q']}; potential={kind['potential_q']} [{kind['potential_q_source']}]; pairing={kind['protocol_pairing']}")
-            self.show(f"  Basis file: {kind['basis_file']}; potential approximation: {kind['potential_approximation']}")
-            self.show(f"  Potential file: {kind['potential_file']}")
-            for role in ('basis', 'potential'):
-                source = kind[role+'_source']
-                if source:
-                    self.show(f"  {role} source: {source['path']}:{source['entry_line']}; sha256={source['sha256']}; data version={source['data_version'] or 'unknown'}")
-            if kind.get('initial_magnetization') is not None:
-                self.show(f"  Initial MAGNETIZATION: {kind['initial_magnetization']}; element: {kind['element']}")
-        self.show(f"Effective density output: electron={manifest['density_output']['electron_density']}, "
-                  f"spin={manifest['density_output']['spin_density']}, stride={manifest['density_output']['stride']}")
+        if settings.method != 'DFT':
+            model = manifest['method_profile']
+            self.show(f"Method: {model['model']}; backend: {model['backend']}; target CP2K {settings.cp2k_version}")
+            self.show(f"Project: {manifest['settings']['project']}; run type: {settings.run_type}; periodicity: NONE; Gamma")
+            self.show(f"Charge [e]: {settings.charge}; multiplicity: {manifest['settings']['multiplicity']}; reference electrons: {manifest['explicit_electron_count']}")
+            self.show(f"Solver: {model['solver']}; self-consistent: {model['self_consistent']}; MAX_SCF: {model['effective_max_scf']}")
+            self.show(f"EPS_SCF: {manifest['effective_eps_scf']}; tblite ACCURACY: {model['accuracy']}; convergence control: {model['convergence_control']}")
+            self.show(f"Intrinsic dispersion: {model['intrinsic_dispersion']}; model data: {model['data_validation']}")
+            self.show('DFT XC/basis/potential/grid/Poisson controls: not applicable. Build/runtime/convergence unverified.')
+            self.show(f"Fixed atoms: {manifest['constraints']['fixed_atoms']}; generated cell [angstrom]: {manifest['generated_structure']['cell']}")
+            if settings.run_type == 'GEO_OPT':
+                self.show(f"Optimizer: {settings.optimizer}; max_iter: {settings.max_iter}; trajectory: {settings.trajectory_format}")
+                self.show(f"TRUST_RADIUS [angstrom]: {manifest['motion_output']['trust_radius_angstrom']}")
+        else:
+            self.show(f"Charge [e]: {settings.charge}; Spin multiplicity: {manifest['settings']['multiplicity']}"
+                      + (' (auto: electron parity)' if settings.multiplicity is None else ''))
+            if settings.dft_plus_u or settings.magnetism is not None:
+                self.show(f"DFT+U [eV]: {format_dft_plus_u(settings.dft_plus_u)}"
+                          + ('; projectors: MULLIKEN' if settings.dft_plus_u else ''))
+                self.show(f"UKS: {manifest['electronic_extensions']['uks']}; initial magnetism: {format_magnetism(settings.magnetism)}")
+            self.show(f"Periodicity: {''.join(a for a, flag in zip('XYZ', manifest['generated_structure']['pbc']) if flag) or 'NONE'}; Dispersion: {settings.dispersion}")
+            self.show(f"Project: {field_display(Field('project', ''), values)}")
+            self.show(f"Grid: CUTOFF={settings.cutoff} Ry; REL_CUTOFF={settings.rel_cutoff} Ry")
+            self.show(f"k-points: {display(settings.kpoints)}")
+            self.show(f"SCF limits: inner/diag={field_display(Field('max_scf', ''), values)}"
+                      + (f"; outer={settings.max_outer_scf}" if settings.scf == 'ot' else ''))
+            if settings.scf == 'diag':
+                self.show(f"Smearing: {str(settings.smearing)+' K' if settings.smearing is not None else 'off'}; "
+                          f"ADDED_MOS={field_display(Field('added_mos', ''), values)}")
+            if settings.run_type in {'GEO_OPT', 'CELL_OPT'}:
+                self.show(f"Optimization: {settings.optimizer}; max_iter={settings.max_iter}")
+                self.show(f"Trajectory: {settings.trajectory_format}; MOTION restart backup copies: 0")
+                self.show(f"Fixed atoms (1-based, fractional XYZ): {manifest['settings']['fixed_atoms']}; count={len(manifest['constraints']['fixed_atoms'])}")
+                if manifest['motion_output']['trust_radius_angstrom'] is not None:
+                    self.show(f"TRUST_RADIUS: {settings.trust_radius} angstrom")
+            if settings.run_type == 'CELL_OPT':
+                self.show(f"External pressure: {settings.pressure} bar")
+            electron_label = "All electrons (including core)" if manifest['electron_count_model'] == 'all_electron' else "Explicit valence electrons"
+            self.show(f"Atoms: {len(structure.symbols)}; {electron_label}: {manifest['explicit_electron_count']}")
+            self.show(f"Target version: {settings.cp2k_version}; Run type: {settings.run_type}; Method: {manifest['method_profile']['qs_method']}/{settings.functional}")
+            self.show(f"XC backend: {manifest['method_profile']['xc_backend']}; target build verified: False")
+            nonlocal_xc = manifest['nonlocal_correlation']
+            if nonlocal_xc['enabled']:
+                self.show(f"Required nonlocal correlation: {nonlocal_xc['type']}; kernel: {nonlocal_xc['kernel_file']}; "
+                          f"parameters b/C: {nonlocal_xc['parameters']}; source bytes checked: {nonlocal_xc['kernel_source'] is not None}; "
+                          "runtime/physical validation: False")
+            self.show(f"Basis selection: {manifest['basis_selection']['number']} [{manifest['basis_selection']['id']}]; data: {manifest['basis_validation']['status']}; runtime validated: False")
+            gapw = manifest['method_profile']['gapw']
+            if gapw:
+                self.show(f"All-electron automatic setup: {gapw['profile']} v{gapw['profile_version']}; not convergence certification")
+                for item in gapw['automatic_settings']:
+                    self.show(f"  {item['setting']} = {item['value']}: {item['reason']}")
+                self.show('Preserved user settings: '+', '.join(gapw['preserved']))
+            self.show(f"Basis files: {', '.join(manifest['method_profile']['basis_files'])}")
+            if settings.basis_overrides:
+                self.show(f"Element basis overrides: {format_basis_overrides(settings.basis_overrides)}")
+            if settings.scf == 'ot':
+                self.show(f"OT ALGORITHM: {manifest['method_profile']['ot_algorithm']}; selection: {settings.ot_algorithm or 'auto'}")
+            self.show("SCF wavefunction restart backups: 0; restart writing is not disabled")
+            self.show(f"Restart suggestion (metadata only, inactive): {manifest['restart_template']['filename']}")
+            self.show(f"SCF: {settings.scf}; Effective EPS_SCF: {manifest['effective_eps_scf']}; Poisson: {manifest['poisson_solver']}")
+            self.show(f"Generated cell [angstrom]: {manifest['generated_structure']['cell']}")
+            self.show(f"Coordinates translated: {manifest['coordinates_translated']}")
+            for element, kind in manifest['kinds'].items():
+                potential_label = "nuclear potential" if kind['basis_kind_type'] == 'all-electron' else "pseudopotential"
+                self.show(f"{element}: basis={kind['basis']}; {potential_label}={kind['potential']}")
+                self.show(f"  Selection: {kind['basis_number']} [{kind['basis_id']}]; ORB; {kind['data_validation']}")
+                if kind['basis_kind_type'] == 'all-electron':
+                    self.show(f"  Nuclear charge Z={kind['nuclear_charge']} [{kind['nuclear_charge_source']}]; explicit electrons={kind['explicit_electrons']}; basis/potential q=not applicable")
+                else:
+                    self.show(f"  q: basis={kind['basis_q']}; potential={kind['potential_q']} [{kind['potential_q_source']}]; pairing={kind['protocol_pairing']}")
+                self.show(f"  Basis file: {kind['basis_file']}; potential approximation: {kind['potential_approximation']}")
+                self.show(f"  Potential file: {kind['potential_file']}")
+                for role in ('basis', 'potential'):
+                    source = kind[role+'_source']
+                    if source:
+                        self.show(f"  {role} source: {source['path']}:{source['entry_line']}; sha256={source['sha256']}; data version={source['data_version'] or 'unknown'}")
+                if kind.get('initial_magnetization') is not None:
+                    self.show(f"  Initial MAGNETIZATION: {kind['initial_magnetization']}; element: {kind['element']}")
+            self.show(f"Effective density output: electron={manifest['density_output']['electron_density']}, "
+                      f"spin={manifest['density_output']['spin_density']}, stride={manifest['density_output']['stride']}")
         for warning in manifest["warnings"]:
             self.show(f"Warning: {warning}")
         self.show(f"Input path: {Path(values['output']).resolve()}")

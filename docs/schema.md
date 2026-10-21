@@ -36,6 +36,11 @@ Quantity:
 ```
 
 Energy fields: segment, index, nullable step, quantity, and its associated scf_converged.
+Total FORCE_EVAL records accept `[a.u.]` and `[hartree]` unit labels
+(case-insensitive); both serialize as `hartree` without numerical conversion.
+Original evidence retains the printed label. Unsupported units and malformed
+records remain unparsed; energy extraction alone does not imply convergence.
+This compatibility fix does not change schema 0.1.0.
 SCF counts use iteration; wall_time uses s; coordinates/cells use angstrom.
 Settings retain original strings, source, and nullable unit; unknown semantics are
 not automatically converted to numbers.
@@ -178,7 +183,8 @@ Schema remains 0.1.0; analysis/CSV and existing config/replay names are unchange
 
 - settings.functional uses one of 15 canonical non-hybrid IDs (PBESOL, REVPBE,
   R2SCAN, B97M-RV, BEEFVDW, etc.). Documented aliases normalize on generation;
-  previous names remain accepted. No hybrid or xTB profile is enabled.
+  previous names remain accepted. No hybrid or xTB XC profile is enabled;
+  xTB is a separate method branch since 0.3.1.
 - method_profile adds family, xc_components (ordered emitted Libxc subsections;
   empty for native/parametrized shortcuts), native_shortcut, pbe_parametrization,
   exact_exchange_fraction=0.0, kinetic_energy_density and generator_scope.
@@ -371,7 +377,8 @@ unchanged. Missing settings in old configs default to off.
   indices/ranges are sorted deterministically; off/none/0 normalize to off.
   Hidden selections remain requests, not evidence of emitted constraints.
 - constraints.enabled: true only when GEO_OPT/CELL_OPT has a nonempty, validated
-  selection. Active constraints currently require target 2026.2.
+  selection. DFT active constraints require target 2026.2; the separate xTB
+  branch uses audited target-specific references on checked 2024.2-2026.2 releases.
 - constraints.fixed_atoms: ordered expanded active indices, [] when disabled.
   Bounds are checked against the loaded structure before expansion. Inactive
   selections are not expanded and are checked when optimization becomes active.
@@ -411,6 +418,51 @@ manifest/review and optional JSON; the default writer still creates input only.
 - No trajectory cadence or filename override is imposed. SCF and MOTION each
   explicitly set backup count 0, without disabling restart writing.
   Static keyword/naming checks are not native acceptance or convergence proof.
+
+## Generated input JSON: GFN-xTB branch (software 0.3.1)
+
+Schema remains 0.1.0; analysis contracts are unchanged. Consumers of generator
+JSON must branch on settings.method (absent in old configs means DFT) /
+method_profile.family before interpreting DFT-specific fields.
+
+- settings adds method (DFT/GFN1-xTB/GFN0-xTB/GFN2-xTB), tblite_available Boolean
+  and xtb_accuracy (positive dimensionless, default 1.0). Raw inactive DFT
+  defaults are retained; they are not an effective xTB basis/XC/grid.
+- method_profile for xTB records family=GFN-xTB, model, upstream_number 30/31/32,
+  qs_method=XTB, backend, backend_version=null, tblite_required/user_asserted,
+  self_consistent, solver, scc_mixer, convergence_control, intrinsic_dispersion,
+  accuracy/unit/accuracy_role, effective_max_scf, parameter_source and data_validation.
+  version_compatibility records legacy_gfn1, legacy/new parameter filename,
+  modern_tblite, extxyz and target-specific tagged-source URLs/SHA-256 hashes.
+  Additive gfn2_ot_enabled is a generator-policy Boolean: true only for target
+  2026.2, not a detected runtime capability. Legacy GFN2 OT requests are rejected
+  before publication; explicit diag remains required on 2025.2/2026.1. Build/runtime flags
+  remain false. count_reference records native/tblite source hashes and the
+  reference tblite version; expected_data_sha256 records pinned native files.
+  Source reference versions do not establish an installed version.
+- explicit_electron_count subtracts charge from model reference occupations;
+  electron_count_model=xtb_reference_occupation and electron_reference_counts
+  records each element. valence_electron_count=null: these are not GTH valences.
+- basis_selection id/number are null (registry_version stays 1),
+  basis_validation.status=not_applicable; kinds is empty. poisson_solver=null.
+  GPW/GAPW XC, nonlocal, kernel and density objects are not reused for xTB.
+- effective_eps_scf=null and effective_max_scf=null for non-SCC GFN0.
+  GFN1/2 record emitted CP2K SCF thresholds/limits. GFN2 OT uses CP2K EPS_SCF
+  for orbital convergence. Only 2026.2 diagonalization/native SCC uses ACCURACY
+  for SCC convergence (not equivalent to EPS_SCF). On 2026.2 OT, accuracy_role
+  is numerical setup only; legacy GFN2 targets have accuracy/unit/role=null and
+  emit no ACCURACY/SCC_MIXER keyword. Default raw xtb_accuracy stays 1.0.
+- data_sources records checked native model/D3 absolute paths/byte hashes;
+  emitted_data_files.xtb records actual runtime filenames. data_validation is
+  source_bytes_checked or unverified_template for native models, backend_unchecked
+  for tblite built-ins. Source-byte checking does not certify a parameter model.
+- Source/generated structures, angstrom geometry, coordinate translation,
+  constraints, wavefunction_output, motion_output, input_text/input_sha256,
+  references and warnings retain their meanings. xTB constraints.keyword_reference
+  uses the selected target's tagged definition/hash. All writing still uses the
+  shared non-destructive publication policy.
+- Initial model/task/spin/PBC restrictions are in the
+  [xTB guide](input-generation.md#gfn-xtb-methods-031). No calculation is executed.
 
 ## Cube check JSON
 

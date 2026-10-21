@@ -131,6 +131,24 @@ port or evidence of validation with the actual software.
   and BEEF-vdW LMKLL are intrinsic, not extra pair dispersion; none retains them.
   Kernel byte/hash checks do not validate numerical kernels. Keep kernel sources
   protected and consistent across CDD components; never invent potential tags/q.
+- 0.3.1 xTB is a separate method branch: chooser 30 GFN1 / 31 GFN0 / 32 GFN2
+  matches Multiwfn; existing DFT chooser positions and basis IDs stay unchanged.
+  140 model / 141 tblite assertion / 142 ACCURACY (2026.2 only). GFN1 targets
+  checked releases 2024.2-2026.2; GFN0 starts at 2025.1, GFN2/tblite at 2025.2.
+  Never pretend unavailable upstream backends work. Keep H-Rn, isolated Gamma
+  closed-shell ENERGY/ENERGY_FORCE/GEO_OPT. Use model reference
+  occupations, intrinsic dispersion and pinned native parameter bytes; no GTH q,
+  XC/grid/Poisson or density/CDD reuse. GFN0 is non-SCC; GFN1 and target-2026.2
+  GFN2 OT use FULL_SINGLE_INVERSE and EPS_SCF. GFN2 OT is blocked on legacy
+  2025.2/2026.1 after a local 2026.1 crash; 2025.2 is conservatively restricted,
+  not runtime validated. Require explicit diag (320/--scf diag), never silently
+  change the solver or treat a target version as a binary upgrade. Legacy
+  GFN2 uses TBLITE T without new backend/mixer/accuracy keywords; 2026.2 native
+  SCC with diag uses ACCURACY, while OT uses it for numerical setup only.
+  Fixed-atom references/data filenames/hashes are target-specific for xTB;
+  EXTXYZ starts at 2026.1. GFN2 requires an explicit tblite build assertion.
+  Hidden incompatible DFT requests fail until
+  explicitly reset. Source checks/build assertions never establish native validation.
 - Do not start expensive calculations. Actual CP2K validation requires explicit
   authorization and a new run directory.
 - For failed-job diagnosis, load `qchem-error-diagnosis`, collect software/version

@@ -41,6 +41,10 @@ Registered modules include `src/cp2kkit/inputgen.py` (generation),
 `src/cp2kkit/method_profiles.py` (inspected parametrized-PBE/Libxc RPBE/q/reference branches),
 `src/cp2kkit/functional_registry.py` (0.3.0 non-hybrid XC/component/nonlocal
 assembly, including Libxc-backed meta-GGAs and BEEFVDW's internal PW92 requirement),
+`src/cp2kkit/xtb.py` (0.3.1 GFN-xTB chooser/model/backend assembly, CP2K model
+reference counts and file-byte identities, no numerical parameter payload),
+`src/cp2kkit/xtb_versions.py` (tagged 2024.2-2026.2 source hashes/capability checks,
+not bundled upstream code or a claim of native runtime validation),
 and `src/cp2kkit/input_tui.py` / `src/cp2kkit/input_editor.py` (numbered interaction
 and selected inspected upstream main-menu IDs, not a full Fortran UI port).
 Menu 9 fixed atoms references the inspected index/range workflow and
