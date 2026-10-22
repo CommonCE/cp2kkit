@@ -1,6 +1,6 @@
 # CP2K input generation
 
-This guide describes cp2kkit **0.3.2**. Older defaults and migration notes are in
+This guide describes cp2kkit **0.3.3**. Older defaults and migration notes are in
 [the changelog](../CHANGELOG.md). AE automatic setup is described in
 [the basis guide](basis-selection.md#all-electron-automatic-setup-027).
 The [registry-v1 basis guide](basis-selection.md) defines permanent numbering toward
@@ -409,9 +409,9 @@ charge. Integrals are not fragment net charge transfer. See [cube checks](cube.m
 |---|---|
 | Structure | `.xyz`/`.extxyz`/text `.restart`/`.gjf`/`.com`/`.cif`/POSCAR/CONTCAR/`.vasp`/`.poscar`; XYZ last frame |
 | Task | ENERGY (default), ENERGY_FORCE, GEO_OPT, CELL_OPT |
-| Method | Quickstep/GPW; 15 non-hybrid profiles plus PBE0/HSE06/B3LYP direct HFX at target 2026.2; per-profile limits below; PBE default |
+| Method | Quickstep/GPW; 15 non-hybrid profiles plus six direct-HFX hybrid profiles at target 2026.2; per-profile limits below; PBE default |
 | Basis | DZVP-MOLOPT-SR-GTH (default); SZV-SR, DZVP/TZVP/TZV2P non-SR; target 2026.2 adds TZVP-SR/TZV2P-SR/TZV2PX and explicit element overrides |
-| Potential | Catalog-checked GTH entries with fixed `-qN`; prefer actual matched functional, then standard hybrid family (B3LYP: BLYP; PBE0/HSE06: PBE); other unmatched profiles require explicit PBE approval |
+| Potential | Catalog-checked GTH entries with fixed `-qN`; prefer actual matched functional, then standard hybrid family (B3LYP: BLYP; other hybrids: PBE); other unmatched profiles require explicit PBE approval |
 | Dispersion | none (default), D3, D3(BJ); dftd3.dat and REFERENCE_FUNCTIONAL |
 | Charge/spin | Default charge 0; automatic multiplicity: even electrons 1, odd electrons 2; explicit values override; UKS for multiplicity > 1 or explicit magnetic request |
 | SCF | OT+FULL_ALL/DIIS+outer SCF (default), or diagonalization+Broyden mixing |
@@ -500,8 +500,9 @@ Standard-library readers preserve original hashes and do not run Gaussian/VASP/M
 ## Direct-HFX hybrids (0.3.2)
 
 PBE0 → HSE06 → B3LYP are implemented through the same generator, not an external
-executable or a second input writer. Target **2026.2** only. BHandHLYP, M06-2X,
-configurable PBEh and arbitrary hybrid mixtures remain deferred.
+executable or a second input writer. Version **0.3.3** extends this shared path
+with BHandHLYP, M06-2X and configurable PBEh. Target **2026.2** only;
+arbitrary XC mixtures remain unsupported.
 
 | Capability | Initial hybrid scope |
 |---|---|
@@ -510,21 +511,23 @@ configurable PBEh and arbitrary hybrid mixtures remain deferred.
 | Spin | RKS, UKS (explicit multiplicity or magnetic seeds); no automatic spin change |
 | Boundary | NONE or XYZ; source PBC/cell preserved; low-dimensional PBC rejected |
 | k-points / SCF | Gamma only; OT or diagonalization; no smearing |
-| Dispersion | none, D3 or D3(BJ), with the exact named functional reference |
+| Dispersion | PBE0/HSE06/B3LYP: none/D3/D3(BJ); M06-2X: none/D3 (reference M062X); BHandHLYP/PBEh: none only |
 | Density | Existing GPW electron/spin cubes and explicit whole/A/B CDD inputs; reference states and actual cube-grid compatibility still need validation |
 | Excluded | GAPW/AE, +U, UZH-PBE0/custom orbital protocols, ADMM, RI-HFX, non-Gamma, correlated methods |
 
-`FUNCTIONALS` retains the original 15 entries, then appends PBE0/HSE06/B3LYP.
+`FUNCTIONALS` retains the original 15 entries, then PBE0/HSE06/B3LYP,
+then BHANDHLYP/M06-2X/PBEH (canonical IDs; names are case-insensitive).
 The method chooser **1/110** uses local positions **16/17/18** (not a claim of
-Multiwfn number equivalence); xTB remains **30/31/32**. Menu **120** edits the
-three direct-HFX numerical controls in sequence. **121/122 remain planned**:
+Multiwfn number equivalence), then **19/20/21** for the added profiles;
+xTB remains **30/31/32**. Menu **120** edits the three direct-HFX numerical
+controls in sequence, followed by the HF fraction for PBEh only. **121/122 remain planned**:
 RI-HFX and ADMM are not enabled by selecting a hybrid. Basis IDs are unchanged;
 UZH-PBE0 30-32 remain unavailable pending their own paired-data/protocol audit.
 
 ### Complete XC/HF definitions
 
-All components use native CP2K XC; no Libxc assertion is required for these
-three definitions. HFX requires a suitable Libint-enabled target build; this
+The first three definitions use native CP2K XC without a Libxc assertion.
+BHandHLYP and M06-2X require `--libxc-available` (menu **113**). HFX requires a suitable Libint-enabled target build; this
 tool neither probes nor certifies the build.
 
 | Profile | Semilocal XC | HF |
@@ -532,17 +535,28 @@ tool neither probes nor certifies the build.
 | PBE0 | PBE SCALE_X=0.75, SCALE_C=1.0 | FRACTION=0.25 |
 | HSE06 | XWPBE SCALE_X=-0.25, SCALE_X0=1.0, OMEGA=0.11; PBE SCALE_X=0.0, SCALE_C=1.0 | FRACTION=0.25, SHORTRANGE OMEGA=0.11 |
 | B3LYP | LYP SCALE_C=0.81; BECKE88 SCALE_X=0.72; VWN FUNCTIONAL_TYPE=VWN3, SCALE_C=0.19; XALPHA SCALE_X=0.08 | FRACTION=0.20 |
+| BHandHLYP | Libxc HYB_GGA_XC_BHANDHLYP (already includes semilocal mixing) | FRACTION=0.50 |
+| M06-2X | Libxc HYB_MGGA_X_M06_2X + MGGA_C_M06_2X (no extra scaling) | FRACTION=0.54 |
+| PBEh | PBE SCALE_X=(1-A), SCALE_C=1.0 | FRACTION=A, explicit 0 < A <= 1 |
 
 HSE06's ω is **0.11 bohr⁻¹**, consistently in both XC and HF. B3LYP deliberately
 uses **VWN3**, matching the inspected Multiwfn/Gaussian convention, not the native
 B3LYP shortcut's implicit variant. Do not compare different B3LYP definitions as
 though they were identical. Fractions and ω are method definitions, not exposed
-tuning controls; configurable PBEh is a later feature.
+tuning controls except for the separate PBEh family. PBEh requires explicit
+`--pbeh-fraction A` (dimensionless, not percent), with no inferred default.
+Zero HF is deliberately outside this hybrid path: select PBE instead.
+A retained PBEh fraction fails on any other DFT/xTB method until explicitly
+reset (API/config null; TUI PBEh menu 120 auto). XC, HF and manifest use one
+resolved profile; no Libxc coefficient or HF contribution is double-counted.
+M06-2X uses kinetic-energy density; retained 400/55 Ry cutoffs are not grid
+convergence evidence. BHandHLYP/PBEh extra dispersion remains blocked:
+no unverified BHLYP alias or fixed-fraction D3 parameter is assumed.
 
 ### Interaction operator, radius and resources
 
-- Isolated PBE0/B3LYP: explicit **COULOMB**, no radius or truncated-gamma table.
-- XYZ PBE0/B3LYP: explicit **TRUNCATED**. Auto radius:
+- Isolated global hybrids: explicit **COULOMB**, no radius or truncated-gamma table.
+- XYZ global hybrids: explicit **TRUNCATED**. Auto radius:
   `min(6 angstrom, minimum cell face spacing / 2.01)`, referencing Multiwfn.
   Perpendicular face spacings, not cell-vector lengths, handle skew cells;
   bounds use the cell rounded to the actual emitted eight decimal places.
@@ -571,8 +585,9 @@ basename and warn that CP2K must resolve it at runtime. Byte checks do not
 validate the numerical table. HSE06/isolated global hybrids do not require it.
 
 Since 0.3.2, actual matched hybrid potential entries are preferred if supplied;
-otherwise **B3LYP uses GTH-BLYP**, and **PBE0/HSE06 use GTH-PBE** as standard
-semilocal-family choices, matching Multiwfn. These three family choices do not
+otherwise **B3LYP uses GTH-BLYP**, and **the other five hybrids use GTH-PBE**
+as standard semilocal-family choices, matching the inspected Multiwfn branches.
+These family choices do not
 require `--allow-pbe-potential` / **114**. If the required family/q entry is
 missing, fail without crossing families, changing q, or inventing labels (even
 when PBE approximation approval is enabled). Other functional approval policies
@@ -591,6 +606,10 @@ cp2kkit generate-input solid.extxyz -o solid-pbe0.inp \
   --hf-eps-schwarz 1e-7 --data-dir /path/to/cp2k/data
 cp2kkit generate-input water.xyz -o water-b3lyp-opt.inp --periodic NONE \
   --functional B3LYP --run-type GEO_OPT
+cp2kkit generate-input water.xyz -o water-m062x.inp --periodic NONE \
+  --functional M06-2X --libxc-available --dispersion d3
+cp2kkit generate-input water.xyz -o water-pbeh.inp --periodic NONE \
+  --functional PBEh --pbeh-fraction 0.45
 ```
 
 The existing staged .inp/optional exclusive JSON writer and CDD bundle collision

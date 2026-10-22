@@ -8,6 +8,7 @@ from pathlib import Path
 from .data_catalog import BASIS_ROWS, POTENTIAL_ROWS, catalog_rows as _rows
 from .errors import KitError
 from .structure import ELEMENTS, ELEMENT_ORDER
+from .hybrid import resolve_functional
 from .basis_registry import basis_option, parse_basis
 from .basis_resolution import BasisResolver, alternatives
 from .functional_registry import (FUNCTIONAL_PROFILES, FUNCTIONALS, HYBRID_POTENTIAL_FAMILIES,
@@ -92,12 +93,12 @@ def electron_model(settings, elements, pseudo_valences):
 
 
 def resolve_method(settings, elements, valences, kind_specs=None):
-    profile = FUNCTIONAL_PROFILES[settings.functional]
+    profile = resolve_functional(settings)
     all_electron, valences = electron_model(settings, elements, valences)
     if settings.dispersion not in profile.dispersion:
         raise KitError(f'No checked {settings.dispersion} combination for {settings.functional}; '
                        'required nonlocal correlation is intrinsic, not an extra pair correction')
-    if profile.exact_exchange_fraction:
+    if profile.hybrid:
         if (all_electron or settings.kpoints != (1, 1, 1) or settings.run_type == 'CELL_OPT'
                 or settings.dft_plus_u or settings.smearing is not None):
             raise KitError(f'{settings.functional} direct HFX currently supports GPW Gamma '
@@ -169,7 +170,7 @@ def resolve_method(settings, elements, valences, kind_specs=None):
         definition = ('uses Libxc '+ ' + '.join(profile.components)) if profile.components else 'uses a native shortcut requiring Libxc internally (LDA_C_PW)'
         warnings.append(f'{settings.functional} {definition}. '
                         'Libxc build support is user-asserted, not probed or runtime-validated.')
-    if profile.family == 'meta-GGA':
+    if profile.kinetic_energy_density:
         warnings.append('Meta-GGA uses kinetic-energy density. Independently converge XC/grid and SCF thresholds, '
                         'including low-density regions; the retained 400/55 Ry defaults are not convergence evidence.')
     if profile.nonlocal_type:
@@ -185,8 +186,10 @@ def resolve_method(settings, elements, valences, kind_specs=None):
     return profile, overrides, records, warnings
 
 
-def xc_lines(functional):
-    profile = FUNCTIONAL_PROFILES[functional]
+def xc_lines(functional, profile=None):
+    profile = profile or FUNCTIONAL_PROFILES[functional]
+    if profile.hybrid and profile.exact_exchange_fraction is None:
+        raise KitError('PBEH XC rendering requires an explicit resolved fraction')
     if profile.xc_parameters:
         return ['      &XC_FUNCTIONAL',
                 *(line for component, parameters in profile.xc_parameters

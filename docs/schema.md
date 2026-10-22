@@ -177,10 +177,10 @@ Fields/units/schema 0.1.0 are unchanged.
 - syntax_reference_checked/runtime_validated describe density-print validation,
   not certification of the entire generator.
 
-## Generated input JSON: direct HFX (software 0.3.2)
+## Generated input JSON: direct HFX (software 0.3.2, extended in 0.3.3)
 
 Software 0.3.2 retains this schema: standard hybrid family potentials record
-`kinds.*.potential_functional=BLYP` for B3LYP or `PBE` for PBE0/HSE06, with
+`kinds.*.potential_functional=BLYP` for B3LYP or `PBE` for the other five hybrids, with
 `potential_approximation=true` (not an exact-hybrid potential). The existing
 `method_profile.potential_approximations` list includes affected elements even
 though family selection no longer requires explicit approximation approval.
@@ -190,16 +190,24 @@ Actual exact-hybrid entries remain preferred and set the flag false.
 Schema remains **0.1.0**; these are additive generator settings/profile metadata,
 not changes to analysis records. Legacy configurations default new fields.
 
-- settings.functional additionally accepts PBE0, HSE06 and B3LYP (chooser 16/17/18).
+- settings.functional additionally accepts PBE0/HSE06/B3LYP (16/17/18) and,
+  since 0.3.3, BHANDHLYP/M06-2X/PBEH (19/20/21). settings.pbeh_fraction
+  defaults to null; PBEH requires an explicit finite dimensionless value in
+  (0, 1]. Other DFT/xTB methods reject non-null values.
   settings.hf_eps_schwarz defaults to 1e-6, hf_memory to 512 [MiB per MPI process],
   hf_cutoff_radius to null (automatic, angstrom). Nondefault controls on pure
   DFT/xTB fail instead of silently being ignored. Method definitions (fraction,
   HSE06 omega, VWN3) are not arbitrary user-editable XC fragments.
-- Hybrid method_profile.family is hybrid-GGA; exact_exchange_fraction is 0.25
-  for PBE0/HSE06 or 0.20 for B3LYP; native_shortcut=null, xc_backend=CP2K-native,
-  libxc_required=false. xc_components retains its Libxc-only meaning (empty);
+- Hybrid method_profile.family is hybrid-GGA (M06-2X: hybrid-meta-GGA,
+  kinetic_energy_density=true); exact_exchange_fraction is 0.25
+  for PBE0/HSE06, 0.20 for B3LYP, 0.50 for BHANDHLYP, 0.54 for M06-2X,
+  or the requested PBEH fraction. native_shortcut=null. BHANDHLYP/M06-2X use
+  xc_backend=Libxc, libxc_required=true and ordered xc_components; other hybrids
+  use CP2K-native, libxc_required=false and empty xc_components.
   **xc_parameters** records ordered native component names and keyword/value
-  strings, including VWN FUNCTIONAL_TYPE=VWN3. generator_scope records the
+  strings, including VWN FUNCTIONAL_TYPE=VWN3 and effective PBEH SCALE_X/SCALE_C
+  (empty for the two Libxc hybrids). dispersion_reference is M062X for
+  M06-2X D3, rather than its canonical profile ID. generator_scope records the
   bounded GPW/classic/Gamma/NONE-or-XYZ task policy.
 - Hybrid-only method_profile.hfx records algorithm=direct_four_center, fraction,
   interaction_potential=COULOMB/TRUNCATED/SHORTRANGE; omega and omega_unit
@@ -227,7 +235,7 @@ Schema remains 0.1.0; analysis/CSV and existing config/replay names are unchange
 
 - settings.functional uses one of 15 canonical non-hybrid IDs (PBESOL, REVPBE,
   R2SCAN, B97M-RV, BEEFVDW, etc.). Documented aliases normalize on generation;
-  previous names remain accepted. Software 0.3.2 additionally enables three
+  previous names remain accepted. Software 0.3.3 enables six
   hybrid IDs as documented above; xTB is a separate method branch since 0.3.1.
 - method_profile adds family, xc_components (ordered emitted Libxc subsections;
   empty for native/parametrized shortcuts), native_shortcut, pbe_parametrization,

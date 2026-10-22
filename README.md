@@ -2,7 +2,7 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.3.2 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.3.3 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 - Analysis remains read-only: no submission/execution or modification of existing
@@ -26,13 +26,15 @@ requires tblite. Delivery is staged with target-version/data/combination checks;
 upstream defaults and correlated methods are not enabled automatically.
 Version 0.3.0 implements the 15 non-hybrid DFT profiles below. Version 0.3.1
 adds the three GFN-xTB methods. Version 0.3.2 adds PBE0, HSE06 and B3LYP direct-HFX
-input generation; BHandHLYP, M06-2X and configurable PBEh remain deferred.
+input generation; version 0.3.3 adds BHandHLYP, M06-2X and configurable PBEh.
+All 21 referenced DFT selections now have bounded generation support; this is
+not full Multiwfn feature/combination coverage.
 
-## Current version: 0.3.2
+## Current version: 0.3.3
 
-### PBE0, HSE06 and B3LYP input generation
+### Six direct-HFX hybrid profiles
 
-The shared CLI/API/TUI generator now supports these three hybrids for target
+The shared CLI/API/TUI generator now supports these six hybrid profiles for target
 **CP2K 2026.2**, with classic MOLOPT/UCL GPW bases, Gamma points, NONE/XYZ PBC,
 ENERGY/ENERGY_FORCE/GEO_OPT, RKS or collinear UKS, and OT or diagonalization
 without smearing. DFT+U, GAPW, CELL_OPT, non-Gamma, ADMM, RI-HFX and UZH-PBE0
@@ -41,13 +43,20 @@ protocols remain outside this initial hybrid scope.
 - **PBE0**: 25% HF + 75% PBE exchange + full PBE correlation.
 - **HSE06**: 25% short-range HF with matching XC/HF ω=0.11 bohr⁻¹.
 - **B3LYP**: 20% HF and explicit **VWN3**, the Gaussian/Multiwfn convention.
-- Isolated global hybrids use full Coulomb HFX; periodic PBE0/B3LYP use truncated
+- **BHandHLYP**: Libxc HYB_GGA_XC_BHANDHLYP + 50% HF.
+- **M06-2X**: Libxc HYB_MGGA_X_M06_2X + MGGA_C_M06_2X + 54% HF;
+  kinetic-energy-density/grid convergence needs independent checking.
+- **PBEh**: explicit `--pbeh-fraction A`, dimensionless `0 < A <= 1`, no default;
+  `(1-A)` PBE exchange + full PBE correlation + `A` HF. Use PBE for zero HF.
+- The two new Libxc profiles require `--libxc-available`; M06-2X permits D3,
+  not D3(BJ). BHandHLYP/PBEh currently permit no extra pair dispersion.
+- Isolated global hybrids use full Coulomb HFX; periodic global hybrids use truncated
   Coulomb HFX. Automatic radius is min(6 angstrom, minimum cell face spacing/2.01),
   including skew cells. Converge radius/supercell separately.
-- Chooser **1/110** appends **16 PBE0 / 17 HSE06 / 18 B3LYP** without changing
-  the original 15 or xTB 30/31/32. Menu **120** edits direct-HFX controls.
+- Chooser **1/110** appends **16 PBE0 / 17 HSE06 / 18 B3LYP / 19 BHandHLYP / 20 M06-2X / 21 PBEh** without changing
+  the original 15 or xTB 30/31/32. Menu **120** edits direct-HFX controls and the explicit PBEh fraction when selected.
 - Prefer real exact-hybrid potential entries when supplied; otherwise use
-  **GTH-BLYP for B3LYP** and **GTH-PBE for PBE0/HSE06** automatically (0.3.2).
+  **GTH-BLYP for B3LYP** and **GTH-PBE for all five other hybrids** automatically.
   These standard semilocal-family potentials need no approximation approval;
   provenance still distinguishes them from exact-hybrid potentials. Missing family
   entries fail without cross-family or q substitution. No auxiliary bases are invented.
@@ -404,7 +413,7 @@ See [input generation](docs/input-generation.md).
 
 Supported: ENERGY/ENERGY_FORCE/GEO_OPT/CELL_OPT subject to the
 [per-profile limits](docs/input-generation.md#non-hybrid-xc-profiles-030), 15 non-hybrid
-XC profiles plus the three [bounded direct-HFX hybrids](docs/input-generation.md#direct-hfx-hybrids-032),
+XC profiles plus the six [bounded direct-HFX hybrid profiles](docs/input-generation.md#direct-hfx-hybrids-032),
 MOLOPT-GTH, checked D3/D3(BJ) combinations, charge/multiplicity,
 cell/PBC, OT/diagonalization, and k-points on the existing semilocal paths.
 For target CP2K **2026.2**, explicit Hubbard Ueff/L and collinear magnetic initial

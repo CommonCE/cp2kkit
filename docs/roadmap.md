@@ -1,6 +1,24 @@
 # Development status and next steps
 
-Current software: **0.3.2**; schema: **0.1.0**.
+Current software: **0.3.3**; schema: **0.1.0**.
+
+## Remaining direct-HFX profiles implemented (0.3.3)
+
+- Add BHandHLYP (50% HF), M06-2X (54% HF, kinetic-energy density), and PBEh
+  (explicit dimensionless fraction in (0,1], no default) at chooser 19/20/21.
+- Require Libxc assertion for the two fixed Libxc hybrids; preserve existing
+  bounded direct-HFX tasks/models/operators, family potentials and writers.
+- M06-2X permits D3 with reference M062X, not D3(BJ); BHandHLYP/PBEh permit
+  no extra pair correction pending a separate parameter/identity audit.
+- All 21 Multiwfn-referenced DFT selections now have bounded generation paths;
+  this is not full Multiwfn feature parity, native acceptance or scientific validation.
+- CLI/TUI/config/replay/CDD use the same effective XC/HF definition. No calculations.
+- User-authorized fresh comparison: Multiwfn 2026.10.18, 64 pairs/128 successful
+  generator processes, 62 policy-adjusted matches. Two M06-2X-D3 inputs differ
+  in upstream reference key (M06-2X versus checked CP2K 2026.2 M062X); other
+  checked semantics/data match in 64/64. High-precision PBEh allows documented
+  upstream rounding, not exact fraction identity. 48 negative CLI checks and
+  479 regression tests passed; no native CP2K calculation or acceptance test.
 
 ## Hybrid family-potential correction (0.3.2)
 
@@ -173,7 +191,7 @@ copy automatic physical changes, unchecked parameters or direct writes blindly.
 MP2/RPA/GW, double hybrids and other non-XC methods remain separate later scopes.
 The non-hybrid subset is implemented in 0.3.0 below; 0.3.1 adds xTB before
 hybrids at the user's request. Version 0.3.2 now adds PBE0/HSE06/B3LYP;
-BHandHLYP, M06-2X and configurable PBEh remain deferred. Default PBE input
+version 0.3.3 adds BHandHLYP, M06-2X and configurable PBEh. Default PBE input
 physics is unchanged.
 
 ### 0.3.1 implemented GFN-xTB scope
@@ -527,7 +545,7 @@ old default, or emitting target-version-unsupported keywords without checking.
    0.3.1 adds the bounded GFN-xTB branch; 0.3.2 adds the first three direct-HFX hybrids;
    initial GAPW/all-electron bases were added in 0.2.7. Remaining: broader meta-GGA
    model/task support, native/scientific UZH validation, UZH-PBE0,
-   remaining hybrid profiles, broader HFX combinations, ADMM/RI-HFX, auxiliary and additional all-electron bases/families/
+   broader HFX combinations, ADMM/RI-HFX, auxiliary and additional all-electron bases/families/
    q policies, correlated wavefunctions, semiempirical/force fields and SCF options.
 4. **Tasks:** frequencies/vibrations/Raman, MD, dimer TS, BAND/NEB, NMR, polarizability,
    BSSE, real-time electrons, PIMD, XAS, appropriate TDDFT.

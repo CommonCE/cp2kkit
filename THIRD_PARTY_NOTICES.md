@@ -41,7 +41,8 @@ Registered modules include `src/cp2kkit/inputgen.py` (generation),
 `src/cp2kkit/method_profiles.py` (inspected parametrized-PBE/Libxc RPBE/q/reference branches),
 `src/cp2kkit/functional_registry.py` (0.3.0 non-hybrid XC/component/nonlocal
 assembly, including Libxc-backed meta-GGAs and BEEFVDW's internal PW92 requirement;
-0.3.2 native PBE0/HSE06/B3LYP XC composition),
+0.3.2 native PBE0/HSE06/B3LYP XC composition; 0.3.3 BHandHLYP/M06-2X
+Libxc definitions and explicit-fraction PBEh assembly),
 `src/cp2kkit/hybrid.py` (0.3.2 direct-HFX operator/fraction/radius/resource assembly,
 including explicit VWN3, no ADMM/RI-HFX or numerical table payload),
 `src/cp2kkit/xtb.py` (0.3.1 GFN-xTB chooser/model/backend assembly, CP2K model

@@ -8,6 +8,40 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.3.3
+
+- Add BHandHLYP (50% HF), M06-2X (54% HF) and explicit-fraction PBEh through
+  the shared direct-HFX generator; append chooser 19/20/21. Original DFT/xTB
+  positions, basis IDs, physical defaults and protected writers are retained.
+- BHandHLYP/M06-2X require --libxc-available. Emit their complete Libxc
+  components and explicit HF, without double scaling. M06-2X records tau
+  dependence and grid-convergence warnings.
+- PBEh requires --pbeh-fraction A (dimensionless 0 < A <= 1; no default).
+  Derive complementary PBE exchange/full correlation and HF from one profile.
+  Reject malformed/non-finite/out-of-range or inactive retained fractions.
+  Menu 120, CLI, config, replay and CDD share the same parameter/identity.
+- Target remains CP2K 2026.2, GPW classic MOLOPT/UCL Gamma NONE/XYZ,
+  ENERGY/ENERGY_FORCE/GEO_OPT, RKS/UKS and OT/diag without smearing or +U.
+  Prefer matched potentials; otherwise all three new profiles use GTH-PBE,
+  retaining approximation warnings and fixed q. No ADMM/RI-HFX or UZH-PBE0.
+- M06-2X permits D3 (reference M062X), not D3(BJ); BHandHLYP/PBEh extra pair
+  dispersion remains blocked pending a separate parameter/identity audit.
+- Software 0.3.2 -> 0.3.3 is explicitly designated by the user; schema remains 0.1.0.
+  Legacy configs default pbeh_fraction to null. All 21 referenced DFT choices
+  now have bounded generation support, not full Multiwfn combination parity.
+- Validation: 117 focused tests and 479 full regression tests passed; compileall,
+  CLI version check and diff whitespace checks passed.
+- User-authorized fresh generator comparison against Multiwfn 2026.10.18:
+  64 pairs, all 128 generator processes exited 0. 62 pairs matched under documented
+  numerical/default policies; two M06-2X-D3 cases retain an upstream reference-key
+  mismatch (Multiwfn M06-2X versus the checked CP2K 2026.2 key M062X).
+  All other checked XC/HF/data/geometry/task/spin/solver settings matched in 64/64.
+  PBEh high-precision comparison explicitly allows upstream five-decimal rounding,
+  not exact fraction identity. All 48 invalid-combination/overwrite checks passed.
+  Raw inputs, commands, stdin, logs, hashes and JSON/CSV summaries are retained in
+  test-workspace/hybrid-remaining-0.3.3-20261022-125352-T48M5s/.
+  No CP2K execution, native acceptance, convergence or scientific-validation claim.
+
 ## 0.3.2
 
 ### Family-potential correction (version retained by explicit user request)

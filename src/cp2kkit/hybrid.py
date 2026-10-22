@@ -4,16 +4,20 @@ XC/HF composition and periodic radius policy reference Multiwfn outCP2Kinp;
 keywords/units are checked against CP2K v2026.2. See feature provenance.
 """
 import math
+from dataclasses import replace
 from pathlib import Path
 
 from .cp2k_data import cp2k_path
 from .errors import KitError
+from .functional_registry import FUNCTIONAL_PROFILES
 from .io import read_text
 from .structure import check_cell
 
 
-HFX_FIELDS = ('hf_eps_schwarz', 'hf_memory', 'hf_cutoff_radius')
+HFX_FIELDS = ('hf_eps_schwarz', 'hf_memory', 'hf_cutoff_radius', 'pbeh_fraction')
 HFX_SOURCE_HASHES = {
+    'xc/xc_libxc.F': '5c7d6d9e1aa6664297e761407530fb1eb5057db87bb38876920f0cedb9ef5e45',
+    'xc/xc_libxc_wrap.F': 'fc0eb02140f09001de9ca35c69589ddefe4ffcf2d84f3fe359d97e6deb0ee40b',
     'input_cp2k_check.F': 'e1f26b06bbc6121a31f9c50c4056dbe43f08a328425c46010566b4e6555ccb5d',
     'input_cp2k_xc.F': '332cda33e1d90c5e3002fcc1e965633d009f28caadbc98c188474cd26e314e3b',
     'input_cp2k_hfx.F': '468ef8c01d0285e2341617d9df269dd3eb227c7006da14937f17acad2db7177f',
@@ -33,6 +37,21 @@ def finite_real(value):
         return False
 
 
+def resolve_functional(settings):
+    """Resolve PBEh once so XC, HF and metadata use the same explicit fraction."""
+    profile = FUNCTIONAL_PROFILES[settings.functional]
+    fraction = settings.pbeh_fraction
+    if settings.functional != 'PBEH':
+        if fraction is not None:
+            raise KitError('pbeh_fraction requires PBEH; reset it explicitly for other DFT methods')
+        return profile
+    if not finite_real(fraction) or not 0 < fraction <= 1:
+        raise KitError('PBEH requires explicit pbeh_fraction in (0, 1]; use PBE for zero HF exchange')
+    return replace(profile, exact_exchange_fraction=fraction,
+                   xc_parameters=(('PBE', (('SCALE_X', format(1-fraction, '.17g')),
+                                           ('SCALE_C', '1.0'))),))
+
+
 def validate_hfx_controls(settings, profile):
     """Reject malformed or inactive explicit requests before any file publication."""
     eps = settings.hf_eps_schwarz
@@ -43,7 +62,7 @@ def validate_hfx_controls(settings, profile):
     radius = settings.hf_cutoff_radius
     if radius is not None and (not finite_real(radius) or radius <= 0):
         raise KitError('hf_cutoff_radius must be finite and positive [angstrom], or auto/None')
-    if not profile.exact_exchange_fraction and (eps != 1e-6 or settings.hf_memory != 512 or radius is not None):
+    if not profile.hybrid and (eps != 1e-6 or settings.hf_memory != 512 or radius is not None):
         raise KitError('Explicit HF controls require a supported hybrid functional; restore defaults explicitly')
 
 
@@ -58,8 +77,10 @@ def cell_heights(cell):
 
 def resolve_hfx(settings, profile, periodic, cell, data_root):
     """Return effective metadata and warnings; data checks are read-only byte checks."""
-    if not profile.exact_exchange_fraction:
+    if not profile.hybrid:
         return None, []
+    if profile.exact_exchange_fraction is None:
+        raise KitError('PBEH HFX rendering requires an explicit resolved fraction')
     if periodic not in {'NONE', 'XYZ'}:
         raise KitError('Direct HFX currently supports periodic NONE or XYZ only; low-dimensional PBC requires a separate audit')
     warnings = ['Direct four-center HFX requires a suitable Libint-enabled CP2K build; build/runtime support is not probed. '
@@ -125,7 +146,7 @@ def resolve_hfx(settings, profile, periodic, cell, data_root):
 def hf_lines(hfx):
     if hfx is None:
         return []
-    lines = ['      &HF', f"        FRACTION {hfx['fraction']:.12g}",
+    lines = ['      &HF', f"        FRACTION {hfx['fraction']!r}",
              '        &SCREENING', f"          EPS_SCHWARZ {hfx['eps_schwarz']:.17g}",
              '          SCREEN_ON_INITIAL_P F', '        &END SCREENING',
              '        &INTERACTION_POTENTIAL', f"          POTENTIAL_TYPE {hfx['interaction_potential']}"]

@@ -11,17 +11,22 @@ from unittest.mock import patch
 
 from cp2kkit.cli import build_parser
 from cp2kkit.errors import KitError, OutputExists
-from cp2kkit.functional_registry import FUNCTIONALS, parse_functional
+from cp2kkit.functional_registry import FUNCTIONAL_PROFILES, FUNCTIONALS, parse_functional
 from cp2kkit.hybrid import cell_heights
 from cp2kkit.input_editor import FIELDS, applicable_entries
-from cp2kkit.input_tui import command_arguments, parse_value, run_interactive
+from cp2kkit.input_tui import command_arguments, parse_value, run_interactive, visible_fields
 from cp2kkit.inputgen import InputSettings, generate_input, write_input
 from cp2kkit.structure import read_structure
 from tests.synthetic_cp2k_data import basis_entry, potential_entry
 from tests.test_input_tui import TTY
 
 
-HYBRIDS = ('PBE0', 'HSE06', 'B3LYP')
+HYBRIDS = ('PBE0', 'HSE06', 'B3LYP', 'BHANDHLYP', 'M06-2X', 'PBEH')
+
+
+def controls(functional):
+    return {'libxc_available': True} if functional in {'BHANDHLYP', 'M06-2X'} else (
+        {'pbeh_fraction': .45} if functional == 'PBEH' else {})
 
 
 class HybridTests(unittest.TestCase):
@@ -39,7 +44,8 @@ class HybridTests(unittest.TestCase):
         os.environ.pop('CP2K_DATA_DIR', None)
 
     def generate(self, functional='PBE0', structure=None, **kwargs):
-        return generate_input(structure or self.water, replace(self.settings, functional=functional, **kwargs))
+        return generate_input(structure or self.water, replace(self.settings, functional=functional,
+                                                              **(controls(functional) | kwargs)))
 
     def periodic(self, cell=None):
         return replace(self.water, cell=cell or [[20., 0., 0.], [0., 20., 0.], [0., 0., 20.]], pbc=[True]*3)
@@ -60,9 +66,67 @@ class HybridTests(unittest.TestCase):
             self.assertEqual(parse_functional(f.lower()), f)
             self.assertEqual(parse_value(FIELDS['functional'], f.lower()), f)
             self.assertEqual(parse_value(FIELDS['functional'], str(FUNCTIONALS.index(f)+1)), f)
-        for f in ('PBEh', 'M06-2X', 'BHandHLYP', 'HSE03', 'PBE0\n&HF'):
+        for f in ('HSE03', 'BHandH', 'PBE0\n&HF'):
             with self.assertRaises(ValueError):
                 parse_functional(f)
+
+    def test_new_libxc_compositions_require_build_assertion(self):
+        for functional, fraction, components in (
+                ('BHANDHLYP', .5, ('HYB_GGA_XC_BHANDHLYP',)),
+                ('M06-2X', .54, ('HYB_MGGA_X_M06_2X', 'MGGA_C_M06_2X'))):
+            with self.assertRaisesRegex(KitError, 'Libxc-enabled'):
+                self.generate(functional, libxc_available=False)
+            text, report = self.generate(functional)
+            for component in components:
+                self.assertIn('&'+component+'\n', text)
+            self.assertNotIn('SCALE_X', text)
+            self.assertNotIn('          SCALE ', text)  # Libxc already includes semilocal mixing.
+            model = report['method_profile']
+            self.assertEqual(model['exact_exchange_fraction'], fraction)
+            self.assertEqual(model['hfx']['fraction'], fraction)
+            self.assertEqual(model['xc_backend'], 'Libxc')
+            self.assertEqual(model['kinetic_energy_density'], functional == 'M06-2X')
+            if functional == 'M06-2X':
+                self.assertTrue(any('kinetic-energy density' in w for w in report['warnings']))
+
+    def test_pbeh_fraction_required_bounded_and_not_silently_reused(self):
+        self.assertIsNone(FUNCTIONAL_PROFILES['PBEH'].exact_exchange_fraction)
+        from cp2kkit.method_profiles import xc_lines
+        with self.assertRaisesRegex(KitError, 'explicit resolved fraction'):
+            xc_lines('PBEH')
+        for value in (None, 0, -1, 1.01, True, '0.45', float('nan'), float('inf'), 10**400):
+            with self.subTest(value=value), self.assertRaisesRegex(KitError, 'explicit pbeh_fraction'):
+                self.generate('PBEH', pbeh_fraction=value)
+        for value in (.01, .25, .45, .123456789012345, 1.):
+            text, report = self.generate('PBEH', pbeh_fraction=value)
+            model = report['method_profile']
+            self.assertEqual(model['hfx']['fraction'], value)
+            self.assertEqual(model['exact_exchange_fraction'], value)
+            self.assertAlmostEqual(float(model['xc_parameters'][0]['parameters']['SCALE_X'])+value, 1.)
+            self.assertIn('FRACTION '+repr(value)+'\n', text)
+            self.assertIn('SCALE_C 1.0', text)
+        for functional in HYBRIDS[:-1]+('PBE',):
+            with self.assertRaisesRegex(KitError, 'requires PBEH'):
+                self.generate(functional, pbeh_fraction=.45)
+        with self.assertRaisesRegex(KitError, 'DFT/density requests'):
+            generate_input(self.water, InputSettings(method='GFN1-xTB', periodic='NONE', pbeh_fraction=.45))
+        output = self.root/'protected.inp'
+        output.write_text('retain previous input\n')
+        with self.assertRaises(KitError):
+            write_input(self.water, replace(self.settings, functional='PBEH'), output)
+        self.assertEqual(output.read_text(), 'retain previous input\n')
+
+    def test_pbeh_menu_fraction_replay_and_visibility(self):
+        self.assertIn('pbeh_fraction', [f.name for f in visible_fields(
+            (FIELDS['pbeh_fraction'],), asdict(replace(self.settings, functional='PBEH')))])
+        output = self.root/'pbeh-tui.inp'
+        log = TTY()
+        code = run_interactive(str(self.source), -1, str(output), replace(InputSettings(periodic='NONE'), write_json=True),
+                               stdin=TTY('1\n21\n120\n\n\n\n0.45\nr\n\n0\n'), stdout=log, plain=True)
+        self.assertEqual(code, 0, log.getvalue())
+        report = json.loads(Path(str(output)+'.json').read_text())
+        self.assertEqual(report['settings']['pbeh_fraction'], .45)
+        self.assertIn('Direct HFX: fraction=0.45', log.getvalue())
 
     def test_pbe0_complete_composition_and_metadata(self):
         text, report = self.generate()
@@ -133,7 +197,7 @@ class HybridTests(unittest.TestCase):
             self.assertFalse(stack)
 
     def test_periodic_global_hybrid_truncation_auto_and_explicit(self):
-        for f in ('PBE0', 'B3LYP'):
+        for f in ('PBE0', 'B3LYP', 'BHANDHLYP', 'M06-2X', 'PBEH'):
             text, report = self.generate(f, self.periodic(), periodic='XYZ')
             self.assertIn('POTENTIAL_TYPE TRUNCATED', text)
             self.assertIn('CUTOFF_RADIUS [angstrom] 6', text)
@@ -184,7 +248,8 @@ class HybridTests(unittest.TestCase):
                     self.generate(f, **changes)
 
     def test_family_potentials_and_matched_real_file_preference(self):
-        for f, family in (('PBE0', 'PBE'), ('HSE06', 'PBE'), ('B3LYP', 'BLYP')):
+        for f, family in (('PBE0', 'PBE'), ('HSE06', 'PBE'), ('B3LYP', 'BLYP'),
+                          ('BHANDHLYP', 'PBE'), ('M06-2X', 'PBE'), ('PBEH', 'PBE')):
             for approval in (False, True):
                 text, report = self.generate(f, allow_pbe_potential=approval)
                 self.assertIn('POTENTIAL GTH-'+family+'-q6', text)
@@ -254,10 +319,16 @@ class HybridTests(unittest.TestCase):
     def test_dispersion_whitelist_complete_reference_and_no_double_correction(self):
         for f in HYBRIDS:
             for dispersion in ('none', 'd3', 'd3bj'):
+                if dispersion not in FUNCTIONAL_PROFILES[f].dispersion:
+                    with self.assertRaisesRegex(KitError, 'No checked'):
+                        self.generate(f, dispersion=dispersion)
+                    continue
                 text, report = self.generate(f, dispersion=dispersion)
                 self.assertEqual(text.count('&VDW_POTENTIAL\n'), int(dispersion != 'none'))
                 if dispersion != 'none':
-                    self.assertIn('REFERENCE_FUNCTIONAL '+f, text)
+                    reference = 'M062X' if f == 'M06-2X' else f
+                    self.assertIn('REFERENCE_FUNCTIONAL '+reference, text)
+                    self.assertEqual(report['method_profile']['dispersion_reference'], reference)
                 self.assertFalse(report['nonlocal_correlation']['enabled'])
                 self.assertEqual(text.count('      &HF\n'), 1)
 
@@ -265,7 +336,7 @@ class HybridTests(unittest.TestCase):
         for f in HYBRIDS:
             output = self.root/(f+'.inp')
             settings = replace(self.settings, functional=f, allow_pbe_potential=False,
-                               write_json=True, hf_memory=768, hf_eps_schwarz=2e-7)
+                               write_json=True, hf_memory=768, hf_eps_schwarz=2e-7, **controls(f))
             argv = command_arguments(self.source, -1, output, settings)
             args = build_parser().parse_args(argv[3:])
             self.assertEqual(args.hf_memory, 768)
@@ -284,7 +355,7 @@ class HybridTests(unittest.TestCase):
 
     def test_tui_method_choices_parameters_review_and_visibility(self):
         for f in HYBRIDS:
-            values = asdict(replace(self.settings, functional=f))
+            values = asdict(replace(self.settings, functional=f, **controls(f)))
             entries = applicable_entries(values)
             self.assertIn(120, {e.number for e in entries})
             self.assertNotIn(114, {e.number for e in entries})
@@ -320,7 +391,7 @@ class HybridTests(unittest.TestCase):
         for f in HYBRIDS:
             settings = replace(self.settings, functional=f, periodic='XYZ', density_difference=True,
                                fragment_a_indices='1', fragment_a_charge=0, fragment_a_multiplicity=3,
-                               fragment_b_charge=0, fragment_b_multiplicity=1)
+                               fragment_b_charge=0, fragment_b_multiplicity=1, **controls(f))
             text, report = generate_input(self.periodic(), settings)
             components = report['density_difference']['components']
             for component in components.values():

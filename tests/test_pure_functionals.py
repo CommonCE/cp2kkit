@@ -70,7 +70,7 @@ class PureFunctionalTests(unittest.TestCase):
     def test_registry_exact_scope_and_original_order(self):
         self.assertEqual(FUNCTIONALS[:15], ('PBE', 'BLYP', 'PBESOL', 'REVPBE', 'RPBE', 'PADE', 'BP86',
                                        'TPSS', 'REVTPSS', 'SCAN', 'R2SCAN', 'MN15L', 'HLE17', 'B97M-RV', 'BEEFVDW'))
-        self.assertEqual({name for name, p in FUNCTIONAL_PROFILES.items() if p.libxc}, set(COMPONENTS) | {'BEEFVDW'})
+        self.assertEqual({name for name, p in FUNCTIONAL_PROFILES.items() if p.libxc and not p.exact_exchange_fraction}, set(COMPONENTS) | {'BEEFVDW'})
 
     def test_aliases_are_shared_by_cli_tui_config_and_api(self):
         field = next(f for _, group in GROUPS for f in group if f.name == 'functional')
@@ -89,13 +89,13 @@ class PureFunctionalTests(unittest.TestCase):
         self.assertEqual(parse_value(field, '1'), 'PBE')
         self.assertEqual(parse_value(field, '5'), 'RPBE')
 
-    def test_deferred_hybrid_xtb_arbitrary_and_injected_functionals_stay_unavailable(self):
-        for value in ('BHandHLYP', 'PBEh', 'M06-2X', 'GFN0-xTB', 'GFN2-xTB', 'OLYP', 'B97M-V',
+    def test_deferred_xtb_arbitrary_and_injected_functionals_stay_unavailable(self):
+        for value in ('PBEh', 'GFN0-xTB', 'GFN2-xTB', 'OLYP', 'B97M-V',
                       'PBE\n&HF', '', None, 1, ['PBE']):
             with self.subTest(value=value), self.assertRaises(KitError):
                 self.generate(value)
         with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as cm:
-            main(['generate-input', str(self.source), '-o', str(self.output), '--functional', 'PBEh'])
+            main(['generate-input', str(self.source), '-o', str(self.output), '--functional', 'OLYP'])
         self.assertEqual(cm.exception.code, 2)
         self.assertFalse(self.output.exists())
 
@@ -191,7 +191,7 @@ class PureFunctionalTests(unittest.TestCase):
 
     def test_meta_nonlocal_scope_rejects_ae_cellopt_kpoints_and_u(self):
         for functional, profile in FUNCTIONAL_PROFILES.items():
-            if not profile.restricted:
+            if not profile.restricted or profile.exact_exchange_fraction:
                 continue
             for kwargs in ({'basis': 'ae-pob-tzvp'}, {'run_type': 'CELL_OPT'},
                            {'kpoints': (2, 2, 2), 'scf': 'diag'}, {'dft_plus_u': (('O', 1, 2.),)}):
@@ -362,7 +362,7 @@ class PureFunctionalTests(unittest.TestCase):
             visible = {f.name for f in visible_fields(fields, values)}
             self.assertEqual('libxc_available' in visible, profile.libxc)
             self.assertEqual('allow_pbe_potential' in visible,
-                             functional not in {'PBE', 'BLYP', 'PBE0', 'HSE06', 'B3LYP'})
+                             functional not in {'PBE', 'BLYP', 'PBE0', 'HSE06', 'B3LYP', 'BHANDHLYP', 'M06-2X', 'PBEH'})
 
     def test_cdd_all_components_share_xc_and_nonlocal_identity(self):
         for functional in ('PADE', 'BP86', 'R2SCAN', 'B97M-RV', 'BEEFVDW'):

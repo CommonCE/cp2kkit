@@ -282,8 +282,10 @@ def edit_entry(menu, values, entry):
             except ValueError as exc:
                 menu.show(f'Invalid input: {exc}')
     elif entry.editor == 'hybrid':
-        menu.show('Direct HFX only; no automatic ADMM/RI-HFX. Radius applies only to periodic PBE0/B3LYP; auto clears it.')
+        menu.show('Direct HFX only; no automatic ADMM/RI-HFX. Radius applies only to periodic global hybrids; auto clears it.')
         for name in HFX_FIELDS:
+            if name == 'pbeh_fraction' and values.get('functional') != 'PBEH':
+                continue
             values[name] = menu.edit(FIELDS[name], values[name], values)
     elif entry.editor == 'source':
         edit_source(menu, values, entry.field)

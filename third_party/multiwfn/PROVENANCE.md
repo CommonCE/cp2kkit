@@ -4,6 +4,118 @@ This records facts, not permission inferred from labels such as "reference-based
 or "rewritten in another language". Prefer version/file/subroutine/SHA-256;
 line numbers are auxiliary. Do not invent upstream commits, inspection dates, or grants.
 
+## Remaining direct-HFX profiles (0.3.3)
+
+- Local: functional_registry.py, hybrid.py resolve_functional, method_profiles.py,
+  inputgen.py and shared CLI/TUI/editor/config/replay. Append chooser 19/20/21
+  for BHANDHLYP/M06-2X/PBEH without changing prior IDs or basis numbers.
+- Rechecked Multiwfn **2026.10.1**, cp2kmate.f90/outCP2Kinp, development locator
+  ../Multiwfn_2026.10.1_src_Linux/cp2kmate.f90; SHA-256
+  f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402.
+  Actual references: menu/fraction prompt 933-1000, potential default 1557-1572,
+  PBEh/BHandHLYP/M06-2X XC definitions 2047-2090 and HF fractions 2179-2184.
+  Reference-based Python assembly; no Fortran port/payload is distributed.
+- BHandHLYP uses HYB_GGA_XC_BHANDHLYP plus explicit HF=0.50; M06-2X uses
+  HYB_MGGA_X_M06_2X + MGGA_C_M06_2X plus HF=0.54. Both require a user Libxc
+  build assertion. Libxc already includes the semilocal mixing: no additional
+  0.50/0.46 XC scaling. M06-2X records kinetic-energy density and grid warnings.
+- Local Libxc **7.0.0** under the supplied CP2K tree tools/toolchain/build:
+  src/hyb_gga_xc_b1wc.c defines BHandHLYP B88/LYP with half-exchange parameter,
+  distinct from BHandH/BHLYP; SHA-256
+  2d5929a4d5ef090cdaecae29bb6ccc5177f7677c8d4f894630aa5347c6188948.
+  src/hyb_mgga_x_m05.c defines M06-2X with intrinsic semilocal mixing and 0.54
+  exact exchange; SHA-256
+  eaf08381d7f16370a46bced3bdf449a663aa089b263264bafcf749814bd387b5.
+  src/mgga_c_m06l.c defines MGGA_C_M06_2X; SHA-256
+  c02a638cc808d14798afaed2d706eaef00415cd5ac43830d7f89986deb8dc45a.
+  No Libxc implementation/parameter arrays are bundled.
+- Additional official v2026.2 raw-source hashes rechecked against local bytes:
+  xc/xc_libxc.F
+  5c7d6d9e1aa6664297e761407530fb1eb5057db87bb38876920f0cedb9ef5e45;
+  xc/xc_libxc_wrap.F
+  fc0eb02140f09001de9ca35c69589ddefe4ffcf2d84f3fe359d97e6deb0ee40b.
+  libxc_add_sections registers named components; RKS/UKS info/derivative paths
+  treat HYB_MGGA as tau-dependent. They do not replace the explicit HF section.
+  These tagged URLs/hashes join existing HFX source metadata.
+  Target-version manual subsection URLs returned 404; the older 2023.2
+  HYB_MGGA_X_M06_2X manual was only a cross-check, not the target-version contract.
+- PBEh differs from upstream's percentage prompt: explicit dimensionless
+  --pbeh-fraction in (0,1], no default; use PBE for zero HF. Derive PBE
+  SCALE_X=1-A, SCALE_C=1.0 and HF=A together, without upstream five-decimal
+  output truncation. Non-null fractions on other methods fail until reset.
+- Preserve target-2026.2 classic GPW/Gamma/NONE-or-XYZ direct-HFX task/solver
+  scope and protected writers. Prefer actual matched potentials; otherwise
+  all three use GTH-PBE per the upstream default branch, with approximation
+  warnings, fixed q and existing source identities. No UZH-PBE0/ADMM/RI-HFX.
+- Dispersion differs conservatively from upstream's unrestricted menu: M06-2X
+  permits only none/D3; emit REFERENCE_FUNCTIONAL M062X, the exact key in the
+  previously hashed qs_dispersion_utils.F zero-damping table. No BJ entry.
+  PBEh has no universal fixed-fraction parameters; BHandHLYP's potential BHLYP
+  alias identity is not assumed. Both currently allow only none. Existing
+  PBE0/HSE06/B3LYP dispersion policies are unchanged.
+- Both required Multiwfn papers remain in input/JSON headers. Existing custom
+  [terms](TERMS.md), absent separate grants and licensing limitations remain.
+  Method references: Libxc's Becke 1993/ Gaussian implementation reference for
+  BHandHLYP and Zhao/Truhlar 2008 M06 suite reference. No clean-room, relicensing,
+  paid-distribution, native compatibility or full-Multiwfn-parity claim.
+- Initial implementation validation: synthetic coefficients/nesting, bounded and inactive fraction
+  requests, Libxc assertions, periodic operators, tasks/solvers/spin, CLI/TUI/
+  replay/config, CDD identity and protected publication; read-only source hashes.
+  No CP2K, Multiwfn or Libxc execution, native input acceptance, convergence,
+  derivative accuracy or scientific property validation in this round.
+
+### User-authorized 0.3.3 generator comparison
+
+- Version explicitly designated **0.3.3**, replacing the preliminary unreleased
+  0.4.0 assignment. Historical test artifacts were not relabeled or overwritten.
+- Fresh cp2kkit 0.3.3 and actual Multiwfn **2026.10.18** binary (banner checked
+  in all 64 paired runs), at one Multiwfn thread each. This is not execution
+  of the referenced 2026.10.1 development source; binary/source/settings hashes
+  are recorded independently.
+- Local ignored evidence directory:
+  `test-workspace/hybrid-remaining-0.3.3-20261022-125352-T48M5s/`.
+  identity.json records binary/settings/source/data/fixture/Python identities;
+  case-matrix.json, summary.json/csv, matrix-results.json and per-case comparison.json
+  preserve the complete matrix. Four earlier pilot pairs and their initial
+  mismatch are retained separately, excluded from 64-pair counts.
+- H/O water geometry fixtures, DZVP-MOLOPT-SR-GTH, q1/q6 GTH-PBE; target 2026.2,
+  CUTOFF/REL_CUTOFF 400/55 Ry. All three profiles: NONE/XYZ, ENERGY/ENERGY_FORCE/
+  GEO_OPT with OT/diag, q=0/multiplicity=1 or q=+1/multiplicity=2 UKS and skew
+  XYZ cell. M06-2X D3 covers NONE/XYZ; PBEh additionally covers explicit fractions
+  0.01/0.25/0.50/0.75/1.0 and a high-precision fraction.
+- All **128 generator processes exited 0**. **62/64 pairs match under documented
+  policies**; no unknown discrepancies. BHandHLYP 17/17, M06-2X 17/19, PBEh 28/28.
+  Both remaining cases are M06-2X-D3: Multiwfn emits
+  `REFERENCE_FUNCTIONAL M06-2X`, cp2kkit emits `M062X`.
+  The hashed CP2K 2026.2 qs_dispersion_utils.F qs_scaling_dftd3 uppercases the
+  explicit reference without removing hyphens and has CASE("M062X"), not
+  CASE("M06-2X"). Preserve this mismatch, not an unverified alias equivalence.
+  CP2K was not executed to demonstrate runtime behavior.
+- All other checked XC/HF coefficients/components, selected numerical basis/
+  potential payloads/q, geometry/cell/PBC, tasks/spin/solver/grid and cp2kkit
+  manifest-version/family/approximation settings pass in 64/64. Full inputs are
+  not byte-identical. EPS_SCF, initial-P screening, per-rank HF memory and radius
+  precision retain the earlier documented local policies.
+- PBEh uses fraction versus upstream percent, explicit SCALE_C=1 versus the
+  checked CP2K default=1 when omitted. CP2K input_cp2k_xc.F 855-862 verifies
+  SCALE_X/C defaults. The high-precision request 0.123456789012345 produces
+  upstream HF=0.12346 / PBE exchange=0.87654 versus cp2kkit's preserved fraction
+  and complementary exchange. This is documented rounding, not exact method
+  parameter identity; the comparison explicitly uses upstream print resolution.
+- **48/48 fresh negative CLI checks passed**, including absent Libxc assertion,
+  absent/invalid/inactive PBEh fractions, unsupported scope/dispersion and bad HF
+  controls. Existing sentinel inputs remained unchanged; no JSON sidecars created.
+  **117 focused / 479 full regression tests passed**, with no skips; compileall,
+  version, link/file and diff checks are separate software checks.
+- Each generator ran in a fresh directory with 15 s wall / 10 s CPU, 4 GiB
+  address-space and 8 MiB per-output-file limits. Full argv/stdin/stdout/stderr/
+  exit/timing records and input diffs are retained. No data file, generated
+  input or binary modification was needed to obtain these results.
+- This establishes bounded real-generator/data comparison, not native CP2K/Libxc
+  evaluation, syntax acceptance, convergence, force accuracy or scientific
+  validation. No calculation/submission, licensing grant or full-Multiwfn-parity
+  claim. Existing custom terms and both required papers remain unchanged.
+
 ## Direct-HFX hybrid implementation (0.3.2)
 
 ### Fixed source and actual reference use

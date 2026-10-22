@@ -4,8 +4,9 @@
 
 **Partially implemented: 0.3.0 delivers 15 non-hybrid DFT profiles; 0.3.1 adds
 all three GFN-xTB models; 0.3.2 adds PBE0, HSE06 and B3LYP direct-HFX input
-generation within the bounded initial scope.** BHandHLYP, M06-2X and configurable
-PBEh remain deferred. See the [implemented capability matrix](input-generation.md#non-hybrid-xc-profiles-030).
+generation within the bounded initial scope. Version 0.3.3 adds BHandHLYP,
+M06-2X and explicit-fraction PBEh.** All 21 profiles now have bounded generation
+support, not unrestricted combination coverage or native validation. See the [implemented capability matrix](input-generation.md#non-hybrid-xc-profiles-030).
 This plan alone authorizes no calculations, installation, further version/default
 changes, commit or push. Later release assignments remain to be agreed.
 
@@ -124,7 +125,7 @@ or scientific validation. Stage 5 is delivered in 0.3.1 for isolated closed-shel
 ENERGY/ENERGY_FORCE/GEO_OPT only. Stage 4 is partially delivered in 0.3.2:
 PBE0/HSE06/B3LYP, direct HFX, target 2026.2, GPW classic MOLOPT/UCL Gamma
 NONE/XYZ ENERGY/ENERGY_FORCE/GEO_OPT without +U or smearing. Broader xTB scope,
-remaining hybrids, ADMM/RI-HFX and stage 6 expansion remain future work; the initial capability
+version 0.3.3 adds the remaining three hybrid profiles. ADMM/RI-HFX and stage 6 expansion remain future work; the initial capability
 matrix is already documented. The list retains the series-level audit goals.
 
 1. **Inventory and registry:** use the fixed upstream menu as the acceptance
@@ -186,9 +187,9 @@ Their XC/HF pieces alone do not implement their correlation energy. PM6,
 SCC-DFTB and FIST also remain separate. Referencing Multiwfn does not make all
 menu entries, arbitrary q changes, external execution or submission in scope.
 
-### 0.3.2 hybrid implementation boundary
+### Hybrid implementation boundary (0.3.2, extended in 0.3.3)
 
-The first three hybrid profiles are now enabled in CLI/API/TUI/config/replay,
+The first three hybrid profiles were enabled in 0.3.2 CLI/API/TUI/config/replay,
 including ordered native XC definitions, direct four-center HF and source/hash
 metadata. See the [hybrid capability matrix](input-generation.md#direct-hfx-hybrids-032).
 No Libxc assertion is needed for these native definitions; a suitable Libint
@@ -199,6 +200,14 @@ bohr^-1. EPS_SCHWARZ/memory/radius have explicit controls at menu 120.
 121/122, UZH-PBE0 30-32 and auxiliary bases remain unavailable, not implicitly
 enabled by this feature. Default pure-DFT input text is unchanged. No CP2K
 calculation, syntax acceptance, convergence or property validation in this round.
+
+Version 0.3.3 adds BHandHLYP/M06-2X (Libxc assertion required, 50%/54% HF)
+and explicit-fraction PBEh (dimensionless (0,1], no default) at chooser 19-21.
+The same bounded direct-HFX task/model/operator/data policy applies. M06-2X
+permits D3 with reference M062X, not D3(BJ); BHandHLYP/PBEh extra pair
+corrections remain blocked pending parameter/identity checks. All 21 DFT
+selections have generation paths, not native/scientific validation or unrestricted
+Multiwfn parity. No ADMM/RI-HFX or auxiliary protocol is implicitly enabled.
 
 ## 7. Additional references
 

@@ -161,6 +161,15 @@ port or evidence of validation with the actual software.
   MiB per MPI process, not total job memory. Keep SCREEN_ON_INITIAL_P F;
   require/protect/hash t_c_g.dat when a data directory is supplied for TRUNCATED.
   Nondefault hidden HF controls fail on pure DFT/xTB until reset.
+- 0.3.3 appends hybrid chooser 19 BHandHLYP / 20 M06-2X / 21 PBEh.
+  Preserve the bounded 0.3.2 direct-HFX scope. The two fixed Libxc hybrids
+  require an explicit build assertion; do not double-scale semilocal mixing.
+  M06-2X is tau-dependent, allows D3 with reference M062X, not D3(BJ).
+  PBEh requires explicit dimensionless pbeh_fraction in (0,1], no default;
+  derive XC/HF/metadata together, reject retained fractions on other methods.
+  Use PBE for zero HF. BHandHLYP/PBEh allow no extra dispersion pending audit.
+  All three use the upstream default GTH-PBE family, preserving approximation
+  metadata/fixed q and actual matched-entry preference. No full-parity claim.
 - Do not start expensive calculations. Actual CP2K validation requires explicit
   authorization and a new run directory.
 - For failed-job diagnosis, load `qchem-error-diagnosis`, collect software/version

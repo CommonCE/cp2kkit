@@ -19,14 +19,24 @@ class FunctionalProfile:
     nonlocal_type: str | None = None
     kernel_file: str | None = None
     nonlocal_parameters: tuple[float, ...] = ()
-    exact_exchange_fraction: float = 0.0
+    exact_exchange_fraction: float | None = 0.0
     omega: float | None = None  # bohr^-1; fixed HSE06 definition, not HSE03.
     xc_parameters: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = ()
+
+    dispersion_reference: str | None = None
+
+    @property
+    def hybrid(self):
+        return self.family in {'hybrid-GGA', 'hybrid-meta-GGA'}
+
+    @property
+    def kinetic_energy_density(self):
+        return self.family in {'meta-GGA', 'hybrid-meta-GGA'}
 
     @property
     def restricted(self):
         """Initial 0.3.0 GPW/Gamma/non-cell-opt subset, not a CP2K-wide limit."""
-        return self.family == 'meta-GGA' or self.nonlocal_type is not None
+        return self.kinetic_energy_density or self.nonlocal_type is not None
 
 
 # Preserve the original five chooser positions; new entries are appended.
@@ -61,10 +71,17 @@ FUNCTIONAL_PROFILES = {
         xc_parameters=(('LYP', (('SCALE_C', '0.81'),)), ('BECKE88', (('SCALE_X', '0.72'),)),
                        ('VWN', (('FUNCTIONAL_TYPE', 'VWN3'), ('SCALE_C', '0.19'))),
                        ('XALPHA', (('SCALE_X', '0.08'),)))),
+    'BHANDHLYP': FunctionalProfile(libxc=True, family='hybrid-GGA', dispersion=('none',),
+        exact_exchange_fraction=0.5, components=('HYB_GGA_XC_BHANDHLYP',)),
+    'M06-2X': FunctionalProfile(libxc=True, family='hybrid-meta-GGA', dispersion=('none', 'd3'), dispersion_reference='M062X',
+        exact_exchange_fraction=0.54, components=('HYB_MGGA_X_M06_2X', 'MGGA_C_M06_2X')),
+    # No fixed/default fraction: resolution requires an explicit user request.
+    'PBEH': FunctionalProfile(family='hybrid-GGA', dispersion=('none',), exact_exchange_fraction=None),
 }
 # Standard semilocal-family GTH choices when no exact hybrid entry is available.
 # Multiwfn outCP2Kinp uses BLYP for B3LYP and PBE for PBE0/HSE06.
-HYBRID_POTENTIAL_FAMILIES = {'PBE0': 'PBE', 'HSE06': 'PBE', 'B3LYP': 'BLYP'}
+HYBRID_POTENTIAL_FAMILIES = {'PBE0': 'PBE', 'HSE06': 'PBE', 'B3LYP': 'BLYP',
+                             'BHANDHLYP': 'PBE', 'M06-2X': 'PBE', 'PBEH': 'PBE'}
 FUNCTIONALS = tuple(FUNCTIONAL_PROFILES)
 ALIASES = {'LDA': 'PADE', 'BP': 'BP86', 'MN15-L': 'MN15L', 'BEEF-VDW': 'BEEFVDW'}
 

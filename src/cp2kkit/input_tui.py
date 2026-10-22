@@ -59,6 +59,7 @@ GROUPS = (
         Field('tblite_available', 'Assert target CP2K has tblite linked (not detected)', 'bool'),
         Field('xtb_accuracy', 'CP2K 2026.2 tblite ACCURACY (dimensionless; role depends on solver)', 'float', positive=True),
         Field("functional", "Functional (GPW/GTH or GAPW/ALL)", choices=FUNCTIONALS),
+        Field('pbeh_fraction', 'PBEh HF fraction (0 < fraction <= 1; not percent; auto clears)', 'float', optional=True, positive=True),
         Field('hf_eps_schwarz', 'Direct HFX EPS_SCHWARZ (0 < threshold < 1)', 'float', positive=True),
         Field('hf_memory', 'HFX MAX_MEMORY [MiB per MPI process, not total job memory]', 'int', minimum=1),
         Field('hf_cutoff_radius', 'Periodic global-hybrid radius [angstrom] (auto: min(6, face spacing/2.01))', 'float', optional=True, positive=True),
@@ -139,7 +140,8 @@ def visible_fields(fields, values):
     non_scf = values.get('method') == 'GFN0-xTB'
     return tuple(f for f in fields
                  if not (xtb and f.name in dft_only)
-                 and not (f.name in HFX_FIELDS and not getattr(FUNCTIONAL_PROFILES.get(values.get('functional')), 'exact_exchange_fraction', 0))
+                 and not (f.name == 'pbeh_fraction' and values.get('functional') != 'PBEH')
+                 and not (f.name in HFX_FIELDS and not getattr(FUNCTIONAL_PROFILES.get(values.get('functional')), 'hybrid', False))
                  and not (non_scf and f.name in {'scf', 'eps_scf', 'max_scf', 'max_outer_scf', 'ot_algorithm'})
                  and not (f.name == 'xtb_accuracy' and values.get('cp2k_version') != '2026.2')
                  and not (f.name in {'tblite_available', 'xtb_accuracy'} and values.get('method') != 'GFN2-xTB')

@@ -129,6 +129,7 @@ class InputSettings:
     hf_eps_schwarz: float = 1e-6
     hf_memory: int = 512  # MiB per MPI process, not total job memory.
     hf_cutoff_radius: float | None = None  # angstrom, periodic global hybrids only.
+    pbeh_fraction: float | None = None  # Explicit dimensionless HF fraction in (0, 1], PBEH only.
 
     @classmethod
     def from_config(cls, values, source_version=None):
@@ -529,11 +530,11 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
         if s.smearing is not None:
             lines += ["      &SMEAR", "        METHOD FERMI_DIRAC", f"        ELECTRONIC_TEMPERATURE [K] {num(s.smearing)}", "      &END SMEAR"]
     lines += ['      &PRINT', '        &RESTART', '          BACKUP_COPIES 0',
-              '        &END RESTART', '      &END PRINT', '    &END SCF', '    &XC', *xc_lines(s.functional), *hf_lines(hfx)]
+              '        &END RESTART', '      &END PRINT', '    &END SCF', '    &XC', *xc_lines(s.functional, method_profile), *hf_lines(hfx)]
     if s.dispersion != "none":
         lines += ["      &VDW_POTENTIAL", "        POTENTIAL_TYPE PAIR_POTENTIAL", "        &PAIR_POTENTIAL",
                   f"          TYPE {'DFTD3' if s.dispersion == 'd3' else 'DFTD3(BJ)'}",
-                  f'          PARAMETER_FILE_NAME {cp2k_long_path(files["dispersion"])}', f"          REFERENCE_FUNCTIONAL {s.functional}",
+                  f'          PARAMETER_FILE_NAME {cp2k_long_path(files["dispersion"])}', f"          REFERENCE_FUNCTIONAL {method_profile.dispersion_reference or s.functional}",
                   "        &END PAIR_POTENTIAL", "      &END VDW_POTENTIAL"]
     if method_profile.nonlocal_type:
         lines += ["      &VDW_POTENTIAL", "        POTENTIAL_TYPE NON_LOCAL", "        &NON_LOCAL",
@@ -643,13 +644,13 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
         'family': method_profile.family, 'xc_components': list(method_profile.components),
         'native_shortcut': None if method_profile.components or method_profile.parametrization or method_profile.xc_parameters else (method_profile.native or s.functional),
         'pbe_parametrization': method_profile.parametrization,
-        'exact_exchange_fraction': method_profile.exact_exchange_fraction, 'kinetic_energy_density': method_profile.family == 'meta-GGA',
+        'exact_exchange_fraction': method_profile.exact_exchange_fraction, 'kinetic_energy_density': method_profile.kinetic_energy_density,
         'generator_scope': 'GPW Gamma ENERGY/ENERGY_FORCE/GEO_OPT without +U' if method_profile.restricted else 'existing GPW/GAPW and task restrictions',
         'ot_algorithm': (ot_algorithm or 'STRICT') if s.scf == 'ot' else None, 'ngrids': ngrids,
         'ngrids_selection': 'whole-system workflow lock' if _common_ngrids is not None else 'effective orbital basis policy',
         'xc_backend': ('Libxc' if method_profile.components else 'CP2K-native + Libxc') if method_profile.libxc else 'CP2K-native',
         'libxc_required': method_profile.libxc, 'libxc_user_asserted': s.libxc_available,
-        'build_verified': False, 'dispersion_reference': s.functional if s.dispersion != 'none' else None,
+        'build_verified': False, 'dispersion_reference': (method_profile.dispersion_reference or s.functional) if s.dispersion != 'none' else None,
         'basis_files': basis_files, 'potential_file': files['potential'],
         'catalog_reference_version': None if all_electron else '2026.2',
         'catalog_sources': [dict(source) for source in (AE_SOURCES if all_electron else CATALOG_SOURCES)], 'runtime_validated': False,

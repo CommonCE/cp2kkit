@@ -1,11 +1,11 @@
-# cp2kkit v0.3.2 architecture
+# cp2kkit v0.3.3 architecture
 
 ## Design principles
 
 The initial analysis MVP baseline is preserved in [the roadmap](roadmap.md).
 Later requirements add an [input-generation](input-generation.md) subset.
 The [numbering/allocation guide](menu-numbering-draft.md) records implemented
-menu layout v1 (introduced in 0.2.9, retained in 0.3.2) plus separately labeled provisional future features.
+menu layout v1 (introduced in 0.2.9, retained in 0.3.3) plus separately labeled provisional future features.
 The current registry contains only implemented entries; no placeholder categories.
 No submission system or deferred Bader/PDOS/NEB post-processing is introduced.
 
@@ -130,7 +130,7 @@ Do not guess labels, drop damaged final frames, or expand CP2K preprocessing.
 structures -> Structure + InputSettings -> validation -> CP2K text/manifest -> new input/JSON
 ```
 
-functional_registry defines the 15 non-hybrid profiles plus PBE0/HSE06/B3LYP, aliases, exact XC
+functional_registry defines the 15 non-hybrid profiles plus six hybrid profiles, aliases, exact XC
 components/native shortcuts, build/dispersion requirements and intrinsic nonlocal
 assembly. It is dependency-light and shared by basis policy, CLI, TUI and generation,
 not a parallel generator. method_profiles resolves explicit XC branches, per-element basis overrides and fixed-q
@@ -147,7 +147,12 @@ metadata distinguishes catalog references from installed-data hashes and preserv
 actual potential library identity. No generic input-rewriting migration is introduced.
 hybrid.py validates explicit HF controls and resolves direct-four-center HFX
 operator/radius/resources and optional t_c_g.dat byte provenance. inputgen renders
-its HF section alongside the registry's ordered native XC parameters. Hybrid
+its HF section alongside ordered native XC parameters or Libxc components.
+resolve_functional requires explicit PBEh fraction and derives a single effective
+profile for XC/HF/metadata, without mutating the shared registry. M06-2X shares
+the kinetic-energy-density flag/warnings with the semilocal meta-GGAs. Its D3
+reference M062X is separate from canonical profile ID M06-2X. No extra Libxc
+semilocal scaling or automatic exact-exchange inference is introduced. Hybrid
 scope is target 2026.2, GPW classic MOLOPT/UCL, Gamma, NONE/XYZ,
 ENERGY/ENERGY_FORCE/GEO_OPT without +U/smearing. Periodic global hybrids use
 face-spacing-bounded truncated Coulomb; isolated ones use full Coulomb; HSE06
