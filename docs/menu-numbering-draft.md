@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-**Software 0.3.3 retains the 0.2.9 menu layout v1, GFN-xTB methods and adds bounded direct-HFX hybrids; distant feature
+**Software 0.3.4 retains the 0.2.9 menu layout v1, GFN-xTB and bounded hybrids, adding opt-in PBE0/HSE06 ADMM; distant feature
 allocations remain a draft, not a frozen future registry or a release claim.**
 
 Schema stays **0.1.0**. The authoritative implemented function registry is
@@ -173,7 +173,7 @@ Owns the electronic state and physical model, not SCF numerical tolerances.
 | 114 | Explicit permission for unmatched-functional GTH-PBE approximation | Existing; never automatic |
 | 120 | Hybrid-exchange parameters | Implemented in 0.3.2: direct-HFX EPS_SCHWARZ, MAX_MEMORY [MiB per MPI process], periodic-global-hybrid radius [angstrom]; 0.3.3 adds explicit PBEh fraction in (0,1] (not percent); other fractions/omega stay fixed |
 | 121 | RI-HFX settings | Planned |
-| 122 | ADMM settings | Planned; auxiliary bases belong to 223 |
+| 122 | ADMM settings | Implemented 0.3.4: PBE0/HSE06 opt-in, purification auto/MO_DIAG/NONE; auxiliary bases belong to 223 |
 | 130 | Constrained DFT target charges/spins | Planned |
 | 140 | DFT / GFN-xTB model | Implemented in 0.3.1: DFT or upstream chooser 30/31/32; other semiempiricals/DFTB deferred |
 | 141 | Target tblite support assertion | Implemented for GFN2 only; not build detection |
@@ -218,7 +218,7 @@ Owns system composition, spatial representation, data sources, and named regions
 | 214 | Electrostatic boundary / Poisson scheme | Planned explicit control; current scheme is derived |
 | 220 | Global orbital basis | Existing; separate immutable basis-number namespace |
 | 221 | Element basis overrides | Existing |
-| 223 | Auxiliary basis selection | Planned |
+| 223 | Auxiliary basis selection | Implemented 0.3.4: independent AUX_FIT numbers 200-203 / stable admm-dz, admm-dzp, admm-tzp, admm-tz2p IDs; f edits explicit auxiliary sources; shown only with ADMM |
 | 224 | Ghost atoms / basis centers | Planned; do not enable implicitly |
 | 225 | GAPW setup profile | Existing auto/native compatibility names and current limitations |
 | 230 | CP2K data directory | Existing |

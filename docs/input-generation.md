@@ -1,6 +1,6 @@
 # CP2K input generation
 
-This guide describes cp2kkit **0.3.3**. Older defaults and migration notes are in
+This guide describes cp2kkit **0.3.4**. Older defaults and migration notes are in
 [the changelog](../CHANGELOG.md). AE automatic setup is described in
 [the basis guide](basis-selection.md#all-electron-automatic-setup-027).
 The [registry-v1 basis guide](basis-selection.md) defines permanent numbering toward
@@ -491,7 +491,8 @@ Standard-library readers preserve original hashes and do not run Gaussian/VASP/M
 - Restart provides **geometry only**: original KIND labels merge by element;
   method/U/constraints/moments/charge/solvent are not inherited. This is a new template,
   not a complete restart of the original job.
-- Hybrids beyond the bounded PBE0/HSE06/B3LYP subset, ADMM/RI-HFX, MD, frequencies, NEB, TDDFT, solvents, external fields, richer
+- Hybrids beyond the six bounded profiles, ADMM beyond PBE0/HSE06, RI-HFX,
+  MD, frequencies, NEB, TDDFT, solvents, external fields, richer
   constraints beyond fixed atoms, and other advanced Multiwfn branches are not implemented.
   Electron/spin cubes are supported; potential/ELF/MO cubes are not.
 - Default cutoff/basis/vacuum/k-points are not converged for the target system.
@@ -513,15 +514,16 @@ arbitrary XC mixtures remain unsupported.
 | k-points / SCF | Gamma only; OT or diagonalization; no smearing |
 | Dispersion | PBE0/HSE06/B3LYP: none/D3/D3(BJ); M06-2X: none/D3 (reference M062X); BHandHLYP/PBEh: none only |
 | Density | Existing GPW electron/spin cubes and explicit whole/A/B CDD inputs; reference states and actual cube-grid compatibility still need validation |
-| Excluded | GAPW/AE, +U, UZH-PBE0/custom orbital protocols, ADMM, RI-HFX, non-Gamma, correlated methods |
+| Excluded | GAPW/AE, +U, UZH-PBE0/custom orbital protocols, RI-HFX, non-Gamma, correlated methods; ADMM is separately opt-in for PBE0/HSE06 only |
 
 `FUNCTIONALS` retains the original 15 entries, then PBE0/HSE06/B3LYP,
 then BHANDHLYP/M06-2X/PBEH (canonical IDs; names are case-insensitive).
 The method chooser **1/110** uses local positions **16/17/18** (not a claim of
 Multiwfn number equivalence), then **19/20/21** for the added profiles;
 xTB remains **30/31/32**. Menu **120** edits the three direct-HFX numerical
-controls in sequence, followed by the HF fraction for PBEh only. **121/122 remain planned**:
-RI-HFX and ADMM are not enabled by selecting a hybrid. Basis IDs are unchanged;
+controls in sequence, followed by the HF fraction for PBEh only. **121 remains planned**;
+**122** explicitly enables the bounded ADMM subset below. Neither ADMM nor
+RI-HFX is enabled by selecting a hybrid. Basis IDs are unchanged;
 UZH-PBE0 30-32 remain unavailable pending their own paired-data/protocol audit.
 
 ### Complete XC/HF definitions
@@ -626,6 +628,105 @@ References: CP2K v2026.2
 and [qs_dispersion_utils.F](https://github.com/cp2k/cp2k/blob/v2026.2/src/qs_dispersion_utils.F).
 Exact inspected hashes are in hybrid.py and [feature provenance](../third_party/multiwfn/PROVENANCE.md).
 The derivative path was inspected, not numerically validated.
+
+## ADMM and auxiliary bases (0.3.4)
+
+ADMM is an additional exchange approximation/assembly scheme, not another XC
+functional and not RI-HFX. The existing direct-four-center backend operates
+with a smaller auxiliary basis. Default **off** preserves previous input physics.
+
+| Capability | Bounded ADMM scope |
+|---|---|
+| XC / target | PBE0 or HSE06 DFT, target 2026.2 only |
+| Model / tasks | Existing classic MOLOPT/UCL GPW, Gamma, NONE/XYZ; ENERGY, ENERGY_FORCE, GEO_OPT |
+| Spin / solver | RKS or collinear UKS, including split magnetic KINDs; OT or diag, no smearing |
+| Projection / correction | BASIS_PROJECTION; EXCH_SCALING_MODEL NONE; EXCH_CORRECTION_FUNC DEFAULT |
+| Purification | auto: OT MO_DIAG / diag NONE; explicit MO_DIAG or NONE; MO_DIAG with diag fails |
+| Auxiliary basis | Independent AUX_FIT registry 200-203; admm-dz, admm-dzp (default), admm-tzp, admm-tz2p |
+| Required data | Actual selected ORB and AUX_FIT Gaussian libraries; default auxiliary source BASIS_ADMM_UZH |
+| Reused features | Existing dispersion gates, electron/spin cubes, whole/A/B CDD with ADMM and per-element auxiliary identity checks |
+| Excluded | B3LYP/BHandHLYP/M06-2X/PBEh ADMM, GAPW/AE, UZH-PBE0/custom ORB, RI-HFX/RI_AUX, +U, smearing, non-Gamma, CELL_OPT/stress, MD/TDDFT |
+
+```bash
+cp2kkit generate-input water.xyz -o water-pbe0-admm.inp --periodic NONE \
+  --functional PBE0 --admm --aux-basis admm-dzp \
+  --data-dir /path/to/cp2k/data --write-json
+cp2kkit generate-input water.xyz -o water-hse06-admm-diag.inp --periodic NONE \
+  --functional HSE06 --admm --scf diag --admm-purification NONE \
+  --basis-file /path/to/BASIS_MOLOPT \
+  --aux-basis-file /path/to/BASIS_ADMM_UZH --write-json
+```
+
+**122** edits enablement and purification. **223** opens the independent
+auxiliary-basis list; its **f** edits the explicit auxiliary-file JSON list,
+and `[]` restores automatic source lookup. Enter keeps; 0/back returns.
+No existing orbital chooser IDs or functional/xTB positions are reassigned.
+CLI/config/replay use string auxiliary IDs, not interactive numbers.
+`--aux-basis-file` is repeatable and explicit files win without default fallback.
+`--data-dir` or CP2K_DATA_DIR supplies the default auxiliary file, with the same
+precedence as the existing resolver. No free-form custom/per-element AUX_FIT
+names or automatic BASIS_ADMM/BASIS_ADMM_MOLOPT substitution in this iteration.
+
+The shared Gaussian parser supports AUX_FIT as a distinct role; RI_AUX remains
+unavailable. Each present element requires the registered `family-qN` alias,
+matching its selected potential's explicit-electron count. Missing elements,
+unknown/wrong auxiliary q, malformed selected payloads, non-finite data and
+differing duplicate aliases fail. Both ORB and AUX_FIT aliases are rechecked
+against the complete emitted basis-file union to prevent cross-file shadowing.
+Known local-data limitation for the inspected BASIS_ADMM_UZH hash: Ca
+`admm-dz-q10` and `admm-dzp-q10` are rejected because a p-shell descriptor
+specifies one contraction but its rows contain two coefficients. The parser
+does not silently discard the extra column. No source data is changed and
+native CP2K handling is unverified. Other selected entries are checked
+independently; no automatic size substitution is made.
+
+Only used files are emitted, deduplicated and hash-recorded. The ADMM follow-up
+retains version 0.3.4 by user request. Portable UZH orbital aliases require matching orbital records; auxiliary-only
+sources retain their resolved paths, including when selected through `--data-dir`
+or `CP2K_DATA_DIR`. This fixes the 0.3.4 misreplacement of `BASIS_ADMM_UZH`
+with `BASIS_MOLOPT_UZH`; the explicit `--basis-file` workaround is no longer
+needed. Regenerate affected inputs to new paths; old inputs are not repaired
+automatically. Auxiliary source paths/hardlinks/symlinks receive the existing
+writer protections. Unsafe whole-line
+filenames fail; literal internal spaces remain supported. No numerical payload
+or installed auxiliary coverage is bundled.
+
+Purification choices follow the inspected Multiwfn ground-state branch:
+MO_DIAG requires OT; NONE supports diagonalization. Only these two force-capable
+purification modes and BASIS_PROJECTION are exposed. No silent solver repair,
+named ADMMS shortcut, blocking, charge-constrained fitting or scaling variant is
+introduced. Explicit incompatible retained controls fail; disabling ADMM requires
+resetting nondefault auxiliary/purification/file overrides rather than hiding them.
+
+`EXCH_CORRECTION_FUNC DEFAULT` intentionally lets CP2K follow the actual HFX
+operator, fraction, omega and radius: full Coulomb uses PBE exchange,
+SHORTRANGE uses matching XWPBE, and TRUNCATED uses the matching
+PBE_HOLE_T_C_LR/XWPBE construction. It is not a universal unscaled PBEX override.
+The existing HF and XC definitions, screening, memory and truncation controls
+are unchanged. Source inspection does not establish linked-build compatibility.
+
+Per-KIND `aux_fit` records independent registry ID/number, role, exact alias/q,
+actual source/entry hashes and `physical_pairing_validated=false`.
+`method_profile.admm` records effective fitting/purification/correction and
+source identity; `hfx.admm=true`, `ri_hfx=false`. Defaults/config migration and
+CDD consistency are described in [the schema](schema.md).
+Using UZH auxiliary data does not open the UZH-PBE0 orbital/potential protocol.
+Orbital/auxiliary physical pairing and basis completeness remain user validation
+responsibilities: compare representative energies/forces with direct HFX and
+converge auxiliary size before production.
+
+References: Multiwfn 2026.10.1 cp2kmate.f90/outCP2Kinp (projection, solver-dependent
+purification and AUX_FIT family organization); supplied local CP2K reference
+tree REVISION git:c92cc08 (input_cp2k_dft.F, cp_control_utils.F,
+hfx_admm_utils.F, admm_methods.F, BASIS_ADMM_UZH). Directory naming/target
+references do not certify unmodified official-tag identity; exact inspected
+hashes and boundaries are in admm.py/auxiliary_basis.py and
+[provenance](../third_party/multiwfn/PROVENANCE.md).
+See the target-2026.2
+[ADMM guide](https://manual.cp2k.org/cp2k-2026_2-branch/methods/dft/hartree-fock/admm.html)
+and [input reference](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/AUXILIARY_DENSITY_MATRIX_METHOD.html).
+No CP2K calculation, native syntax acceptance, convergence, speedup or scientific
+accuracy is established by this implementation.
 
 ## GFN-xTB methods (0.3.1)
 
@@ -956,9 +1057,9 @@ energies/forces/stress, recommended bases/U, or validation of an adsorption mode
 The registry follow-up enables paired UZH-PBE DZVP/TZVP/TZV2P for target 2026.2
 and explicit custom pseudopotential ORB files. Version 0.3.0 adds the bounded
 meta-GGA/nonlocal subset above; 0.3.1 adds the separate bounded xTB branch.
-Version 0.3.2 adds the bounded direct-HFX hybrids above. ADMM/RI-HFX, UZH-PBE0 templates,
-arbitrary q changes, auxiliary and reserved
-families remain unimplemented; see [basis selection](basis-selection.md).
+Versions 0.3.2/0.3.3 add the six bounded direct-HFX hybrids; 0.3.4 separately
+adds PBE0/HSE06 ADMM and checked AUX_FIT families. RI-HFX, UZH-PBE0 templates,
+arbitrary q changes, broader auxiliary and reserved families remain unimplemented; see [basis selection](basis-selection.md).
 
 ## DFT+U and magnetic initialization (112 / 103)
 

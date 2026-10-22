@@ -37,6 +37,8 @@ from .cp2k_data import cp2k_long_path
 from .constraints import CONSTRAINT_REFERENCE, resolve_fixed_atoms
 from .functional_registry import parse_functional
 from .hybrid import validate_hfx_controls, resolve_hfx, hf_lines
+from .admm import validate_admm, resolve_admm, admm_lines
+from .auxiliary_basis import DEFAULT_AUXILIARY_BASIS, auxiliary_option, parse_auxiliary_basis
 
 MULTIWFN_CITATIONS = (
     "Tian Lu, Feiwu Chen, J. Comput. Chem. 33, 580-592 (2012). DOI: 10.1002/jcc.22885",
@@ -130,6 +132,10 @@ class InputSettings:
     hf_memory: int = 512  # MiB per MPI process, not total job memory.
     hf_cutoff_radius: float | None = None  # angstrom, periodic global hybrids only.
     pbeh_fraction: float | None = None  # Explicit dimensionless HF fraction in (0, 1], PBEH only.
+    admm: bool = False
+    admm_purification: str | None = None  # auto: OT MO_DIAG, diagonalization NONE.
+    aux_basis: str = DEFAULT_AUXILIARY_BASIS  # Independent AUX_FIT registry ID, not ORB/RI.
+    aux_basis_files: tuple[str, ...] = ()  # Actual Gaussian libraries; no header-only fallback.
 
     @classmethod
     def from_config(cls, values, source_version=None):
@@ -147,6 +153,7 @@ class InputSettings:
             values = dict(values['settings'])
         try:
             values['functional'] = parse_functional(values.get('functional', 'PBE'))
+            values['aux_basis'] = parse_auxiliary_basis(values.get('aux_basis', DEFAULT_AUXILIARY_BASIS))
         except ValueError as exc:
             raise KitError(str(exc)) from exc
         from .xtb import parse_method
@@ -158,7 +165,9 @@ class InputSettings:
         if values.get('basis_overrides'):
             values['basis_overrides'] = tuple((el, migrate_basis(basis, source_version))
                                               for el, basis in values['basis_overrides'])
-        for name in ('cell', 'kpoints', 'cube_stride', 'basis_files', 'potential_files'):
+        if 'aux_basis_files' in values and not isinstance(values['aux_basis_files'], (tuple, list)):
+            raise KitError('aux_basis_files config must be a list of literal file paths')
+        for name in ('cell', 'kpoints', 'cube_stride', 'basis_files', 'potential_files', 'aux_basis_files'):
             if values.get(name) is not None:
                 values[name] = tuple(values[name])
         return cls(**values)
@@ -296,10 +305,12 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
         project = Path(structure.source['path']).stem
     s = replace(settings, functional=functional,
                 basis=basis_option(settings.basis).id,
+                aux_basis=auxiliary_option(settings.aux_basis).id,
                 project=project,
                 max_scf=settings.max_scf if settings.max_scf is not None else (25 if settings.scf == 'ot' else 128),
                 added_mos=settings.added_mos if settings.added_mos is not None else
                 (max(30, (len(structure.symbols)+1)//2) if settings.scf == 'diag' and settings.smearing is not None else 0))
+    validate_admm(s)
     if s.multiplicity is None:
         s = replace(s, multiplicity=automatic_multiplicity(structure, s))
     if s.cp2k_version not in CP2K_VERSIONS:
@@ -428,10 +439,14 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
         initial_sum = sum(kind_specs[label][1] or 0. for label in atom_labels)
         if magnetism and not math.isclose(initial_sum, s.multiplicity-1, abs_tol=1e-10):
             warnings.append(f'Requested initial atomic moments sum to {initial_sum:g}, while MULTIPLICITY-1 is {s.multiplicity-1}; check the intended magnetic state. Neither value is adjusted automatically.')
+    admm, auxiliary, admm_warnings = resolve_admm(s, element_records)
+    warnings.extend(admm_warnings)
     kinds = {}
     u_by_element = {el: (angular, energy) for el, angular, energy in hubbard}
     for label, (el, moment) in sorted(kind_specs.items()):
         kind = dict(element_records[el])
+        if admm is not None:
+            kind['aux_fit'] = auxiliary[el]
         if hubbard or magnetism is not None:
             kind['element'] = el
             kind['initial_magnetization'] = moment
@@ -440,14 +455,15 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
                 kind['dft_plus_u'] = {'L': angular, 'U_minus_J': energy, 'unit': 'eV', 'method': 'MULLIKEN'}
         kinds[label] = kind
     data_sources = {}
-    basis_files = sorted({record['basis_file'] for record in element_records.values()})
+    basis_files = sorted({record['basis_file'] for record in element_records.values()} |
+                         {record['basis_file'] for record in auxiliary.values()})
     potentials = sorted({record['potential_file'] for record in element_records.values()})
     if len(potentials) != 1:
         raise KitError('Mixed potential source files cannot be represented by the single POTENTIAL_FILE_NAME: '
                        + ', '.join(potentials) + '. Choose one explicit, physically appropriate source; no automatic protocol replacement/merge is performed.')
     files = {'potential': potentials[0], 'dispersion': 'dftd3.dat'}
     for i, file in enumerate(basis_files):
-        record = next(r for r in element_records.values() if r['basis_file'] == file)
+        record = next(r for r in (*element_records.values(), *auxiliary.values()) if r['basis_file'] == file)
         if record['basis_source']:
             key = 'basis' if i == 0 else 'basis:'+Path(file).name
             if key in data_sources:
@@ -498,9 +514,12 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
     if s.run_type == "CELL_OPT":
         lines.append("  STRESS_TENSOR ANALYTICAL")
     restart_filename = s.project+'-RESTART'+('.wfn' if s.kpoints == (1, 1, 1) else '.kp')
-    # Portable UZH runtime aliases; resolved source paths/hashes stay in provenance.
+    # Only files with orbital records qualify for portable UZH aliases; an
+    # auxiliary-only file must not pass all() on an empty orbital selection.
+    # Resolved source paths/hashes stay in provenance.
     emitted_basis_files = sorted({
         'BASIS_MOLOPT_UZH' if not s.basis_files and
+        any(r['basis_file'] == file for r in element_records.values()) and
         all(r['basis_protocol'] == 'uzh-pbe' or r['basis_id'].startswith('ae-uzh-')
             for r in element_records.values() if r['basis_file'] == file)
         else file for file in basis_files})
@@ -530,7 +549,8 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
         if s.smearing is not None:
             lines += ["      &SMEAR", "        METHOD FERMI_DIRAC", f"        ELECTRONIC_TEMPERATURE [K] {num(s.smearing)}", "      &END SMEAR"]
     lines += ['      &PRINT', '        &RESTART', '          BACKUP_COPIES 0',
-              '        &END RESTART', '      &END PRINT', '    &END SCF', '    &XC', *xc_lines(s.functional, method_profile), *hf_lines(hfx)]
+              '        &END RESTART', '      &END PRINT', '    &END SCF', *admm_lines(admm),
+              '    &XC', *xc_lines(s.functional, method_profile), *hf_lines(hfx)]
     if s.dispersion != "none":
         lines += ["      &VDW_POTENTIAL", "        POTENTIAL_TYPE PAIR_POTENTIAL", "        &PAIR_POTENTIAL",
                   f"          TYPE {'DFTD3' if s.dispersion == 'd3' else 'DFTD3(BJ)'}",
@@ -562,6 +582,7 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
     for label, kind in kinds.items():
         el = kind.get('element', label)
         lines += [f"    &KIND {label}", f"      ELEMENT {el}", f"      BASIS_SET {kind['basis']}",
+                  *([f"      BASIS_SET AUX_FIT {kind['aux_fit']['basis']}"] if admm is not None else []),
                   f"      POTENTIAL {kind['potential']}",
                   *(f"      {key} {value}" for key, value in (gapw['kind'] if gapw else {}).items())]
         if kind.get('initial_magnetization') is not None:
@@ -662,6 +683,8 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
             for component, parameters in method_profile.xc_parameters]
         manifest['method_profile']['generator_scope'] = 'GPW classic MOLOPT/UCL Gamma NONE/XYZ ENERGY/ENERGY_FORCE/GEO_OPT without +U or smearing'
         manifest['emitted_data_files']['hfx_truncated_gamma'] = hfx['truncated_gamma_file']
+    if admm is not None:
+        manifest['method_profile']['admm'] = admm
     if hubbard or magnetism is not None:
         manifest['electronic_extensions'] = {
             'uks': uks, 'atom_kinds': atom_labels, 'atom_index_base': 1,

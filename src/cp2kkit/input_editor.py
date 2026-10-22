@@ -282,11 +282,16 @@ def edit_entry(menu, values, entry):
             except ValueError as exc:
                 menu.show(f'Invalid input: {exc}')
     elif entry.editor == 'hybrid':
-        menu.show('Direct HFX only; no automatic ADMM/RI-HFX. Radius applies only to periodic global hybrids; auto clears it.')
+        menu.show('HFX parameters; ADMM is explicit at 122, never automatic. RI-HFX is unavailable. Radius applies only to periodic global hybrids; auto clears it.')
         for name in HFX_FIELDS:
             if name == 'pbeh_fraction' and values.get('functional') != 'PBEH':
                 continue
             values[name] = menu.edit(FIELDS[name], values[name], values)
+    elif entry.editor == 'admm':
+        menu.show('PBE0/HSE06 ADMM approximation; select AUX_FIT at 223. Auto purification: OT MO_DIAG / diagonalization NONE. No solver changes.')
+        values['admm'] = menu.edit(FIELDS['admm'], values['admm'], values)
+        if values['admm'] or values['admm_purification'] is not None:
+            values['admm_purification'] = menu.edit(FIELDS['admm_purification'], values['admm_purification'], values)
     elif entry.editor == 'source':
         edit_source(menu, values, entry.field)
     elif entry.editor in {'custom_basis', 'custom_potential'}:

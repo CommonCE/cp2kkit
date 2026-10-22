@@ -4,6 +4,98 @@ This records facts, not permission inferred from labels such as "reference-based
 or "rewritten in another language". Prefer version/file/subroutine/SHA-256;
 line numbers are auxiliary. Do not invent upstream commits, inspection dates, or grants.
 
+## ADMM emitted-library correction and executable comparison (0.3.4, version retained)
+
+The fix retains software version 0.3.4 by explicit user request. The comparison
+below was executed before that request with temporary version 0.3.5; historical
+inputs, manifests, logs and evidence-directory names are preserved unchanged.
+
+- Fix only the local inputgen.py portable-filename predicate: an auxiliary-only
+  file has no orbital records and must not qualify through an empty all().
+  Resolved AUX_FIT source paths are now emitted; actual UZH orbital aliases,
+  physical parameters, data bytes and the existing upstream assembly are unchanged.
+- User-authorized fresh executable comparison: cp2kkit 0.3.5 against actual
+  Multiwfn **2026.10.18** (banner checked per paired process), not the development
+  source version 2026.10.1. Binary/source/helper hashes and local CP2K reference
+  revision are recorded in test-workspace/admm-0.3.5-fix-e7UQQm/identity.json.
+- 56 fresh real-data cases passed with --data-dir and no explicit --basis-file
+  workaround: 32 paired water cases for PBE0/HSE06, NONE/XYZ, OT/diag,
+  ENERGY/ENERGY_FORCE/GEO_OPT and charged doublets; plus 24 cp2kkit-only cases
+  for admm-dz/tzp/tz2p. The paired default auxiliary is admm-dzp. Checks cover
+  emitted auxiliary-library identity, ORB/AUX/potential numerical signatures/q,
+  projection/purification, HF fraction/operator/omega/radius and coordinates.
+- This is not byte identity: Multiwfn omits scaling/correction where inspected
+  CP2K 2026.2 defaults are NONE/DEFAULT; existing resource/screening/restart
+  differences remain. No CP2K was executed, no jobs submitted, no convergence,
+  energy/force accuracy, speedup or scientific validation established.
+- Local evidence: test-workspace/admm-0.3.5-fix-e7UQQm/summary.json,
+  per-case inputs/logs/diffs/results, red.log, focused.log and regression.log.
+  Earlier failing outputs under admm-0.3.4-comparison-9LH4xs are preserved.
+  No additional upstream code, permission or changed licensing is implied;
+  the references, required citations and authorization limits below still apply.
+
+## PBE0/HSE06 ADMM and auxiliary-basis infrastructure (0.3.4)
+
+- Local: admm.py, auxiliary_basis.py, shared cp2k_data.py Gaussian-role validation,
+  inputgen.py, CLI/TUI/editor, density_workflow.py and data_catalog.py source
+  identity. No coefficients, potential parameters or Fortran are bundled.
+- Reference: Multiwfn **2026.10.1**, cp2kmate.f90/outCP2Kinp, development locator
+  ../Multiwfn_2026.10.1_src_Linux/cp2kmate.f90; SHA-256
+  f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402.
+  Inspected per-KIND AUX_FIT/q branches around 1543-1548, BASIS_ADMM_UZH file
+  inclusion around 1705, and projection/solver-dependent purification around
+  1962-1988. These are reference-based Python assemblies, not clean-room claims.
+- Retained organization: pseudopotential admm-dzp-qN, DFT-level ADMM section,
+  BASIS_PROJECTION, OT MO_DIAG / diagonalization NONE. This iteration adds
+  independently numbered admm-dz/dzp/tzp/tz2p choices and actual-data resolution.
+  It does not port Multiwfn's GAPW, RI-HFX/ADMMS, TDDFT, XAS or other-hybrid ADMM.
+- Differences: explicit opt-in rather than method-name suffix; separate AUX_FIT
+  registry and file overrides; exact element/q/payload checks, final ORB/AUX
+  file-union alias checks, source hashes/protection, config/replay and CDD locks.
+  Explicit EXCH_SCALING_MODEL NONE and EXCH_CORRECTION_FUNC DEFAULT retain
+  operator-consistent native correction rather than forcing PBEX universally.
+  Existing HFX resources/screening and physical defaults remain unchanged.
+- Inspected local CP2K reference: /home/xwp/soft/cp2k-2026.2, REVISION
+  **git:c92cc08**, target keyword policy 2026.2. Directory/branch names do not
+  establish an unmodified official tag or a linked binary. Exact source hashes:
+  - input_cp2k_dft.F:
+    93887178d0208020a96826b794459bac9937a66cec8ff6a69b7d4e1d393d5648
+  - cp_control_utils.F:
+    da04a34bb800c6ccc9314a9e434abca7b0f1482a250f1672bb0cd27adff6aa39
+  - hfx_admm_utils.F:
+    41bdcc775ad8a7461d9f811a8058434195da7004135651d7308fe27b5bb0c0ed
+  - admm_methods.F:
+    0a72a5ad6fa9a7398b3a9c8d828c241f32fb7198bbf8d6a90c5e642cc7595317
+  - data/BASIS_ADMM_UZH:
+    3f08699fd16a79e116de65f7520db362f71468657ab5e1c90c735fa4930393c1
+- cp_control_utils.F checks MO-based purification requires OT. admm_methods.F
+  supports force paths for BASIS_PROJECTION with MO_DIAG or NONE.
+  hfx_admm_utils.F DEFAULT correction follows full Coulomb/PBE, short-range/
+  matching XWPBE, or truncated/PBE_HOLE_T_C_LR plus XWPBE and inherits the
+  HF fraction, omega and cutoff. These are inspected paths, not numerical tests.
+  Target-2026.2 [ADMM guide](https://manual.cp2k.org/cp2k-2026_2-branch/methods/dft/hartree-fock/admm.html)
+  and [keyword reference](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/AUXILIARY_DENSITY_MATRIX_METHOD.html)
+  were also inspected; the guide's ADMMS/PBEX example is not this chosen profile.
+- Local data-only audit: 284 registered auxiliary entries inspected, 282
+  structurally accepted. Ca admm-dz-q10 (entry line 1356) and admm-dzp-q10
+  (1370) are rejected: the p-shell descriptor specifies one contraction while
+  rows contain an exponent and two coefficients. No values are dropped or data
+  modified. Native CP2K handling of the extra values is unverified. Only selected
+  entries are validated, so other elements and Ca TZP/TZ2P are not blocked solely
+  by these entries. No automatic auxiliary-family substitution.
+- 32 water generator cases (PBE0/HSE06, OT/diag, NONE/XYZ, four auxiliary sizes)
+  passed using actual local data. Local ignored evidence:
+  test-workspace/admm-0.3.4-data-audit-TSjzozqx/ (audit.py, preserved first-pass
+  script/log, completed.log and completed/summary.json plus inputs/sidecars).
+  This is not a fresh executable Multiwfn comparison or any CP2K execution.
+  Synthetic tests separately cover malformed/conflicting sources, state gates,
+  replay/TUI/CDD and overwrite protections; no energy, force accuracy, speedup,
+  convergence, native acceptance or scientific-validity claim.
+- Authorization/citations: reference use does not expand upstream permission.
+  No separate author grant is recorded; existing custom terms and required
+  Lu/Chen 2012 and Lu 2024 citations remain. No license or paid-distribution
+  permission is inferred.
+
 ## Remaining direct-HFX profiles (0.3.3)
 
 - Local: functional_registry.py, hybrid.py resolve_functional, method_profiles.py,

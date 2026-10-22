@@ -26,6 +26,48 @@ preserved in `docs/roadmap.md`. The current generator is an incomplete GPW/GAPW 
 Full coverage of Multiwfn's CP2K input generator is a long-term goal, not a completed
 port or evidence of validation with the actual software.
 
+### Focused source and log reading
+
+- Locate relevant definitions and evidence first with
+  `rg -n 'def |class |CP2K|keyword' <paths>` or a targeted `grep -n`.
+  Read only the relevant ranges with `sed -n 'a,bp' <path>`, then read the
+  complete target function once it is identified for modification.
+- Track file paths and line ranges already inspected during the session. Do not
+  reread an entire file for a local change; inspect the changed range and any
+  newly relevant callers or dependencies. Refresh line locations after edits.
+- Redirect all test and authorized CP2K run output (stdout and stderr) to log
+  files. Inspect with `tail -n 80 <log>` and
+  `grep -nE 'FAILED|ERROR|ABORT|converged|Total energy' <log>`, then read targeted
+  ranges as needed. Never read an entire `.out` file. These filters are navigation
+  aids, not proof of success; retain exit status and check the actual termination
+  and convergence evidence. Logging does not authorize a CP2K run.
+- Use new log paths outside tracked files; never overwrite existing calculation
+  outputs or logs merely to capture a development check.
+
+### Focused CP2K reference retrieval
+
+- When the authoritative URL is known, fetch it directly: use keyword paths on
+  `manual.cp2k.org` and the relevant source file or issue on
+  `github.com/cp2k/cp2k`. Match the target CP2K version rather than assuming trunk
+  documents the installed release.
+- Search only when the page location or keyword spelling is uncertain, subject
+  to mandatory tool instructions for current information. Set `resultsPerQuery`
+  to 5 when the search tool supports it; do not pass unsupported parameters.
+- Every `web_fetch` call must explicitly set `maxChars` to 8000–12000. For long
+  manual pages, retrieve the opening portion to locate relevant content, then
+  retrieve targeted sections with range-capable tools where available; do not
+  repeatedly fetch the whole page or assume an unsupported offset parameter.
+- Use `batch_web_fetch` only after identifying 2–3 directly relevant URLs, with
+  an explicit 8000–12000 character limit per page. Do not fetch speculative
+  backup pages.
+
+### Session boundaries
+
+- At the end of a development stage, summarize changes, checks, limitations,
+  and next steps, then use `/compact` or start a new session before continuing
+  another long tool chain. If session controls are user-only, ask the user to
+  compact or start a new session; do not claim to have executed them.
+
 ## 2. Code and interfaces
 
 - Python >= 3.10, conventional `src/` layout. The core uses the standard library;
@@ -170,6 +212,18 @@ port or evidence of validation with the actual software.
   Use PBE for zero HF. BHandHLYP/PBEh allow no extra dispersion pending audit.
   All three use the upstream default GTH-PBE family, preserving approximation
   metadata/fixed q and actual matched-entry preference. No full-parity claim.
+- 0.3.4 adds explicit PBE0/HSE06 ADMM only, retaining existing hybrid gates.
+  Menu 122 controls BASIS_PROJECTION, purification auto/MO_DIAG/NONE; auto
+  means MO_DIAG for OT and NONE for diag. Explicit MO_DIAG with diag fails.
+  Exchange scaling NONE and operator-consistent DEFAULT correction preserve
+  HFX fraction/omega/radius. Independent AUX_FIT registry at 223 uses immutable
+  200-203 / admm-dz, admm-dzp (default), admm-tzp, admm-tz2p. CLI/config use IDs,
+  never numeric ORB migration. Require actual ORB/AUX libraries, selected payload/
+  q checks and alias checks across the full emitted union; hash/protect every
+  emitted auxiliary source. Split KINDs and CDD preserve per-element aux_fit
+  and global ADMM identity. Nondefault inactive requests fail until reset.
+  No RI-HFX, UZH-PBE0, GAPW, custom/per-element auxiliary names or other-hybrid
+  ADMM is implied. Source/data checks are not native/scientific validation.
 - Do not start expensive calculations. Actual CP2K validation requires explicit
   authorization and a new run directory.
 - For failed-job diagnosis, load `qchem-error-diagnosis`, collect software/version
@@ -194,13 +248,27 @@ port or evidence of validation with the actual software.
 
 ## 6. Testing and delivery
 
-From the project root, run relevant tests first, then regression:
+From the project root, run relevant tests first, then regression. Use the
+selected, verified Python interpreter (shown below as `$PYTHON`) and redirect
+output to fresh logs, for example:
 
 ```bash
-PYTHONPATH=src python -m unittest discover -s tests -v
-PYTHONPATH=src python -m compileall -q src tests
+check_logs=$(mktemp -d "${TMPDIR:-/tmp}/cp2kkit-checks.XXXXXX")
+PYTHONPATH=src "$PYTHON" -m unittest discover -s tests -v >"$check_logs/unittest.log" 2>&1
+test_status=$?
+tail -n 80 "$check_logs/unittest.log"
+grep -nE 'FAILED|ERROR|ABORT|converged|Total energy' "$check_logs/unittest.log"
+printf 'unittest exit status: %s\n' "$test_status"
+PYTHONPATH=src "$PYTHON" -m compileall -q src tests >"$check_logs/compileall.log" 2>&1
+compile_status=$?
+tail -n 80 "$check_logs/compileall.log"
+printf 'compileall exit status: %s\n' "$compile_status"
 git diff --check
 ```
+
+Set `$PYTHON` to the selected interpreter's absolute path before using this
+example. Apply the same log capture to focused tests. A grep with no matches
+is not a test failure or a success verdict; report each check's own exit status.
 
 Cover normal, boundary, invalid-combination, damaged-input, provenance/unit,
 determinism, and overwrite-protection cases. Add CLI subprocess smoke tests where

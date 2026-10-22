@@ -1,4 +1,4 @@
-"""Bounded direct-HFX setup; no execution, auxiliary basis or solver fallback.
+"""Bounded direct-HFX setup; ADMM auxiliary assembly is separate, no execution or solver fallback.
 
 XC/HF composition and periodic radius policy reference Multiwfn outCP2Kinp;
 keywords/units are checked against CP2K v2026.2. See feature provenance.
@@ -84,7 +84,8 @@ def resolve_hfx(settings, profile, periodic, cell, data_root):
     if periodic not in {'NONE', 'XYZ'}:
         raise KitError('Direct HFX currently supports periodic NONE or XYZ only; low-dimensional PBC requires a separate audit')
     warnings = ['Direct four-center HFX requires a suitable Libint-enabled CP2K build; build/runtime support is not probed. '
-                'Converge EPS_SCHWARZ, SCF, basis and cell independently. ADMM and RI-HFX are not enabled.',
+                'Converge EPS_SCHWARZ, SCF, basis and cell independently. RI-HFX is not enabled.'
+                + (' ADMM is enabled separately; auxiliary convergence is also required.' if settings.admm else ' ADMM is not enabled.'),
                 f'HFX MAX_MEMORY={settings.hf_memory} MiB per MPI process is not total job memory or a scheduler request; '
                 'budget other CP2K arrays and rank/thread counts separately.']
     radius, limit, heights = None, None, None
@@ -136,7 +137,7 @@ def resolve_hfx(settings, profile, periodic, cell, data_root):
         'max_memory_mib_per_mpi_process': settings.hf_memory, 'eps_storage_scaling': 0.1,
         'truncated_gamma_file': table, 'truncated_gamma_source': source,
         'data_validation': 'source_bytes_only' if source else 'not_checked' if table else 'not_required',
-        'admm': False, 'ri_hfx': False, 'build_verified': False, 'runtime_validated': False,
+        'admm': settings.admm, 'ri_hfx': False, 'build_verified': False, 'runtime_validated': False,
         'keyword_reference_version': '2026.2',
         'sources': [{'url': 'https://raw.githubusercontent.com/cp2k/cp2k/v2026.2/src/'+file, 'sha256': sha}
                     for file, sha in HFX_SOURCE_HASHES.items()],

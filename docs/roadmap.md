@@ -1,6 +1,35 @@
 # Development status and next steps
 
-Current software: **0.3.3**; schema: **0.1.0**.
+Current software: **0.3.4**; schema: **0.1.0**.
+
+## ADMM auxiliary-library emission correction (0.3.4, version retained)
+
+Version remains 0.3.4 by explicit user request; the correction is retained.
+
+- Require matching orbital records before applying a portable UZH orbital alias;
+  auxiliary-only files keep their resolved source paths. The default data-directory
+  and environment paths no longer need the explicit orbital-file workaround.
+- Add emitted-file/manifest checks for all auxiliary sizes, source-selection
+  routes, CLI and shared libraries; preserve the genuine UZH orbital behavior.
+- Existing 0.3.4 inputs are not repaired automatically. Regenerate to new paths.
+  No physical settings, schema or interfaces change; no CP2K calculation is run.
+
+## ADMM and auxiliary-basis infrastructure implemented (0.3.4)
+
+- PBE0/HSE06 opt-in ADMM: BASIS_PROJECTION, exchange scaling NONE,
+  operator-consistent DEFAULT correction; auto MO_DIAG for OT / NONE for diag.
+  No change of solver, HFX fraction, range parameter, radius or potential family.
+- Independent AUX_FIT registry 200-203 / admm-dz, admm-dzp (default),
+  admm-tzp, admm-tz2p. Actual ORB/AUX data required, with selected Gaussian
+  payload/q/hash checks and conflicting-alias rejection across emitted files.
+- Shared CLI/API/TUI/config/replay, menu 122/223, split KIND and CDD identities;
+  existing writers protect auxiliary sources and preserve sidecar exclusivity.
+- Existing target-2026.2/classic-GPW/Gamma/NONE-or-XYZ/hybrid task/spin/SCF
+  gates remain. No RI-HFX, UZH-PBE0, GAPW or ADMM on the other hybrids.
+- Defaults remain ADMM-off and schema 0.1.0. Local source/data inspection and
+  synthetic software checks are not native acceptance or scientific validation.
+  See [ADMM capability and limits](input-generation.md#admm-and-auxiliary-bases-034).
+
 
 ## Remaining direct-HFX profiles implemented (0.3.3)
 
@@ -545,7 +574,7 @@ old default, or emitting target-version-unsupported keywords without checking.
    0.3.1 adds the bounded GFN-xTB branch; 0.3.2 adds the first three direct-HFX hybrids;
    initial GAPW/all-electron bases were added in 0.2.7. Remaining: broader meta-GGA
    model/task support, native/scientific UZH validation, UZH-PBE0,
-   broader HFX combinations, ADMM/RI-HFX, auxiliary and additional all-electron bases/families/
+   broader HFX/ADMM combinations, RI-HFX, additional auxiliary and all-electron bases/families/
    q policies, correlated wavefunctions, semiempirical/force fields and SCF options.
 4. **Tasks:** frequencies/vibrations/Raman, MD, dimer TS, BAND/NEB, NMR, polarizability,
    BSSE, real-time electrons, PIMD, XAS, appropriate TDDFT.

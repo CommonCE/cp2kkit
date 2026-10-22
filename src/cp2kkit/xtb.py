@@ -77,13 +77,16 @@ def generate_xtb(structure, settings):
         raise KitError('GFN-xTB density-difference inputs are not enabled')
     if s.method == 'GFN2-xTB' and not s.tblite_available:
         raise KitError('GFN2-xTB requires a tblite-linked target CP2K build; assert --tblite-available (menu 141). Build support is not detected')
+    from .admm import validate_admm
+    validate_admm(s)
     defaults = InputSettings()
     conflicts = ('functional', 'dispersion', 'basis_overrides', 'basis_files', 'potential_files',
                  'custom_basis_file', 'custom_basis_name', 'custom_potential_file', 'custom_potential_name',
                  'gapw_profile', 'allow_pbe_potential', 'libxc_available', 'dft_plus_u', 'magnetism',
                  'electron_density', 'spin_density', 'cube_stride', 'cutoff', 'rel_cutoff',
-                 'hf_eps_schwarz', 'hf_memory', 'hf_cutoff_radius', 'pbeh_fraction')
-    sequence_fields = {'basis_overrides', 'basis_files', 'potential_files', 'dft_plus_u'}
+                 'hf_eps_schwarz', 'hf_memory', 'hf_cutoff_radius', 'pbeh_fraction',
+                 'admm', 'admm_purification', 'aux_basis', 'aux_basis_files')
+    sequence_fields = {'basis_overrides', 'basis_files', 'potential_files', 'aux_basis_files', 'dft_plus_u'}
     active = [name for name in conflicts
               if (getattr(s, name) not in ((), []) if name in sequence_fields
                   else getattr(s, name) != getattr(defaults, name))]

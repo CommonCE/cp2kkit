@@ -21,6 +21,7 @@ from .spin_settings import parse_dft_plus_u, parse_magnetism
 from .method_profiles import parse_basis_overrides
 from .constraints import parse_fixed_atoms
 from .functional_registry import parse_functional
+from .auxiliary_basis import DEFAULT_AUXILIARY_BASIS, parse_auxiliary_basis
 
 
 def build_parser():
@@ -76,6 +77,13 @@ def build_parser():
                      help='Direct HFX MAX_MEMORY [MiB per MPI process], not total job memory; default 512')
     gen.add_argument('--hf-cutoff-radius', type=float,
                      help='Periodic global-hybrid truncation radius [angstrom]; default min(6, minimum face spacing/2.01)')
+    gen.add_argument('--admm', action='store_true', help='PBE0/HSE06 only: enable checked AUX_FIT exchange approximation (target 2026.2)')
+    gen.add_argument('--admm-purification', type=str.upper, choices=('MO_DIAG', 'NONE'),
+                     help='Default auto: OT MO_DIAG, diagonalization NONE; MO_DIAG requires OT')
+    gen.add_argument('--aux-basis', type=parse_auxiliary_basis, default=DEFAULT_AUXILIARY_BASIS,
+                     help='Independent AUX_FIT stable ID: admm-dz/admm-dzp/admm-tzp/admm-tz2p; default admm-dzp, active only with --admm')
+    gen.add_argument('--aux-basis-file', dest='aux_basis_files', action='append', default=[],
+                     help='Explicit AUX_FIT Gaussian library; repeat for sources; no catalog-only fallback')
     gen.add_argument("--basis", type=parse_basis, default=DEFAULT_BASIS,
                      help="Stable ORB ID or legacy family name; numbers are interactive-only")
     gen.add_argument("--gapw-profile", choices=("auto", "native"), default="auto",

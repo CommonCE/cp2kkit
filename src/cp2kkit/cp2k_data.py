@@ -80,7 +80,7 @@ class Entry:
                 raise ValueError('non-finite numerical payload')
             if not all(NUMERIC.fullmatch(token) for row in rows for token in row):
                 raise ValueError('unsupported numerical token (expected CP2K decimal/E/D notation)')
-            if self.role == 'ORB':
+            if self.role in {'ORB', 'AUX_FIT'}:
                 if len(rows[0]) != 1:
                     raise ValueError('expected exponent-set count')
                 nsets = int(rows[0][0])
@@ -98,8 +98,10 @@ class Entry:
                     if width < 2:
                         raise ValueError('exponent set has no contracted shells')
                     for row in numbers[index+1:index+1+count]:
-                        if len(row) != width or row[0] <= 0:
-                            raise ValueError('invalid exponent/contraction row')
+                        if len(row) != width:
+                            raise ValueError(f'invalid exponent/contraction row: expected {width} values, got {len(row)}')
+                        if row[0] <= 0:
+                            raise ValueError('invalid exponent/contraction row: nonpositive Gaussian exponent')
                     index += 1+count
                 if index != len(rows):
                     raise ValueError('truncated or trailing basis payload')
@@ -149,8 +151,8 @@ class Entry:
 
 
 def read_library(path, role):
-    if role not in {'ORB', 'POTENTIAL'}:
-        raise KitError('Only ORB and pseudopotential data are supported; AUX_FIT/RI_AUX are distinct, unimplemented roles')
+    if role not in {'ORB', 'AUX_FIT', 'POTENTIAL'}:
+        raise KitError('Only Gaussian ORB/AUX_FIT and pseudopotential data are supported; RI_AUX is a distinct, unimplemented role')
     text, source = read_text(path)
     source['requested_path'] = str(Path(path).absolute())
     source['data_version'] = None  # Only a pinned full-byte hash can identify a reference version.

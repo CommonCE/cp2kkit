@@ -2,7 +2,7 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.3.3 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.3.4 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 - Analysis remains read-only: no submission/execution or modification of existing
@@ -30,15 +30,52 @@ input generation; version 0.3.3 adds BHandHLYP, M06-2X and configurable PBEh.
 All 21 referenced DFT selections now have bounded generation support; this is
 not full Multiwfn feature/combination coverage.
 
-## Current version: 0.3.3
+## Current version: 0.3.4
+
+The ADMM follow-up retains version 0.3.4 by user request and fixes auxiliary-library emission: ADMM inputs generated with
+`--data-dir` or `CP2K_DATA_DIR` retain the resolved `BASIS_ADMM_UZH` path,
+rather than incorrectly replacing it with the orbital alias `BASIS_MOLOPT_UZH`.
+No explicit `--basis-file` workaround is needed. Regenerate affected 0.3.4
+inputs into new paths; existing files are not repaired automatically. Orbital
+UZH aliases, method parameters, CLI/config interfaces and schema remain unchanged.
+This is an input-generation fix, not native CP2K or scientific validation.
+
+### PBE0/HSE06 ADMM and AUX_FIT infrastructure
+
+ADMM is opt-in, not a new functional. `--admm` (menu **122**) enables
+`BASIS_PROJECTION` with operator-consistent `EXCH_CORRECTION_FUNC DEFAULT`
+and exchange scaling `NONE`. Purification defaults to **MO_DIAG for OT** or
+**NONE for diagonalization**; explicit MO_DIAG with diagonalization fails without
+changing the solver. All existing hybrid task/model restrictions still apply.
+
+Menu **223** selects the independent AUX_FIT registry: **200 admm-dz /
+201 admm-dzp (default) / 202 admm-tzp / 203 admm-tz2p** from
+`BASIS_ADMM_UZH`. CLI/config use stable string IDs, not these numbers.
+Actual ORB and AUX_FIT files are required; element/q, selected Gaussian payloads,
+conflicting aliases across the complete emitted file union, paths and hashes are
+checked. No coefficients or catalog-only auxiliary templates are bundled.
+
+```bash
+cp2kkit generate-input water.xyz -o water-pbe0-admm.inp --periodic NONE \
+  --functional PBE0 --admm --aux-basis admm-dzp \
+  --data-dir /path/to/cp2k/data --write-json
+```
+
+Explicit sources use `--basis-file` and repeatable `--aux-basis-file`;
+menu 223's **f** edits the auxiliary-file list. Config/replay, split magnetic
+KINDs, density bundles and source-file overwrite protection share this resolution.
+RI-HFX, UZH-PBE0, GAPW and ADMM with the other four hybrids remain unavailable.
+Checked data/q is not auxiliary-basis convergence, physical-pairing certification,
+native CP2K acceptance or scientific validation. See
+[ADMM details](docs/input-generation.md#admm-and-auxiliary-bases-034).
 
 ### Six direct-HFX hybrid profiles
 
 The shared CLI/API/TUI generator now supports these six hybrid profiles for target
 **CP2K 2026.2**, with classic MOLOPT/UCL GPW bases, Gamma points, NONE/XYZ PBC,
 ENERGY/ENERGY_FORCE/GEO_OPT, RKS or collinear UKS, and OT or diagonalization
-without smearing. DFT+U, GAPW, CELL_OPT, non-Gamma, ADMM, RI-HFX and UZH-PBE0
-protocols remain outside this initial hybrid scope.
+without smearing. DFT+U, GAPW, CELL_OPT, non-Gamma, RI-HFX and UZH-PBE0
+protocols remain outside this hybrid scope. ADMM is separately opt-in for PBE0/HSE06 only.
 
 - **PBE0**: 25% HF + 75% PBE exchange + full PBE correlation.
 - **HSE06**: 25% short-range HF with matching XC/HF ω=0.11 bohr⁻¹.
@@ -227,7 +264,8 @@ The preceding 0.2.6 basis follow-up added a
 [permanent numbered registry](docs/basis-selection.md) with stable string IDs,
 classic/UCL and paired UZH-PBE choices, explicit custom ORB files, actual-entry
 alias/q checks, source ambiguity rejection and per-KIND provenance. PBE0 numbers
-are allocated but unavailable; hybrid/auxiliary templates remain unavailable.
+are allocated but unavailable. Version 0.3.4 separately enables the checked
+PBE0/HSE06 AUX_FIT subset above; this does not enable paired UZH-PBE0 protocols.
 Registry version 1 distinguishes the new contract from earlier positional menus;
 old family names remain accepted, old numbers need explicit migration. This is
 not a 1.0.0 release. With no actual data, output is an unverified template;

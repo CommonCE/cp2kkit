@@ -80,3 +80,31 @@ def edit_basis(menu, current, values=None):
             return result
         except (KitError, ValueError) as exc:
             menu.show(f'Invalid basis selection: {exc}')
+
+
+def edit_auxiliary_basis(menu, current, values=None):
+    """Independent AUX_FIT numbers; ORB and RI selections cannot leak here."""
+    from .auxiliary_basis import AUXILIARY_OPTIONS, auxiliary_option, numbered_auxiliary_basis, parse_auxiliary_basis
+    from .input_tui import GROUPS
+    while True:
+        menu.show('AUX_FIT registry v1 (separate from ORB and menu IDs)')
+        for option in AUXILIARY_OPTIONS:
+            menu.show(f'  {option.number}. {option.id}; source {option.sources[0]}; actual element/q checks required')
+        menu.show('No RI_AUX or automatic physical-pairing validation. Enter keeps; 0/back returns; f edits explicit AUX_FIT files.')
+        try:
+            label = auxiliary_option(current).id
+        except KitError:
+            label = str(current)+' (invalid retained value)'
+        raw = menu.ask(f'Current [{label}]: ')
+        if not raw or raw.lower() in {'0', 'back'}:
+            return current
+        try:
+            if raw.lower() == 'f':
+                if values is None:
+                    raise ValueError('AUX_FIT file editing needs a generation draft')
+                field = next(f for _, fields in GROUPS for f in fields if f.name == 'aux_basis_files')
+                values['aux_basis_files'] = menu.edit(field, values['aux_basis_files'], values)
+                continue
+            return numbered_auxiliary_basis(int(raw)) if raw.isdigit() else parse_auxiliary_basis(raw)
+        except (KitError, ValueError) as exc:
+            menu.show(f'Invalid AUX_FIT selection: {exc}')

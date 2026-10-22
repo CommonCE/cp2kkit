@@ -1,11 +1,11 @@
-# cp2kkit v0.3.3 architecture
+# cp2kkit v0.3.4 architecture
 
 ## Design principles
 
 The initial analysis MVP baseline is preserved in [the roadmap](roadmap.md).
 Later requirements add an [input-generation](input-generation.md) subset.
 The [numbering/allocation guide](menu-numbering-draft.md) records implemented
-menu layout v1 (introduced in 0.2.9, retained in 0.3.3) plus separately labeled provisional future features.
+menu layout v1 (introduced in 0.2.9, retained in 0.3.4) plus separately labeled provisional future features.
 The current registry contains only implemented entries; no placeholder categories.
 No submission system or deferred Bader/PDOS/NEB post-processing is introduced.
 
@@ -38,6 +38,8 @@ cli.py
  |-- xtb.py -- xtb_versions.py (GFN model/backend/count/data policy; tagged-version syntax and sources)
  |-- functional_registry.py (shared XC definitions/aliases, exact-exchange/nonlocal/build/dispersion/scope policy)
  |-- hybrid.py (direct-HFX validation/operator/radius/data provenance; no executor)
+ |-- admm.py -- auxiliary_basis.py (bounded projection/purification/correction and independent AUX_FIT registry)
+ |-- auxiliary_basis.py -- basis_registry.py / basis_resolution.py / cp2k_data.py (checked auxiliary q/payload, final ORB/AUX file union)
  |-- method_profiles.py -- functional_registry.py / basis_resolution.py / data_catalog.py (XC, approvals, per-element resolution)
  |-- basis_registry.py (immutable allocated numbers/string IDs, roles/status, explicit legacy migration)
  |-- basis_resolution.py -- basis_registry.py / cp2k_data.py / data_catalog.py (ORB/potential protocol checks)
@@ -156,10 +158,20 @@ semilocal scaling or automatic exact-exchange inference is introduced. Hybrid
 scope is target 2026.2, GPW classic MOLOPT/UCL, Gamma, NONE/XYZ,
 ENERGY/ENERGY_FORCE/GEO_OPT without +U/smearing. Periodic global hybrids use
 face-spacing-bounded truncated Coulomb; isolated ones use full Coulomb; HSE06
-uses matching XC/HF omega=0.11 bohr^-1. No ADMM/RI-HFX or UZH-PBE0 protocol
-is activated. Existing density/CDD and staged publication are reused. HF control
+uses matching XC/HF omega=0.11 bohr^-1. ADMM is separately opt-in for
+PBE0/HSE06 since 0.3.4; no RI-HFX or UZH-PBE0 protocol is activated. Existing density/CDD and staged publication are reused. HF control
 edits at menu 120 share CLI/config/replay semantics; inactive nondefault requests
 fail rather than silently disappearing. Defaults add no HF section to pure DFT.
+ADMM assembly lives in admm.py, not the XC definitions or HF operator resolver.
+It retains the direct four-center backend but uses the smaller AUX_FIT basis.
+Solver-derived purification is explicit in the effective model, never a solver
+repair. auxiliary_basis.py owns separate immutable 200-203 IDs/numbers using
+the existing BasisOption/AUX_FIT role and Libraries Gaussian parser; ORB choices
+are unchanged, RI_AUX remains rejected. Actual ORB/AUX source files are mandatory,
+with selected-entry/q checks and duplicate checks across the final emitted union.
+Only used files are emitted, deduplicated, hash-recorded and writer-protected.
+Kinds carry aux_fit metadata; CDD compares per-element auxiliary identity and
+global ADMM settings as well as HFX identity. No calculation is invoked.
 This is not the deferred ARC-3 prepared-state/render/manifest separation.
 
 Do not inherit original electronic settings. Unknown PBC, electron/spin conflicts,

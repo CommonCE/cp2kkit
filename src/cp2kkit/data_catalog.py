@@ -96,7 +96,14 @@ UZH_POTENTIAL_ROWS = {
     "GTH-PBE": "H:1 He:2 Li:1,3 Be:2,4 B:3 C:4 N:5 O:6 F:7 Ne:8 Na:1,9 Mg:2,10 Al:3 Si:4 P:5 S:6 Cl:7 Ar:8 K:1,9 Ca:2,10 Sc:3,11 Ti:4,12 V:5,13 Cr:6,14 Mn:7,15 Fe:8,16 Co:9,17 Ni:10,18 Cu:1,11,19 Zn:2,12,20 Ga:3,13,21 Ge:4,14,22 As:5,15,23 Se:6,16,24 Br:7,17,25 Kr:8,18,26 Rb:1,9 Sr:2,10 Y:3,11 Zr:4,12 Nb:5,13 Mo:6,14 Tc:7,15 Ru:8,16 Rh:9,17 Pd:10,18 Ag:1,11,19 Cd:2,12,20 In:3,13,21 Sn:4,14,22 Sb:5,15,23 Te:6,16,24 I:7,17,25 Xe:8,18,26 Cs:1,9 Ba:2,10 La:11 Ce:12,30 Pr:13 Nd:14 Pm:15 Sm:16 Eu:17 Gd:18 Tb:19 Dy:20 Ho:21 Er:22 Tm:23 Yb:24 Lu:25 Hf:12 Ta:5,13 W:6,14 Re:7,15 Os:8,16 Ir:9,17 Pt:10,18 Au:1,11,19 Hg:2,12,20 Tl:3,13,21 Pb:4,14,22 Bi:5,15,23 Po:6,16,24 At:7,17,25 Rn:8,18,26",
     "GTH-PBE0": "H:1 He:2 Li:1,3 Be:2,4 B:3 C:4 N:5 O:6 F:7 Ne:8 Na:1,9 Mg:2,10 Al:3 Si:4 P:5 S:6 Cl:7 Ar:8 K:1,9 Ca:2,10 Sc:3,11 Ti:4,12 V:5,13 Cr:6,14 Mn:7,15 Fe:8,16 Co:9,17 Ni:10,18 Cu:1,11,19 Zn:2,12,20 Ga:3,13,21 Ge:4,14,22 As:5,15,23 Se:6,16,24 Br:7,17,25 Kr:8,18,26 Rb:1,9 Sr:2,10 Y:3,11 Zr:4,12 Nb:5,13 Mo:6,14 Tc:7,15 Ru:8,16 Rh:9,17 Pd:10,18 Ag:1,11,19 Cd:2,12,20 In:3,13,21 Sn:4,14,22 Sb:5,15,23 Te:6,16,24 I:7,17,25 Xe:8,18,26 Cs:1,9 Ba:2,10 La:3,11,29 Ce:4,12,30 Pr:5,13,31 Nd:6,14,32 Pm:7,15,33 Sm:8,16,34 Eu:9,17,35 Gd:10,18,36 Tb:11,19,37 Dy:12,20,38 Ho:13,21,39 Er:14,22,40 Tm:15,23,41 Yb:16,24,42 Lu:17,25,43 Hf:4,12 Ta:5,13 W:6,14 Re:7,15 Os:8,16 Ir:9,17 Pt:10,18 Au:1,11,19 Hg:2,12,20 Tl:3,13,21 Pb:4,14,22 Bi:5,15,23 Po:6,16,24 At:7,17,25 Rn:8,18,26"
 }
+# Auxiliary source identity only, not a catalog template or numerical data.
+AUXILIARY_SOURCE = {
+    'url': 'https://raw.githubusercontent.com/cp2k/cp2k/v2026.2/data/BASIS_ADMM_UZH',
+    'sha256': '3f08699fd16a79e116de65f7520db362f71468657ab5e1c90c735fa4930393c1',
+    'data_version': 'Local CP2K reference bytes git:c92cc08; official tag identity unverified',
+}
 CATALOG_SOURCES += [
+    AUXILIARY_SOURCE,
     {
         "url": "https://raw.githubusercontent.com/cp2k/cp2k/v2026.2/data/BASIS_MOLOPT_UZH_2026.2",
         "sha256": "8ca617142cc73b02e47d5806d97e91d2c3312444c411c5a093f4dfe8fb9355c4"

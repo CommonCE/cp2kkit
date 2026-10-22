@@ -101,6 +101,10 @@ def generate_difference(structure, settings):
             for key in ('basis', 'potential', 'basis_file', 'potential_file', 'basis_source', 'potential_source', 'valence_electrons'):
                 if kind[key] != candidates[0][key]:
                     raise KitError(f'Fragment {label} changes {element} {key}; provide consistent explicit data sources')
+            if kind.get('aux_fit') != candidates[0].get('aux_fit'):
+                raise KitError(f'Fragment {label} changes {element} AUX_FIT basis/data identity; provide consistent data sources')
+        if report['method_profile'].get('admm') != whole['method_profile'].get('admm'):
+            raise KitError(f'Fragment {label} changes ADMM projection/purification/correction settings')
         if report['nonlocal_correlation'] != whole['nonlocal_correlation']:
             raise KitError(f'Fragment {label} changes nonlocal correlation/kernel identity; provide consistent data sources')
         if report['method_profile'].get('hfx') != whole['method_profile'].get('hfx'):

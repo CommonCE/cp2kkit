@@ -1,4 +1,4 @@
-# Orbital basis registry (software 0.3.0, registry v1)
+# Basis registries (software 0.3.4, registry v1)
 
 The registry establishes the numbering contract **toward 1.0.0**; it does not
 release 1.0.0 or certify calculations. The generator uses compact shortcuts and
@@ -55,11 +55,51 @@ names remain accepted on input. The default remains DZVP-MOLOPT-SR-GTH.
 
 Numbers outside these entries are not selectable. Disabled PBE0 entries are
 shown with an explicit UNAVAILABLE reason, not advertised as working templates.
-ORB, AUX_FIT and RI_AUX are distinct roles in the model; only ORB is selectable.
-No auxiliary basis, ADMM or RI method template is added. Software 0.3.2 enables
+ORB, AUX_FIT and RI_AUX are distinct roles. Software 0.3.4 separately enables
+the bounded AUX_FIT registry below; RI_AUX remains unavailable. Software 0.3.2 enables
 [direct-HFX hybrids](input-generation.md#direct-hfx-hybrids-032) using classic
 MOLOPT/UCL only; UZH-PBE0 remains unavailable. AE 50-59
 uses the separate GAPW model described below, not the fixed-q GPW policy.
+
+## AUX_FIT registry (0.3.4)
+
+This independent selector is opened by **223**, not orbital chooser **2/220**.
+Its immutable numbers share the basis-value namespace without changing any ORB
+allocation; they are not menu function IDs. CLI/config/replay persist stable IDs.
+
+| Number | Stable ID / family | Source |
+|---:|---|---|
+| 200 | admm-dz | BASIS_ADMM_UZH |
+| 201 | admm-dzp (default when ADMM enabled) | BASIS_ADMM_UZH |
+| 202 | admm-tzp | BASIS_ADMM_UZH |
+| 203 | admm-tz2p | BASIS_ADMM_UZH |
+
+Each family resolves the real `family-qN` alias for each element's selected
+GTH explicit-electron count. Actual ORB and AUX_FIT libraries are mandatory;
+no auxiliary coefficients/catalog coverage are bundled and no element/q fallback
+or orbital/RI-role substitution is allowed. Supply a data directory or explicit
+`--basis-file` / repeatable `--aux-basis-file`. File overrides win, without
+fallback to the default auxiliary file. Only files selected for present kinds
+are emitted; aliases are checked across the complete ORB/AUX file union to
+prevent cross-role shadowing. Identical duplicate payloads may be deduplicated;
+differing selected aliases fail. Paths with internal spaces are emitted literally;
+unsafe preprocessor/comment/control characters fail. All emitted source files
+are hash-recorded and overwrite-protected.
+
+Menu 223's **f** edits the auxiliary-file JSON list (`[]` restores automatic
+sources); **0/back** returns unchanged. Auxiliary numeric IDs are not accepted
+by CLI/config, including legacy orbital migration. No free-form custom AUX_FIT
+name or per-element auxiliary override is offered in this first subset.
+BASIS_ADMM and BASIS_ADMM_MOLOPT are not automatically selected; explicitly
+supplied files still must contain the exact registered family/q aliases.
+Known limitation of the inspected local BASIS_ADMM_UZH bytes: Ca
+admm-dz-q10 and admm-dzp-q10 have a descriptor/row-width mismatch and are
+rejected by selected-entry checks; no coefficients are discarded or data edited.
+Native handling is unverified. See the detailed ADMM guide linked below.
+Using UZH auxiliary data does not activate UZH orbital/potential protocols.
+Data checks do not establish physical pairing, basis completeness or convergence;
+`physical_pairing_validated=false` is explicit. See
+[ADMM settings and limits](input-generation.md#admm-and-auxiliary-bases-034).
 
 ## Functional pairing in 0.3.0
 

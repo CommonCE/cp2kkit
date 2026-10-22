@@ -22,6 +22,8 @@ from .method_profiles import parse_basis_overrides, format_basis_overrides
 from .functional_registry import FUNCTIONAL_PROFILES, HYBRID_POTENTIAL_FAMILIES, parse_functional
 from .constraints import parse_fixed_atoms
 from .hybrid import HFX_FIELDS
+from .admm import ADMM_FIELDS, ADMM_FUNCTIONALS
+from .auxiliary_basis import auxiliary_option, numbered_auxiliary_basis, parse_auxiliary_basis
 from .spin_settings import (parse_dft_plus_u, parse_magnetism,
                             format_dft_plus_u, format_magnetism)
 
@@ -63,6 +65,10 @@ GROUPS = (
         Field('hf_eps_schwarz', 'Direct HFX EPS_SCHWARZ (0 < threshold < 1)', 'float', positive=True),
         Field('hf_memory', 'HFX MAX_MEMORY [MiB per MPI process, not total job memory]', 'int', minimum=1),
         Field('hf_cutoff_radius', 'Periodic global-hybrid radius [angstrom] (auto: min(6, face spacing/2.01))', 'float', optional=True, positive=True),
+        Field('admm', 'Enable ADMM approximation (PBE0/HSE06 only; checked AUX_FIT data required)', 'bool'),
+        Field('admm_purification', 'ADMM purification (auto: OT MO_DIAG, diagonalization NONE)', choices=('MO_DIAG', 'NONE'), optional=True),
+        Field('aux_basis', 'AUX_FIT basis (independent immutable number or stable ID; f edits explicit files)', 'aux_basis'),
+        Field('aux_basis_files', 'Explicit AUX_FIT files (JSON list)', 'paths'),
         Field("basis", "Orbital basis (immutable registry number or stable ID/name; 0 returns)", 'basis'),
         Field("dispersion", "Dispersion", choices=("none", "d3", "d3bj")),
         Field("data_dir", "CP2K data directory (verify entries and hashes)", optional=True),
@@ -132,7 +138,7 @@ def visible_fields(fields, values):
     except KitError:
         has_ae = True  # Invalid drafts stay editable; authoritative review gives the error.
     xtb = values.get('method', 'DFT') != 'DFT'
-    dft_only = {*HFX_FIELDS, 'basis', 'basis_overrides', 'basis_files', 'potential_files', 'custom_basis_file',
+    dft_only = {*HFX_FIELDS, *ADMM_FIELDS, 'basis', 'basis_overrides', 'basis_files', 'potential_files', 'custom_basis_file',
                 'custom_basis_name', 'custom_potential_file', 'custom_potential_name', 'gapw_profile',
                 'dispersion', 'libxc_available', 'allow_pbe_potential', 'dft_plus_u', 'magnetism',
                 'cutoff', 'rel_cutoff', 'electron_density', 'spin_density', 'cube_stride', 'density_difference',
@@ -140,6 +146,9 @@ def visible_fields(fields, values):
     non_scf = values.get('method') == 'GFN0-xTB'
     return tuple(f for f in fields
                  if not (xtb and f.name in dft_only)
+                 and not (f.name in ADMM_FIELDS and values.get('functional') not in ADMM_FUNCTIONALS)
+                 and not (f.name in {'aux_basis', 'aux_basis_files'} and not values.get('admm'))
+                 and not (f.name == 'admm_purification' and not values.get('admm') and values.get('admm_purification') is None)
                  and not (f.name == 'pbeh_fraction' and values.get('functional') != 'PBEH')
                  and not (f.name in HFX_FIELDS and not getattr(FUNCTIONAL_PROFILES.get(values.get('functional')), 'hybrid', False))
                  and not (non_scf and f.name in {'scf', 'eps_scf', 'max_scf', 'max_outer_scf', 'ot_algorithm'})
@@ -227,6 +236,8 @@ def parse_value(field, raw):
     """Local lexical/range validation only; cross-field chemistry stays in inputgen."""
     if field.kind == 'basis':
         return numbered_basis(int(raw)) if raw.isdigit() else parse_basis(raw)
+    if field.kind == 'aux_basis':
+        return numbered_auxiliary_basis(int(raw)) if raw.isdigit() else parse_auxiliary_basis(raw)
     if field.kind == 'fixed_atoms':
         return parse_fixed_atoms(raw)
     if field.kind == 'paths':
@@ -293,9 +304,12 @@ def command_arguments(path, frame, output, settings):
         flag = "--" + name.replace("_", "-")
         if name == 'basis':
             args.append(flag+'='+basis_option(value).id)
-        elif name in {'basis_files', 'potential_files'}:
+        elif name == 'aux_basis':
+            args.append(flag+'='+auxiliary_option(value).id)
+        elif name in {'basis_files', 'potential_files', 'aux_basis_files'}:
+            file_flag = {'basis_files': 'basis-file', 'potential_files': 'potential-file', 'aux_basis_files': 'aux-basis-file'}[name]
             for file in value:
-                args.append('--'+('basis-file' if name == 'basis_files' else 'potential-file')+'='+file)
+                args.append('--'+file_flag+'='+file)
         elif name == 'basis_overrides':
             if value:
                 args.append(flag+'='+format_basis_overrides(value))
@@ -352,6 +366,9 @@ class Menu:
         if field.kind == 'basis':
             from .basis_ui import edit_basis
             return edit_basis(self, current, values)
+        if field.kind == 'aux_basis':
+            from .basis_ui import edit_auxiliary_basis
+            return edit_auxiliary_basis(self, current, values)
         self.show(field.label)
         if field.name == 'method':
             from .xtb import XTB_NUMBERS
@@ -462,6 +479,10 @@ class Menu:
                     self.show(f"  {item['setting']} = {item['value']}: {item['reason']}")
                 self.show('Preserved user settings: '+', '.join(gapw['preserved']))
             self.show(f"Basis files: {', '.join(manifest['method_profile']['basis_files'])}")
+            admm = manifest['method_profile'].get('admm')
+            if admm:
+                self.show(f"ADMM: {admm['method']}; purification {admm['purification']}; operator-consistent DEFAULT correction; exchange scaling NONE")
+                self.show('AUX_FIT: '+', '.join(f"{label}={kind['aux_fit']['basis']}" for label, kind in manifest['kinds'].items()))
             if settings.basis_overrides:
                 self.show(f"Element basis overrides: {format_basis_overrides(settings.basis_overrides)}")
             if settings.scf == 'ot':

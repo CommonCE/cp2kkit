@@ -44,7 +44,10 @@ assembly, including Libxc-backed meta-GGAs and BEEFVDW's internal PW92 requireme
 0.3.2 native PBE0/HSE06/B3LYP XC composition; 0.3.3 BHandHLYP/M06-2X
 Libxc definitions and explicit-fraction PBEh assembly),
 `src/cp2kkit/hybrid.py` (0.3.2 direct-HFX operator/fraction/radius/resource assembly,
-including explicit VWN3, no ADMM/RI-HFX or numerical table payload),
+including explicit VWN3; no RI-HFX or numerical table payload),
+`src/cp2kkit/admm.py` and `src/cp2kkit/auxiliary_basis.py` (0.3.4 bounded
+PBE0/HSE06 projection, solver-dependent purification and checked AUX_FIT
+family/q organization; reference-based Multiwfn/CP2K assembly, no coefficients),
 `src/cp2kkit/xtb.py` (0.3.1 GFN-xTB chooser/model/backend assembly, CP2K model
 reference counts and file-byte identities, no numerical parameter payload),
 `src/cp2kkit/xtb_versions.py` (tagged 2024.2-2026.2 source hashes/capability checks,

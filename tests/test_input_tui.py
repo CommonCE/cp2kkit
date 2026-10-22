@@ -91,7 +91,8 @@ class MenuTests(unittest.TestCase):
         self.assertNotIn('602. Charge-density', log)
         self.assertEqual({f.name for _, f in NUMBERED_FIELDS},
                          (set(InputSettings.__dataclass_fields__) | {'path', 'frame', 'output'}) - {
-                             'custom_basis_name', 'custom_potential_name', 'hf_memory', 'hf_cutoff_radius', 'pbeh_fraction', 'fragment_a_indices',
+                             'custom_basis_name', 'custom_potential_name', 'hf_memory', 'hf_cutoff_radius', 'pbeh_fraction',
+                             'admm_purification', 'aux_basis_files', 'fragment_a_indices',
                              'fragment_a_charge', 'fragment_a_multiplicity', 'fragment_b_charge', 'fragment_b_multiplicity'})
         self.assertIn('generator default', log)
         self.assertFalse(self.output.exists())

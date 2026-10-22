@@ -107,7 +107,8 @@ def resolve_method(settings, elements, valences, kind_specs=None):
         selected = dict(normalize_basis_overrides(settings.basis_overrides, elements))
         if any(basis_option(selected.get(el, settings.basis)).protocol != 'classic' for el in elements):
             raise KitError('Initial direct HFX profiles require classic MOLOPT/UCL orbital bases; '
-                           'UZH-PBE0, custom bases, ADMM and RI-HFX are not enabled')
+                           'UZH-PBE0, custom orbital bases and RI-HFX are not enabled; '
+                           'ADMM uses the same classic ORB gate with separate AUX_FIT checks')
     if profile.restricted:
         if all_electron or settings.kpoints != (1, 1, 1) or settings.run_type == 'CELL_OPT' or settings.dft_plus_u:
             raise KitError(f'{settings.functional} currently supports GPW Gamma ENERGY/ENERGY_FORCE/GEO_OPT '

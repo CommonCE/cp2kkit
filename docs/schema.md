@@ -177,6 +177,40 @@ Fields/units/schema 0.1.0 are unchanged.
 - syntax_reference_checked/runtime_validated describe density-print validation,
   not certification of the entire generator.
 
+## Generated input JSON: ADMM / AUX_FIT (software 0.3.4)
+
+Schema stays **0.1.0**. Legacy configs default to admm=false,
+admm_purification=null, aux_basis=admm-dzp and aux_basis_files=[].
+These fields are additive; numeric auxiliary settings have no implicit orbital
+migration. aux_basis_files must be a list of literal paths. Nondefault ADMM
+controls while disabled, and all active ADMM requests outside PBE0/HSE06 DFT
+target 2026.2, fail instead of disappearing.
+
+- settings retains requested purification (null means auto) and independent
+  auxiliary stable ID/file overrides. Effective OT purification is MO_DIAG;
+  diagonalization uses NONE. Explicit MO_DIAG with diag fails.
+- Enabled-only method_profile.admm records enabled, method=BASIS_PROJECTION,
+  purification, purification_selection=explicit/solver-derived,
+  exchange_scaling_model=NONE, exchange_correction_functional=DEFAULT,
+  operator-consistent correction_policy, auxiliary_registry_version=1,
+  keyword_reference_version, local source identity/hash scope and reference
+  locators/hashes. build_verified/runtime_validated remain false.
+- method_profile.hfx.admm becomes true when enabled; algorithm remains
+  direct_four_center and ri_hfx remains false. Its fraction, operator,
+  omega/radius/data and resource semantics are unchanged.
+- Every generated KIND (including split magnetic labels) gains aux_fit:
+  id, number, role=AUX_FIT, registry_version, basis (real alias), basis_file,
+  basis_q, basis_source (path/bytes/hash/entry line/entry hash),
+  data_validation=data_checked and physical_pairing_validated=false.
+  Disabled ADMM adds no aux_fit or method_profile.admm object.
+- method_profile.basis_files and emitted_data_files.basis include the
+  deduplicated used ORB/AUX union. data_sources records every emitted auxiliary
+  file, reusing the basis source-key scheme and protected writers.
+- Density bundles compare per-element aux_fit identity and global admm model
+  across whole/A/B. Actual CUBE compatibility and scientific validity remain
+  unverified. Selected bytes/q and source hashes do not certify a CP2K build,
+  native acceptance, physical pairing or convergence.
+
 ## Generated input JSON: direct HFX (software 0.3.2, extended in 0.3.3)
 
 Software 0.3.2 retains this schema: standard hybrid family potentials record
@@ -216,7 +250,7 @@ not changes to analysis records. Legacy configurations default new fields.
   Automatic radius is min(6 angstrom, minimum emitted-cell face spacing/2.01);
   settings retains null while hfx records the effective radius.
 - hfx also records eps_schwarz, screen_on_initial_p=false,
-  max_memory_mib_per_mpi_process, eps_storage_scaling=0.1, admm=false,
+  max_memory_mib_per_mpi_process, eps_storage_scaling=0.1, admm=false (true only with the explicit 0.3.4 ADMM option),
   ri_hfx=false, build_verified=false and runtime_validated=false.
 - truncated_gamma_file/source and data_validation distinguish not_required,
   not_checked and source_bytes_only. If a data directory is supplied, the

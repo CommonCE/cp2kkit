@@ -8,6 +8,58 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.3.4
+
+### ADMM auxiliary-library correction (version retained by user request)
+
+- Fix ADMM auxiliary-library emission: require a nonempty matching orbital
+  selection before applying the portable BASIS_MOLOPT_UZH alias. Auxiliary-only
+  files retain their resolved paths instead of passing all() on an empty set.
+- Cover emitted input filenames and manifest identity across data-directory,
+  environment and explicit source selection, all four auxiliary sizes, shared
+  ORB/AUX libraries and CLI generation. Preserve genuine UZH orbital aliases.
+- Software remains 0.3.4 by explicit user request; schema stays 0.1.0. No method, solver, auxiliary
+  registry, CLI/config or physical-default changes. Regenerate affected 0.3.4
+  inputs to new paths; old inputs/results are not modified automatically.
+- Fresh real-data generation without explicit orbital-file workarounds: 56/56
+  cases passed, including 32 paired comparisons with Multiwfn 2026.10.18 and
+  24 additional auxiliary-size cases. 92 focused and 510 regression tests,
+  compileall and CLI version checks passed. Evidence is retained locally in
+  test-workspace/admm-0.3.5-fix-e7UQQm/; historical failing artifacts are intact.
+- Validation is input generation and software regression only; no CP2K
+  execution, job submission, convergence or scientific-validity certification.
+
+### Initial ADMM implementation
+
+- Explicit user-assigned version. Add opt-in PBE0/HSE06 ADMM for target 2026.2,
+  retaining classic MOLOPT/UCL GPW, Gamma, NONE/XYZ, ENERGY/ENERGY_FORCE/GEO_OPT,
+  RKS/UKS and OT/diag without smearing or +U.
+- Emit BASIS_PROJECTION, EXCH_SCALING_MODEL NONE and operator-consistent
+  EXCH_CORRECTION_FUNC DEFAULT. Auto purification uses MO_DIAG for OT or NONE
+  for diagonalization. Explicit incompatible purification fails without repair.
+- Add independent AUX_FIT registry v1: immutable 200-203 / admm-dz, admm-dzp,
+  admm-tzp, admm-tz2p, default admm-dzp when ADMM is enabled. Require actual
+  orbital and auxiliary files; validate selected Gaussian payloads, aliases/q,
+  source paths/hashes and conflicts across the full emitted ORB/AUX union.
+  No auxiliary coefficients, q substitution or catalog-only auxiliary template.
+- Integrate --admm / --admm-purification / --aux-basis / repeatable
+  --aux-basis-file, menu 122/223, config/replay, magnetic KINDs and CDD identity
+  checks. Protect auxiliary sources using the existing staged writers.
+- Default ADMM remains off; existing orbital IDs, functional/xTB chooser numbers,
+  pure-DFT/direct-HFX defaults and schema 0.1.0 remain unchanged. Reject inactive
+  nondefault auxiliary requests and incompatible DFT/xTB combinations.
+- RI-HFX, UZH-PBE0, GAPW, custom/per-element auxiliary names and ADMM for the
+  other four hybrids remain outside this subset. Data checks do not establish
+  physical pairing, native CP2K acceptance, convergence or scientific validity.
+  No CP2K calculation or job submission is performed.
+- Actual local-data audit: 32 water generator cases passed; 282/284 registered
+  auxiliary entries passed structural checks. Ca admm-dz-q10 / admm-dzp-q10
+  are rejected for descriptor/row-width mismatch; native handling is unverified.
+  No data changes, silent coefficient dropping or automatic family substitution.
+- Software checks: 136 focused and 509 full regression tests passed, along with
+  compileall, version consistency, 159 relative Markdown file links and diff checks.
+  These are generation/software checks, not native CP2K or scientific validation.
+
 ## 0.3.3
 
 - Add BHandHLYP (50% HF), M06-2X (54% HF) and explicit-fraction PBEh through
