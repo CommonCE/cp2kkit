@@ -4,6 +4,101 @@ This records facts, not permission inferred from labels such as "reference-based
 or "rewritten in another language". Prefer version/file/subroutine/SHA-256;
 line numbers are auxiliary. Do not invent upstream commits, inspection dates, or grants.
 
+## Direct-HFX hybrid implementation (0.3.2)
+
+### Fixed source and actual reference use
+
+- Local modules: functional_registry.py native XC/HF definitions; method_profiles.py
+  scope checks; hybrid.py direct-HFX controls/operator/radius/resources/data references;
+  inputgen.py orchestration/render/metadata; CLI/TUI/editor/menu 120 integration.
+- Multiwfn **2026.10.1**, supplied cp2kmate.f90, subroutine outCP2Kinp;
+  development locator ../Multiwfn_2026.10.1_src_Linux/cp2kmate.f90 (not a runtime
+  dependency). Rechecked raw SHA-256:
+  f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402.
+- Inspected native PBE0/B3LYP/HSE XC branches around 2039-2126, face-spacing/
+  truncation and HF/RI assembly around 2153-2240, and dispersion around 2329-2392.
+  Reference-based Python assembly, not a claim of clean-room work or a complete port.
+- PBE0: PBE SCALE_X=0.75, SCALE_C=1.0 and HF=0.25.
+  HSE06: XWPBE SCALE_X=-0.25, SCALE_X0=1.0, OMEGA=0.11 plus full PBE correlation;
+  SHORTRANGE HF=0.25, OMEGA=0.11 bohr^-1.
+  B3LYP: LYP=0.81, BECKE88=0.72, VWN3=0.19, XALPHA=0.08, HF=0.20.
+  Explicit VWN3 retains the upstream Gaussian convention, not CP2K's native
+  shortcut VWN5. These are method definitions, not arbitrary input fragments.
+
+### CP2K tagged-source audit
+
+Inspected official v2026.2 sources at
+https://raw.githubusercontent.com/cp2k/cp2k/v2026.2/src/ :
+
+| File | SHA-256 | Use |
+|---|---|---|
+| input_cp2k_xc.F | 332cda33e1d90c5e3002fcc1e965633d009f28caadbc98c188474cd26e314e3b | Native XC keywords, scaling, VWN3 and XWPBE definitions |
+| input_cp2k_check.F | e1f26b06bbc6121a31f9c50c4056dbe43f08a328425c46010566b4e6555ccb5d | Native B3LYP shortcut explicitly uses VWN5, hence not reused |
+| input_cp2k_hfx.F | 468ef8c01d0285e2341617d9df269dd3eb227c7006da14937f17acad2db7177f | HF fraction, operators, cutoff angstrom, initial-P screening, memory MiB/MPI process, storage |
+| xc/xc_xwpbe.F | 652ef1c975b9533e8c4fe1e1d0e43d39887e715e3c0c9496f871924033261dda | Short-range/original-hole scaling, omega and RKS/UKS derivative paths |
+| xc/xc_vwn.F | 788ec05f5f5283b70d8e1b9e6bcf50c2d6989b2ccf7a20b70ac34c39d7ef3803 | VWN3/VWN5 and spin implementations |
+| hfx_derivatives.F | 52961d2ffba8baabbe44a05b77a410a1e95f19fb943ec46e8363ac97bc004967 | Direct four-center derivative path, not numerical force validation |
+| qs_dispersion_utils.F | 587b8b35f0fadba226335ec4b45b5290260ea05c67eb8b77b8ec1511ba4bd337 | PBE0/HSE06/B3LYP D3 and D3(BJ) reference-name whitelist |
+
+Source hashes also accompany generated HFX metadata. Manual checks covered
+XC_FUNCTIONAL and HF/INTERACTION_POTENTIAL on the cp2k-2026_2-branch.
+Static source identity does not certify an installed executable or backend.
+
+### Local policy differences and scope
+
+- Target 2026.2 GPW classic MOLOPT/UCL Gamma NONE/XYZ ENERGY/ENERGY_FORCE/GEO_OPT;
+  RKS/UKS and OT/diag without smearing or +U. No GAPW, CELL_OPT, non-Gamma,
+  low-dimensional PBC, ADMM/RI-HFX, custom or UZH-PBE0 basis protocols.
+  Existing GPW density/CDD and protected single/bundle writers are reused.
+- Isolated global hybrids explicitly use COULOMB. Periodic global hybrids use
+  TRUNCATED, auto min(6 angstrom, minimum cell face spacing/2.01), referencing
+  upstream but bounding against the cell actually emitted at eight decimal places.
+  Explicit radii must stay strictly below half the minimum face spacing.
+  No clipping, cell/model/solver replacement or automatic physical fallback.
+- HSE06 emits SHORTRANGE, OMEGA=0.11, and omits CUTOFF_RADIUS; CP2K derives the
+  short-range numerical cutoff from omega/EPS_SCHWARZ.
+- EPS_SCHWARZ=1e-6 and EPS_STORAGE_SCALING=0.1 reference upstream; explicit
+  SCREEN_ON_INITIAL_P=F avoids upstream's restart-dependent T. MAX_MEMORY=512
+  MiB per MPI process follows the checked CP2K native default, not upstream 3000.
+  All three numerical controls have shared CLI/config/TUI replay; no arbitrary
+  HF fraction/omega or implicit resource request is introduced.
+- Truncated-gamma t_c_g.dat is only referenced, never bundled. Supplied data
+  directory requires a read-only byte/hash check and protected absolute path;
+  otherwise emit its runtime basename with an unchecked-data warning. T_C_G_DATA
+  uses default_c_val (char_t), so paths with spaces are quoted, unlike CP2K's
+  whole-line lchar_t basis/kernel filenames.
+- Existing matched potential/data/q resolution is preserved. The family-potential
+  follow-up (version 0.3.2 retained by explicit user request) corrects the initial
+  generic PBE-approval policy: prefer actual exact-hybrid entries; otherwise
+  automatically select BLYP for B3LYP and PBE for PBE0/HSE06.
+  Reference: same fixed cp2kmate.f90/outCP2Kinp, lines 1557-1572 (B3LYP/BLYP
+  branch and default PBE). Actual local Multiwfn 2026.10.18 generation also
+  emitted GTH-BLYP for B3LYP; binary and development-source versions differ.
+  Record semilocal-family approximation status without claiming exact-hybrid
+  matching or user approval. Required family/q absence fails, with no cross-family
+  substitution or invented labels. This user-directed policy needs no additional
+  numerical payload; existing terms/citations and validation limits remain.
+  UZH-PBE0 30-32 remain unavailable pending a distinct paired-data/protocol audit.
+
+### Citations, authorization and validation boundary
+
+Generated input headers and JSON retain both required Multiwfn papers. The
+[recorded custom terms](TERMS.md) and absence of separate author permission are
+unchanged. No Fortran, Libxc implementation, basis coefficients, pseudopotential
+parameters, D3 data or truncated-gamma numerical table is bundled.
+No new clean-room, relicensing, paid-distribution or whole-project compatibility
+claim is made. Method references remain those of the upstream XC/HFX sources.
+
+Synthetic tests cover complete coefficients/sections/units, operator/radius bounds
+including skew cells, invalid combinations, deterministic replay, CLI/TUI, spin/
+density/CDD and protected publication. Source/byte checks establish neither native
+syntax acceptance nor convergence, derivative accuracy or property correctness.
+Fresh local B3LYP generator comparison against Multiwfn 2026.10.18 passed 21/21
+cases, including selected basis/potential payload checks; documented screening,
+memory and SCF policy differences remain. Local evidence: test-workspace/
+b3lyp-0.3.2-retest-20261022-114046-bWjbx5/summary.json (not a distributed fixture).
+No CP2K execution or submission was performed for this feature.
+
 ## GFN-xTB implementation (0.3.1)
 
 The initial audit below describes the first 2026.2-only implementation. The
@@ -280,7 +375,8 @@ its historical source identity or validation evidence.
 ## Functional and GFN-xTB planning reinspection (planning-stage 0.3.x)
 
 - Historical planning inspection: [functional/method proposal](../../docs/functional-roadmap-0.3.md).
-  The non-hybrid implementation is registered above; hybrids/xTB remain planned.
+  This historical planning-stage note predates the implemented non-hybrid/xTB
+  and first three direct-HFX features registered above.
   This planning note itself adds no copied Fortran or calculation result.
 - Reinspected local Multiwfn 2026.10.1, `cp2kmate.f90`, `outCP2Kinp`;
   development locator `../Multiwfn_2026.10.1_src_Linux/cp2kmate.f90`.

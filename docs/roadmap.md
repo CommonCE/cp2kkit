@@ -1,6 +1,34 @@
 # Development status and next steps
 
-Current software: **0.3.1**; schema: **0.1.0**.
+Current software: **0.3.2**; schema: **0.1.0**.
+
+## Hybrid family-potential correction (0.3.2)
+
+- Prefer actual exact-hybrid entries; otherwise select GTH-BLYP for B3LYP and
+  GTH-PBE for PBE0/HSE06 without extra approximation approval.
+- Preserve family identity, approximation status, data hashes and fixed q.
+  Missing family entries fail without cross-family substitution. Other XC
+  approval policies and hybrid scope remain unchanged; no CP2K calculation.
+
+
+## Implemented first direct-HFX hybrids (0.3.2)
+
+- PBE0 → HSE06 → B3LYP input generation, shared API/CLI/TUI/config/replay;
+  local chooser 16/17/18 preserves original 1-15 and xTB 30/31/32.
+- Target 2026.2, GPW classic MOLOPT/UCL Gamma NONE/XYZ ENERGY/ENERGY_FORCE/
+  GEO_OPT, RKS/UKS, OT/diag without smearing or +U; existing density/CDD reused.
+- Complete native XC/HF definitions: PBE0 25%, HSE06 25% short-range with
+  matching omega=0.11 bohr^-1, B3LYP 20% and explicit VWN3.
+- Explicit full/short-range/truncated operators; periodic global auto radius
+  min(6 angstrom, minimum emitted-cell face spacing/2.01); user radius bounds,
+  screening and per-MPI-process MiB memory controls at 120/CLI.
+- No restart-dependent SCREEN_ON_INITIAL_P, solver/model changes, automatic
+  ADMM/RI-HFX, UZH-PBE0 enablement or fabricated matched potentials.
+  Data-directory TRUNCATED inputs require protected/hash-recorded t_c_g.dat.
+- Source/manual checks and synthetic generator tests only; no CP2K calculation.
+  Broader combinations and native/scientific validation remain separate.
+  See [capability matrix](input-generation.md#direct-hfx-hybrids-032).
+
 
 ## Implemented parser compatibility follow-up (0.3.1 retained)
 
@@ -144,7 +172,8 @@ keywords/units, data/model pairing, spin, tasks and build requirements; do not
 copy automatic physical changes, unchecked parameters or direct writes blindly.
 MP2/RPA/GW, double hybrids and other non-XC methods remain separate later scopes.
 The non-hybrid subset is implemented in 0.3.0 below; 0.3.1 adds xTB before
-hybrids at the user's request. Six hybrids remain deferred. Default PBE input
+hybrids at the user's request. Version 0.3.2 now adds PBE0/HSE06/B3LYP;
+BHandHLYP, M06-2X and configurable PBEh remain deferred. Default PBE input
 physics is unchanged.
 
 ### 0.3.1 implemented GFN-xTB scope
@@ -495,10 +524,10 @@ old default, or emitting target-version-unsupported keywords without checking.
 3. **Methods/bases:** 0.2.6 adds PBEsol/revPBE/RPBE and explicit catalog-backed
    MOLOPT/UCL mixed bases; the registry follow-up adds UZH-PBE pairs and custom ORB.
    Version 0.3.0 adds the non-hybrid registry and complete nonlocal methods;
-   0.3.1 adds the bounded GFN-xTB branch before hybrids;
+   0.3.1 adds the bounded GFN-xTB branch; 0.3.2 adds the first three direct-HFX hybrids;
    initial GAPW/all-electron bases were added in 0.2.7. Remaining: broader meta-GGA
    model/task support, native/scientific UZH validation, UZH-PBE0,
-   hybrids/HF/ADMM/RI-HFX, auxiliary and additional all-electron bases/families/
+   remaining hybrid profiles, broader HFX combinations, ADMM/RI-HFX, auxiliary and additional all-electron bases/families/
    q policies, correlated wavefunctions, semiempirical/force fields and SCF options.
 4. **Tasks:** frequencies/vibrations/Raman, MD, dimer TS, BAND/NEB, NMR, polarizability,
    BSSE, real-time electrons, PIMD, XAS, appropriate TDDFT.

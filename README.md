@@ -2,7 +2,7 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.3.1 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.3.2 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 - Analysis remains read-only: no submission/execution or modification of existing
@@ -25,9 +25,51 @@ series (GFN0, GFN1 and GFN2)**. GFN0/1 use CP2K-native implementations; GFN2
 requires tblite. Delivery is staged with target-version/data/combination checks;
 upstream defaults and correlated methods are not enabled automatically.
 Version 0.3.0 implements the 15 non-hybrid DFT profiles below. Version 0.3.1
-adds the three GFN-xTB methods before hybrid work; all six hybrids remain deferred.
+adds the three GFN-xTB methods. Version 0.3.2 adds PBE0, HSE06 and B3LYP direct-HFX
+input generation; BHandHLYP, M06-2X and configurable PBEh remain deferred.
 
-## Current version: 0.3.1
+## Current version: 0.3.2
+
+### PBE0, HSE06 and B3LYP input generation
+
+The shared CLI/API/TUI generator now supports these three hybrids for target
+**CP2K 2026.2**, with classic MOLOPT/UCL GPW bases, Gamma points, NONE/XYZ PBC,
+ENERGY/ENERGY_FORCE/GEO_OPT, RKS or collinear UKS, and OT or diagonalization
+without smearing. DFT+U, GAPW, CELL_OPT, non-Gamma, ADMM, RI-HFX and UZH-PBE0
+protocols remain outside this initial hybrid scope.
+
+- **PBE0**: 25% HF + 75% PBE exchange + full PBE correlation.
+- **HSE06**: 25% short-range HF with matching XC/HF ω=0.11 bohr⁻¹.
+- **B3LYP**: 20% HF and explicit **VWN3**, the Gaussian/Multiwfn convention.
+- Isolated global hybrids use full Coulomb HFX; periodic PBE0/B3LYP use truncated
+  Coulomb HFX. Automatic radius is min(6 angstrom, minimum cell face spacing/2.01),
+  including skew cells. Converge radius/supercell separately.
+- Chooser **1/110** appends **16 PBE0 / 17 HSE06 / 18 B3LYP** without changing
+  the original 15 or xTB 30/31/32. Menu **120** edits direct-HFX controls.
+- Prefer real exact-hybrid potential entries when supplied; otherwise use
+  **GTH-BLYP for B3LYP** and **GTH-PBE for PBE0/HSE06** automatically (0.3.2).
+  These standard semilocal-family potentials need no approximation approval;
+  provenance still distinguishes them from exact-hybrid potentials. Missing family
+  entries fail without cross-family or q substitution. No auxiliary bases are invented.
+
+```bash
+cp2kkit generate-input water.xyz -o water-pbe0.inp --periodic NONE \
+  --functional PBE0
+cp2kkit generate-input solid.extxyz -o solid-hse06.inp \
+  --functional HSE06 --hf-memory 1024
+cp2kkit generate-input water.xyz -o water-b3lyp-opt.inp --periodic NONE \
+  --functional B3LYP --run-type GEO_OPT
+```
+
+Direct HFX defaults: EPS_SCHWARZ=1e-6, MAX_MEMORY=512 **MiB per MPI process**,
+EPS_STORAGE_SCALING=0.1, SCREEN_ON_INITIAL_P=F (no restart-dependent screening).
+Override with `--hf-eps-schwarz`, `--hf-memory`, and periodic-global-hybrid-only
+`--hf-cutoff-radius` [angstrom]. Memory is not total job memory or a scheduler
+request. Nondefault HF controls fail on non-hybrid/xTB methods rather than being
+silently ignored. No CP2K calculations were run for this feature; source checks
+and synthetic generation do not certify the executable, convergence or properties.
+See [complete hybrid scope and provenance](docs/input-generation.md#direct-hfx-hybrids-032).
+
 
 Parser compatibility follow-up (version retained by user request): total-energy
 records accept both `[a.u.]` and `[hartree]`, with values stored in hartree and
@@ -97,7 +139,7 @@ Initial meta-GGA/nonlocal scope is GPW, Gamma, ENERGY/ENERGY_FORCE/GEO_OPT,
 without +U. GAPW/non-Gamma/CELL_OPT/+U require separate validation; these are
 cp2kkit scope limits, not CP2K-wide prohibitions. Existing GGA paths, basis IDs,
 CLI/config/replay controls and default PBE input physics remain compatible.
-Schema stays 0.1.0 with additive XC/kernel and model provenance. No hybrids, new
+Schema stays 0.1.0 with additive XC/kernel, HFX and model provenance. No new
 Python runtime dependency or native calculation is included. See the
 [full capability/dispersion matrix](docs/input-generation.md#non-hybrid-xc-profiles-030).
 
@@ -362,7 +404,8 @@ See [input generation](docs/input-generation.md).
 
 Supported: ENERGY/ENERGY_FORCE/GEO_OPT/CELL_OPT subject to the
 [per-profile limits](docs/input-generation.md#non-hybrid-xc-profiles-030), 15 non-hybrid
-XC profiles, MOLOPT-GTH, checked D3/D3(BJ) combinations, charge/multiplicity,
+XC profiles plus the three [bounded direct-HFX hybrids](docs/input-generation.md#direct-hfx-hybrids-032),
+MOLOPT-GTH, checked D3/D3(BJ) combinations, charge/multiplicity,
 cell/PBC, OT/diagonalization, and k-points on the existing semilocal paths.
 For target CP2K **2026.2**, explicit Hubbard Ueff/L and collinear magnetic initial
 states are also supported, including same-element opposite-spin KIND splitting.

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .errors import KitError
 from .functional_registry import parse_functional
+from .hybrid import HFX_FIELDS
 from .input_tui import (Cancelled, SessionExit, Menu, GROUPS, field_display,
                         parse_value, visible_fields)
 from .inputgen import InputSettings, generate_input, write_input
@@ -280,6 +281,10 @@ def edit_entry(menu, values, entry):
                 return
             except ValueError as exc:
                 menu.show(f'Invalid input: {exc}')
+    elif entry.editor == 'hybrid':
+        menu.show('Direct HFX only; no automatic ADMM/RI-HFX. Radius applies only to periodic PBE0/B3LYP; auto clears it.')
+        for name in HFX_FIELDS:
+            values[name] = menu.edit(FIELDS[name], values[name], values)
     elif entry.editor == 'source':
         edit_source(menu, values, entry.field)
     elif entry.editor in {'custom_basis', 'custom_potential'}:

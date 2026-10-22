@@ -65,7 +65,7 @@ class MethodProfileTests(unittest.TestCase):
 
     def test_functional_names_and_distinct_xc_expansions(self):
         self.assertEqual(FUNCTIONALS[:5], ('PBE', 'BLYP', 'PBESOL', 'REVPBE', 'RPBE'))
-        self.assertEqual(len(FUNCTIONALS), 15)
+        self.assertEqual(len(FUNCTIONALS), 18)
         for functional in ('PBESOL', 'REVPBE', 'RPBE'):
             with self.subTest(functional=functional):
                 text, manifest = self.generate(functional=functional, allow_pbe_potential=True, libxc_available=True)

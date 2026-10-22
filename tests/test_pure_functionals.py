@@ -68,7 +68,7 @@ class PureFunctionalTests(unittest.TestCase):
         return data
 
     def test_registry_exact_scope_and_original_order(self):
-        self.assertEqual(FUNCTIONALS, ('PBE', 'BLYP', 'PBESOL', 'REVPBE', 'RPBE', 'PADE', 'BP86',
+        self.assertEqual(FUNCTIONALS[:15], ('PBE', 'BLYP', 'PBESOL', 'REVPBE', 'RPBE', 'PADE', 'BP86',
                                        'TPSS', 'REVTPSS', 'SCAN', 'R2SCAN', 'MN15L', 'HLE17', 'B97M-RV', 'BEEFVDW'))
         self.assertEqual({name for name, p in FUNCTIONAL_PROFILES.items() if p.libxc}, set(COMPONENTS) | {'BEEFVDW'})
 
@@ -89,18 +89,18 @@ class PureFunctionalTests(unittest.TestCase):
         self.assertEqual(parse_value(field, '1'), 'PBE')
         self.assertEqual(parse_value(field, '5'), 'RPBE')
 
-    def test_hybrid_xtb_arbitrary_and_injected_functionals_stay_unavailable(self):
-        for value in ('PBE0', 'HSE06', 'M06-2X', 'GFN0-xTB', 'GFN2-xTB', 'OLYP', 'B97M-V',
+    def test_deferred_hybrid_xtb_arbitrary_and_injected_functionals_stay_unavailable(self):
+        for value in ('BHandHLYP', 'PBEh', 'M06-2X', 'GFN0-xTB', 'GFN2-xTB', 'OLYP', 'B97M-V',
                       'PBE\n&HF', '', None, 1, ['PBE']):
             with self.subTest(value=value), self.assertRaises(KitError):
                 self.generate(value)
         with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as cm:
-            main(['generate-input', str(self.source), '-o', str(self.output), '--functional', 'PBE0'])
+            main(['generate-input', str(self.source), '-o', str(self.output), '--functional', 'PBEh'])
         self.assertEqual(cm.exception.code, 2)
         self.assertFalse(self.output.exists())
 
     def test_every_profile_has_no_hf_and_preserves_core_settings(self):
-        for functional in FUNCTIONALS:
+        for functional in FUNCTIONALS[:15]:
             with self.subTest(functional=functional):
                 text, report = self.generate(functional, cutoff=530., rel_cutoff=67., eps_scf=2e-7, charge=1, multiplicity=2)
                 self.assertNotIn('&HF', text)
@@ -179,12 +179,12 @@ class PureFunctionalTests(unittest.TestCase):
         self.assertEqual(report['method_profile']['potential_approximations'], [])
 
     def test_pbe_approval_does_not_relabel_uzh_or_change_electron_model(self):
-        for functional in FUNCTIONALS[5:]:
+        for functional in FUNCTIONALS[5:15]:
             with self.subTest(functional=functional), self.assertRaisesRegex(KitError, 'requires'):
                 self.generate(functional, basis='uzh-pbe-tzvp')
 
     def test_new_profiles_remain_target_version_gated(self):
-        for functional in FUNCTIONALS[5:]:
+        for functional in FUNCTIONALS[5:15]:
             for target in ('2024.1', '2025.2', '2026.1'):
                 with self.subTest(functional=functional, target=target), self.assertRaisesRegex(KitError, '2026.2'):
                     self.generate(functional, cp2k_version=target)
@@ -200,7 +200,7 @@ class PureFunctionalTests(unittest.TestCase):
 
     def test_gamma_energy_force_and_geo_opt_allow_rks_and_uks(self):
         periodic = replace(self.water, pbc=[True]*3, cell=[[12., 0., 0.], [0., 12., 0.], [0., 0., 12.]])
-        for functional in FUNCTIONALS[5:]:
+        for functional in FUNCTIONALS[5:15]:
             for task in ('ENERGY', 'ENERGY_FORCE', 'GEO_OPT'):
                 for magnetic in (None, ()):
                     with self.subTest(functional=functional, task=task, magnetic=magnetic):
@@ -306,7 +306,7 @@ class PureFunctionalTests(unittest.TestCase):
             self.assertIsNone(report['emitted_data_files']['xc_kernel'])
 
     def test_replay_config_and_input_publication_for_all_new_profiles(self):
-        for functional in FUNCTIONALS[5:]:
+        for functional in FUNCTIONALS[5:15]:
             with self.subTest(functional=functional):
                 settings = replace(self.settings, functional=functional, write_json=True)
                 output = self.root/(functional+'.inp')
@@ -361,7 +361,8 @@ class PureFunctionalTests(unittest.TestCase):
             values = {**asdict(self.settings), 'path': str(self.source), 'frame': -1, 'functional': functional}
             visible = {f.name for f in visible_fields(fields, values)}
             self.assertEqual('libxc_available' in visible, profile.libxc)
-            self.assertEqual('allow_pbe_potential' in visible, functional not in {'PBE', 'BLYP'})
+            self.assertEqual('allow_pbe_potential' in visible,
+                             functional not in {'PBE', 'BLYP', 'PBE0', 'HSE06', 'B3LYP'})
 
     def test_cdd_all_components_share_xc_and_nonlocal_identity(self):
         for functional in ('PADE', 'BP86', 'R2SCAN', 'B97M-RV', 'BEEFVDW'):

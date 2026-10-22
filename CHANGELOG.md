@@ -8,6 +8,66 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.3.2
+
+### Family-potential correction (version retained by explicit user request)
+
+- Correct standard hybrid family-potential selection: B3LYP uses GTH-BLYP;
+  PBE0/HSE06 use GTH-PBE when no actual exact-hybrid entry is supplied.
+  Family selection no longer requires --allow-pbe-potential. Prefer verified
+  exact-hybrid entries, preserve fixed q and actual file/entry hashes, and reject
+  missing family entries rather than crossing families (even with approval).
+- Keep existing potential_functional/potential_approximation provenance: family
+  potentials remain semilocal approximations, not exact-hybrid potentials.
+  Warnings distinguish automatic family policy from user-approved PBE fallback.
+  Other functionals retain their approval requirements. No schema change,
+  XC/HFX composition change, CP2K execution or scientific-validation claim.
+- Hide inactive menu 114 for these three hybrids, retaining hidden values for
+  other functional selections. CLI/config compatibility is preserved.
+- Validation: 44 focused and 476 full regression tests passed. Regenerated 63
+  cp2kkit cases without approval and compared against preserved real Multiwfn
+  2026.10.18 inputs: XC/HF, geometry/task/spin/solver and selected basis/potential
+  payload checks passed for all cases, allowing documented numerical-policy
+  differences. No new Multiwfn run or native CP2K validation in that comparison.
+- Version retained at 0.3.2 by explicit user request. Fresh B3LYP retest ran both
+  cp2kkit and Multiwfn 2026.10.18 for 21 cases without approximation approval:
+  all semantic/data-payload checks passed, with known numerical-policy differences
+  retained. Package/CLI/generated-manifest versions are 0.3.2; 21 focused and
+  476 full regression tests passed. No CP2K execution or convergence claim.
+
+### Initial direct-HFX implementation
+
+- User-designated version: add PBE0 → HSE06 → B3LYP direct-four-center HFX
+  input generation through the shared API/CLI/TUI/config/replay/writer.
+  Preserve original 15 DFT positions and xTB 30/31/32; append local 16/17/18.
+  Menu 120 edits HF controls; 121/122 remain planned RI-HFX/ADMM.
+- Emit complete native XC/HF compositions: PBE0 25%; HSE06 25% short-range HF
+  with matching XC/HF omega=0.11 bohr^-1; B3LYP 20% with explicit VWN3
+  (Gaussian/Multiwfn convention, not the CP2K shortcut's VWN5).
+- Initial scope: target CP2K 2026.2, GPW classic MOLOPT/UCL orbital bases,
+  Gamma NONE/XYZ ENERGY/ENERGY_FORCE/GEO_OPT, RKS/UKS, OT/diag without smearing
+  or +U. Existing density/CDD generation is reused. GAPW, CELL_OPT, non-Gamma,
+  low-dimensional PBC, UZH-PBE0/custom orbital protocols, ADMM and RI-HFX are
+  not enabled. BHandHLYP/M06-2X/configurable PBEh remain deferred.
+- Isolated globals use COULOMB; periodic globals use TRUNCATED. Auto radius is
+  min(6 angstrom, minimum emitted-cell face spacing/2.01), including skew cells.
+  Explicit radii must be below half the minimum spacing; no automatic clipping,
+  cell/solver/model changes or restart-dependent initial-P screening.
+- Add --hf-eps-schwarz (default 1e-6), --hf-memory (512 MiB per MPI process,
+  not total job memory), --hf-cutoff-radius [angstrom; periodic globals only].
+  SCREEN_ON_INITIAL_P=F and EPS_STORAGE_SCALING=0.1. Nondefault inactive HF
+  requests fail on pure DFT/xTB instead of being silently ignored.
+- Reuse checked basis/potential resolution and explicit GTH-PBE approximation
+  approval. UZH-PBE0 basis numbers remain unavailable with corrected reasons.
+  For TRUNCATED, --data-dir requires/protects/hashes t_c_g.dat; without it,
+  emit an unchecked runtime basename and warning. No numerical data bundled.
+- Schema remains 0.1.0 with additive native XC/HFX metadata, units, effective
+  operator/radius, resource policy and tagged-source provenance. Existing pure
+  DFT/xTB input physics and protected publication semantics are unchanged.
+- Validation is source/manual inspection and synthetic generation/regression
+  tests only; no CP2K run, submission, native syntax acceptance, convergence
+  or property-validation claim. No commit, push or package publication.
+
 ## 0.3.1
 
 - GFN2 OT crash-protection follow-up (version retained): reject OT generation

@@ -67,7 +67,13 @@ def build_parser():
     gen.add_argument('--xtb-accuracy', type=float, default=1.0,
                      help='CP2K 2026.2 GFN2 tblite accuracy factor: numerical setup; also native SCC convergence with diag, not OT EPS_SCF')
     gen.add_argument("--functional", type=parse_functional, choices=FUNCTIONALS, default="PBE",
-                     help="Non-hybrid profile; aliases LDA/PADE, BP/BP86, MN15-L/MN15L, BEEF-vdW/BEEFVDW")
+                     help="XC profile including PBE0/HSE06/B3LYP; aliases LDA/PADE, BP/BP86, MN15-L/MN15L, BEEF-vdW/BEEFVDW")
+    gen.add_argument('--hf-eps-schwarz', type=float, default=1e-6,
+                     help='Direct HFX screening threshold, 0 < value < 1; default 1e-6 is not convergence evidence')
+    gen.add_argument('--hf-memory', type=int, default=512,
+                     help='Direct HFX MAX_MEMORY [MiB per MPI process], not total job memory; default 512')
+    gen.add_argument('--hf-cutoff-radius', type=float,
+                     help='Periodic PBE0/B3LYP truncation radius [angstrom]; default min(6, minimum face spacing/2.01)')
     gen.add_argument("--basis", type=parse_basis, default=DEFAULT_BASIS,
                      help="Stable ORB ID or legacy family name; numbers are interactive-only")
     gen.add_argument("--gapw-profile", choices=("auto", "native"), default="auto",

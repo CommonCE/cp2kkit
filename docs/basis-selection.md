@@ -56,7 +56,9 @@ names remain accepted on input. The default remains DZVP-MOLOPT-SR-GTH.
 Numbers outside these entries are not selectable. Disabled PBE0 entries are
 shown with an explicit UNAVAILABLE reason, not advertised as working templates.
 ORB, AUX_FIT and RI_AUX are distinct roles in the model; only ORB is selectable.
-No auxiliary basis, hybrid/HF/ADMM or RI method template is added. AE 50-59
+No auxiliary basis, ADMM or RI method template is added. Software 0.3.2 enables
+[direct-HFX hybrids](input-generation.md#direct-hfx-hybrids-032) using classic
+MOLOPT/UCL only; UZH-PBE0 remains unavailable. AE 50-59
 uses the separate GAPW model described below, not the fixed-q GPW policy.
 
 ## Functional pairing in 0.3.0
@@ -175,8 +177,9 @@ potential source and reject it for UZH. Unrecognized explicit UZH file bytes hav
 unverified physical pairing, even when selected-entry structural/q checks pass.
 Classic/UCL and UZH potential libraries are not silently exchanged.
 
-PBE0-family headers exist, including HYB aliases, but no hybrid calculation
-template exists. The pinned UZH basis file has the literal anomalous header
+PBE0-family headers exist, including HYB aliases, but the UZH-PBE0 paired
+protocol is not enabled. The 0.3.2 classic-basis direct-HFX templates do not
+promote these distinct UZH entries to selectable methods. The pinned UZH basis file has the literal anomalous header
 `a TZV2P-MOLOPT-PBE0-GTH-q10 TZV2P-MOLOPT-HYB-GTH-q10` at line **5614**.
 Do not infer/repair Ca from the preceding comment; this family has only 70 current
 preset-element headers rather than 71. POTENTIAL_UZH also has 30 PBE `NA`

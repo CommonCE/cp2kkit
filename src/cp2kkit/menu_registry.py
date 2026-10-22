@@ -39,6 +39,7 @@ ENTRIES = (
     MenuEntry(112, 'dft_plus_u', 'DFT+U [eV]'),
     MenuEntry(113, 'libxc_available', 'Target CP2K has Libxc (user assertion)'),
     MenuEntry(114, 'allow_pbe_potential', 'Allow GTH-PBE approximation'),
+    MenuEntry(120, 'hf_eps_schwarz', 'Direct HFX parameters', editor='hybrid'),
     MenuEntry(140, 'method', 'DFT / GFN-xTB model'),
     MenuEntry(141, 'tblite_available', 'Target CP2K has tblite (user assertion)'),
     MenuEntry(142, 'xtb_accuracy', 'tblite ACCURACY (dimensionless)'),

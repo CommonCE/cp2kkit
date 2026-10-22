@@ -1,6 +1,6 @@
 # CP2K input generation
 
-This guide describes cp2kkit **0.3.1**. Older defaults and migration notes are in
+This guide describes cp2kkit **0.3.2**. Older defaults and migration notes are in
 [the changelog](../CHANGELOG.md). AE automatic setup is described in
 [the basis guide](basis-selection.md#all-electron-automatic-setup-027).
 The [registry-v1 basis guide](basis-selection.md) defines permanent numbering toward
@@ -409,9 +409,9 @@ charge. Integrals are not fragment net charge transfer. See [cube checks](cube.m
 |---|---|
 | Structure | `.xyz`/`.extxyz`/text `.restart`/`.gjf`/`.com`/`.cif`/POSCAR/CONTCAR/`.vasp`/`.poscar`; XYZ last frame |
 | Task | ENERGY (default), ENERGY_FORCE, GEO_OPT, CELL_OPT |
-| Method | Quickstep/GPW; 15 non-hybrid profiles at target 2026.2; per-profile limits below; PBE default |
+| Method | Quickstep/GPW; 15 non-hybrid profiles plus PBE0/HSE06/B3LYP direct HFX at target 2026.2; per-profile limits below; PBE default |
 | Basis | DZVP-MOLOPT-SR-GTH (default); SZV-SR, DZVP/TZVP/TZV2P non-SR; target 2026.2 adds TZVP-SR/TZV2P-SR/TZV2PX and explicit element overrides |
-| Potential | Catalog-checked GTH entries with fixed `-qN`; prefer actual matched functional, explicitly approved PBE approximation otherwise |
+| Potential | Catalog-checked GTH entries with fixed `-qN`; prefer actual matched functional, then standard hybrid family (B3LYP: BLYP; PBE0/HSE06: PBE); other unmatched profiles require explicit PBE approval |
 | Dispersion | none (default), D3, D3(BJ); dftd3.dat and REFERENCE_FUNCTIONAL |
 | Charge/spin | Default charge 0; automatic multiplicity: even electrons 1, odd electrons 2; explicit values override; UKS for multiplicity > 1 or explicit magnetic request |
 | SCF | OT+FULL_ALL/DIIS+outer SCF (default), or diagonalization+Broyden mixing |
@@ -491,11 +491,122 @@ Standard-library readers preserve original hashes and do not run Gaussian/VASP/M
 - Restart provides **geometry only**: original KIND labels merge by element;
   method/U/constraints/moments/charge/solvent are not inherited. This is a new template,
   not a complete restart of the original job.
-- Hybrid/ADMM, MD, frequencies, NEB, TDDFT, solvents, external fields, richer
+- Hybrids beyond the bounded PBE0/HSE06/B3LYP subset, ADMM/RI-HFX, MD, frequencies, NEB, TDDFT, solvents, external fields, richer
   constraints beyond fixed atoms, and other advanced Multiwfn branches are not implemented.
   Electron/spin cubes are supported; potential/ELF/MO cubes are not.
 - Default cutoff/basis/vacuum/k-points are not converged for the target system.
   Deprecated CELL_OPT TYPE DIRECT_CELL_OPT is not emitted.
+
+## Direct-HFX hybrids (0.3.2)
+
+PBE0 → HSE06 → B3LYP are implemented through the same generator, not an external
+executable or a second input writer. Target **2026.2** only. BHandHLYP, M06-2X,
+configurable PBEh and arbitrary hybrid mixtures remain deferred.
+
+| Capability | Initial hybrid scope |
+|---|---|
+| Tasks | ENERGY, ENERGY_FORCE, GEO_OPT; no CELL_OPT/stress |
+| Electronic model | GPW, classic MOLOPT/UCL orbital bases and fixed-q GTH potentials |
+| Spin | RKS, UKS (explicit multiplicity or magnetic seeds); no automatic spin change |
+| Boundary | NONE or XYZ; source PBC/cell preserved; low-dimensional PBC rejected |
+| k-points / SCF | Gamma only; OT or diagonalization; no smearing |
+| Dispersion | none, D3 or D3(BJ), with the exact named functional reference |
+| Density | Existing GPW electron/spin cubes and explicit whole/A/B CDD inputs; reference states and actual cube-grid compatibility still need validation |
+| Excluded | GAPW/AE, +U, UZH-PBE0/custom orbital protocols, ADMM, RI-HFX, non-Gamma, correlated methods |
+
+`FUNCTIONALS` retains the original 15 entries, then appends PBE0/HSE06/B3LYP.
+The method chooser **1/110** uses local positions **16/17/18** (not a claim of
+Multiwfn number equivalence); xTB remains **30/31/32**. Menu **120** edits the
+three direct-HFX numerical controls in sequence. **121/122 remain planned**:
+RI-HFX and ADMM are not enabled by selecting a hybrid. Basis IDs are unchanged;
+UZH-PBE0 30-32 remain unavailable pending their own paired-data/protocol audit.
+
+### Complete XC/HF definitions
+
+All components use native CP2K XC; no Libxc assertion is required for these
+three definitions. HFX requires a suitable Libint-enabled target build; this
+tool neither probes nor certifies the build.
+
+| Profile | Semilocal XC | HF |
+|---|---|---|
+| PBE0 | PBE SCALE_X=0.75, SCALE_C=1.0 | FRACTION=0.25 |
+| HSE06 | XWPBE SCALE_X=-0.25, SCALE_X0=1.0, OMEGA=0.11; PBE SCALE_X=0.0, SCALE_C=1.0 | FRACTION=0.25, SHORTRANGE OMEGA=0.11 |
+| B3LYP | LYP SCALE_C=0.81; BECKE88 SCALE_X=0.72; VWN FUNCTIONAL_TYPE=VWN3, SCALE_C=0.19; XALPHA SCALE_X=0.08 | FRACTION=0.20 |
+
+HSE06's ω is **0.11 bohr⁻¹**, consistently in both XC and HF. B3LYP deliberately
+uses **VWN3**, matching the inspected Multiwfn/Gaussian convention, not the native
+B3LYP shortcut's implicit variant. Do not compare different B3LYP definitions as
+though they were identical. Fractions and ω are method definitions, not exposed
+tuning controls; configurable PBEh is a later feature.
+
+### Interaction operator, radius and resources
+
+- Isolated PBE0/B3LYP: explicit **COULOMB**, no radius or truncated-gamma table.
+- XYZ PBE0/B3LYP: explicit **TRUNCATED**. Auto radius:
+  `min(6 angstrom, minimum cell face spacing / 2.01)`, referencing Multiwfn.
+  Perpendicular face spacings, not cell-vector lengths, handle skew cells;
+  bounds use the cell rounded to the actual emitted eight decimal places.
+  This is a finite-cell HFX approximation, not convergence evidence.
+- Override with `--hf-cutoff-radius R` [angstrom]. Require strictly less than half
+  the minimum face spacing; reject invalid values without clipping or enlarging
+  the cell. A radius request on isolated hybrids or HSE06 fails explicitly.
+- HSE06: **SHORTRANGE** with ω=0.11. Omit CUTOFF_RADIUS; CP2K derives the
+  short-range numerical cutoff from ω and EPS_SCHWARZ.
+- `--hf-eps-schwarz`: finite 0 < threshold < 1; default **1e-6**.
+- `--hf-memory`: positive integer **MiB per MPI process**, default **512**.
+  This follows CP2K's native memory default, not Multiwfn's 3000 setting. It is
+  an HFX budget, not the total process memory or a scheduler allocation.
+- Explicit **SCREEN_ON_INITIAL_P F**, unlike upstream's restart-dependent T.
+  EPS_STORAGE_SCALING is fixed at **0.1**; no wavefunction restart is required.
+- Nondefault HF controls on pure DFT or xTB fail until explicitly reset; hidden
+  requests are retained, not silently applied to an unrelated method.
+
+Periodic global hybrids need **t_c_g.dat** for truncated-gamma evaluation.
+With `--data-dir` (or CP2K_DATA_DIR), require the file, record absolute path,
+raw-byte SHA-256/size in `data_sources.hfx_truncated_gamma`, emit T_C_G_DATA,
+and protect it from output replacement. T_C_G_DATA is a single char_t token:
+paths containing spaces are quoted, unlike whole-line basis/kernel filenames.
+Without a data directory, emit the
+basename and warn that CP2K must resolve it at runtime. Byte checks do not
+validate the numerical table. HSE06/isolated global hybrids do not require it.
+
+Since 0.3.2, actual matched hybrid potential entries are preferred if supplied;
+otherwise **B3LYP uses GTH-BLYP**, and **PBE0/HSE06 use GTH-PBE** as standard
+semilocal-family choices, matching Multiwfn. These three family choices do not
+require `--allow-pbe-potential` / **114**. If the required family/q entry is
+missing, fail without crossing families, changing q, or inventing labels (even
+when PBE approximation approval is enabled). Other functional approval policies
+are unchanged. `potential_functional` records the actual family, and
+`potential_approximation=true` still distinguishes it from an exact-hybrid
+potential; the warning identifies automatic family selection, not user approval.
+Real file names, q and hashes stay in existing KIND/source provenance.
+
+```bash
+cp2kkit generate-input water.xyz -o water-pbe0.inp --periodic NONE \
+  --functional PBE0 --write-json
+cp2kkit generate-input solid.extxyz -o solid-hse06.inp \
+  --functional HSE06 --hf-memory 1024
+cp2kkit generate-input solid.extxyz -o solid-pbe0.inp \
+  --functional PBE0 --hf-cutoff-radius 5 \
+  --hf-eps-schwarz 1e-7 --data-dir /path/to/cp2k/data
+cp2kkit generate-input water.xyz -o water-b3lyp-opt.inp --periodic NONE \
+  --functional B3LYP --run-type GEO_OPT
+```
+
+The existing staged .inp/optional exclusive JSON writer and CDD bundle collision
+rules are reused. Source checks and synthetic section/coefficient/CLI/TUI/replay/
+protection tests are not native syntax acceptance, derivative accuracy,
+convergence or scientific validation. **No CP2K run or submission in this round.**
+
+References: CP2K v2026.2
+[input_cp2k_xc.F](https://github.com/cp2k/cp2k/blob/v2026.2/src/input_cp2k_xc.F),
+[input_cp2k_hfx.F](https://github.com/cp2k/cp2k/blob/v2026.2/src/input_cp2k_hfx.F),
+[xc_xwpbe.F](https://github.com/cp2k/cp2k/blob/v2026.2/src/xc/xc_xwpbe.F),
+[xc_vwn.F](https://github.com/cp2k/cp2k/blob/v2026.2/src/xc/xc_vwn.F),
+[hfx_derivatives.F](https://github.com/cp2k/cp2k/blob/v2026.2/src/hfx_derivatives.F)
+and [qs_dispersion_utils.F](https://github.com/cp2k/cp2k/blob/v2026.2/src/qs_dispersion_utils.F).
+Exact inspected hashes are in hybrid.py and [feature provenance](../third_party/multiwfn/PROVENANCE.md).
+The derivative path was inspected, not numerically validated.
 
 ## GFN-xTB methods (0.3.1)
 
@@ -826,7 +937,7 @@ energies/forces/stress, recommended bases/U, or validation of an adsorption mode
 The registry follow-up enables paired UZH-PBE DZVP/TZVP/TZV2P for target 2026.2
 and explicit custom pseudopotential ORB files. Version 0.3.0 adds the bounded
 meta-GGA/nonlocal subset above; 0.3.1 adds the separate bounded xTB branch.
-Hybrids/HF/ADMM, UZH-PBE0 templates,
+Version 0.3.2 adds the bounded direct-HFX hybrids above. ADMM/RI-HFX, UZH-PBE0 templates,
 arbitrary q changes, auxiliary and reserved
 families remain unimplemented; see [basis selection](basis-selection.md).
 

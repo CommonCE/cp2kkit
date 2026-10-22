@@ -19,8 +19,9 @@ from .inputgen import (CP2K_VERSIONS, FUNCTIONALS, PERIODICITIES, RUN_TYPES, TRA
 from .structure import read_structure
 from .presentation import Presenter
 from .method_profiles import parse_basis_overrides, format_basis_overrides
-from .functional_registry import FUNCTIONAL_PROFILES, parse_functional
+from .functional_registry import FUNCTIONAL_PROFILES, HYBRID_POTENTIAL_FAMILIES, parse_functional
 from .constraints import parse_fixed_atoms
+from .hybrid import HFX_FIELDS
 from .spin_settings import (parse_dft_plus_u, parse_magnetism,
                             format_dft_plus_u, format_magnetism)
 
@@ -58,6 +59,9 @@ GROUPS = (
         Field('tblite_available', 'Assert target CP2K has tblite linked (not detected)', 'bool'),
         Field('xtb_accuracy', 'CP2K 2026.2 tblite ACCURACY (dimensionless; role depends on solver)', 'float', positive=True),
         Field("functional", "Functional (GPW/GTH or GAPW/ALL)", choices=FUNCTIONALS),
+        Field('hf_eps_schwarz', 'Direct HFX EPS_SCHWARZ (0 < threshold < 1)', 'float', positive=True),
+        Field('hf_memory', 'HFX MAX_MEMORY [MiB per MPI process, not total job memory]', 'int', minimum=1),
+        Field('hf_cutoff_radius', 'Periodic global-hybrid radius [angstrom] (auto: min(6, face spacing/2.01))', 'float', optional=True, positive=True),
         Field("basis", "Orbital basis (immutable registry number or stable ID/name; 0 returns)", 'basis'),
         Field("dispersion", "Dispersion", choices=("none", "d3", "d3bj")),
         Field("data_dir", "CP2K data directory (verify entries and hashes)", optional=True),
@@ -127,7 +131,7 @@ def visible_fields(fields, values):
     except KitError:
         has_ae = True  # Invalid drafts stay editable; authoritative review gives the error.
     xtb = values.get('method', 'DFT') != 'DFT'
-    dft_only = {'basis', 'basis_overrides', 'basis_files', 'potential_files', 'custom_basis_file',
+    dft_only = {*HFX_FIELDS, 'basis', 'basis_overrides', 'basis_files', 'potential_files', 'custom_basis_file',
                 'custom_basis_name', 'custom_potential_file', 'custom_potential_name', 'gapw_profile',
                 'dispersion', 'libxc_available', 'allow_pbe_potential', 'dft_plus_u', 'magnetism',
                 'cutoff', 'rel_cutoff', 'electron_density', 'spin_density', 'cube_stride', 'density_difference',
@@ -135,6 +139,7 @@ def visible_fields(fields, values):
     non_scf = values.get('method') == 'GFN0-xTB'
     return tuple(f for f in fields
                  if not (xtb and f.name in dft_only)
+                 and not (f.name in HFX_FIELDS and not getattr(FUNCTIONAL_PROFILES.get(values.get('functional')), 'exact_exchange_fraction', 0))
                  and not (non_scf and f.name in {'scf', 'eps_scf', 'max_scf', 'max_outer_scf', 'ot_algorithm'})
                  and not (f.name == 'xtb_accuracy' and values.get('cp2k_version') != '2026.2')
                  and not (f.name in {'tblite_available', 'xtb_accuracy'} and values.get('method') != 'GFN2-xTB')
@@ -146,7 +151,7 @@ def visible_fields(fields, values):
                  and not (f.name == 'vacuum' and periodic != 'NONE')
                  and not (f.name in {'smearing', 'added_mos'} and values['scf'] == 'ot')
                  and not (f.name in {'max_outer_scf', 'ot_algorithm'} and values['scf'] != 'ot')
-                 and not (f.name == 'allow_pbe_potential' and values.get('functional') in {'PBE', 'BLYP'})
+                 and not (f.name == 'allow_pbe_potential' and values.get('functional') in {'PBE', 'BLYP', *HYBRID_POTENTIAL_FAMILIES})
                  and not (f.name == 'libxc_available' and not
                           getattr(FUNCTIONAL_PROFILES.get(values.get('functional')), 'libxc', False)))
 
@@ -436,6 +441,12 @@ class Menu:
             self.show(f"Atoms: {len(structure.symbols)}; {electron_label}: {manifest['explicit_electron_count']}")
             self.show(f"Target version: {settings.cp2k_version}; Run type: {settings.run_type}; Method: {manifest['method_profile']['qs_method']}/{settings.functional}")
             self.show(f"XC backend: {manifest['method_profile']['xc_backend']}; target build verified: False")
+            hfx = manifest['method_profile'].get('hfx')
+            if hfx:
+                self.show(f"Direct HFX: fraction={hfx['fraction']}; operator={hfx['interaction_potential']}; "
+                          f"omega={hfx['omega']} bohr^-1; radius={hfx['cutoff_radius_angstrom']} angstrom")
+                self.show(f"EPS_SCHWARZ={hfx['eps_schwarz']}; MAX_MEMORY={hfx['max_memory_mib_per_mpi_process']} MiB per MPI process; "
+                          "ADMM/RI-HFX: off; runtime validated: False")
             nonlocal_xc = manifest['nonlocal_correlation']
             if nonlocal_xc['enabled']:
                 self.show(f"Required nonlocal correlation: {nonlocal_xc['type']}; kernel: {nonlocal_xc['kernel_file']}; "

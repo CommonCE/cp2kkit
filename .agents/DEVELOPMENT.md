@@ -149,6 +149,18 @@ port or evidence of validation with the actual software.
   EXTXYZ starts at 2026.1. GFN2 requires an explicit tblite build assertion.
   Hidden incompatible DFT requests fail until
   explicitly reset. Source checks/build assertions never establish native validation.
+- 0.3.2 adds PBE0/HSE06/B3LYP direct-four-center HFX for target 2026.2,
+  GPW classic MOLOPT/UCL Gamma NONE/XYZ ENERGY/ENERGY_FORCE/GEO_OPT, RKS/UKS,
+  OT/diag without +U or smearing. Preserve original DFT chooser 1-15 and xTB
+  30-32; append local hybrid choices 16-18. Menu 120 edits HF screening/memory/
+  periodic-global radius. PBE0/HSE06 fraction=0.25, B3LYP=0.20 with explicit
+  VWN3; HSE06 XC/HF omega=0.11 bohr^-1. Isolated globals use full Coulomb;
+  periodic globals use truncated Coulomb bounded by half emitted-cell face
+  spacing (auto min(6 angstrom, face spacing/2.01)). No silent radius clipping,
+  PBC/model/solver changes, ADMM/RI-HFX or UZH-PBE0 enablement. HFX memory is
+  MiB per MPI process, not total job memory. Keep SCREEN_ON_INITIAL_P F;
+  require/protect/hash t_c_g.dat when a data directory is supplied for TRUNCATED.
+  Nondefault hidden HF controls fail on pure DFT/xTB until reset.
 - Do not start expensive calculations. Actual CP2K validation requires explicit
   authorization and a new run directory.
 - For failed-job diagnosis, load `qchem-error-diagnosis`, collect software/version

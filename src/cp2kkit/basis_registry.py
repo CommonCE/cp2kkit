@@ -42,7 +42,7 @@ class BasisOption:
 
 CLASSIC = 'Classic MOLOPT / UCL extensions'
 UZH_PBE = 'UZH-PBE (paired potential protocol)'
-UZH_PBE0 = 'UZH-PBE0 (not selectable: no hybrid template)'
+UZH_PBE0 = 'UZH-PBE0 (not selectable: paired protocol not enabled)'
 ALL_ELECTRON = 'All-electron orbital bases (GAPW + ALL; audited light elements)'
 CUSTOM = 'Custom orbital basis'
 M = ('BASIS_MOLOPT', 'BASIS_MOLOPT_UCL')
@@ -70,13 +70,13 @@ OPTIONS = (
                 ('TZV2P-MOLOPT-GGA-GTH',), functionals=('PBE',), protocol='uzh-pbe'),
     BasisOption('uzh-pbe0-dzvp', 30, 'DZVP-MOLOPT-PBE0-GTH', UZH_PBE0, 'DZVP-MOLOPT-PBE0-GTH', U, UP,
                 ('DZVP-MOLOPT-HYB-GTH',), functionals=('PBE0',), protocol='uzh-pbe0', status='unavailable',
-                restriction='Data names exist in v2026.2; hybrid/HF/ADMM templates are not implemented.'),
+                restriction='Paired UZH-PBE0 protocol is not enabled; classic direct HFX does not validate these data.'),
     BasisOption('uzh-pbe0-tzvp', 31, 'TZVP-MOLOPT-PBE0-GTH', UZH_PBE0, 'TZVP-MOLOPT-PBE0-GTH', U, UP,
                 ('TZVP-MOLOPT-HYB-GTH',), functionals=('PBE0',), protocol='uzh-pbe0', status='unavailable',
-                restriction='Data names exist in v2026.2; hybrid/HF/ADMM templates are not implemented.'),
+                restriction='Paired UZH-PBE0 protocol is not enabled; classic direct HFX does not validate these data.'),
     BasisOption('uzh-pbe0-tzv2p', 32, 'TZV2P-MOLOPT-PBE0-GTH', UZH_PBE0, 'TZV2P-MOLOPT-PBE0-GTH', U, UP,
                 ('TZV2P-MOLOPT-HYB-GTH',), functionals=('PBE0',), protocol='uzh-pbe0', status='unavailable',
-                restriction='Data names exist in v2026.2; hybrid/HF/ADMM templates are not implemented.'),
+                restriction='Paired UZH-PBE0 protocol is not enabled; classic direct HFX does not validate these data.'),
     BasisOption('ae-6-31g-star', 50, '6-31G*', ALL_ELECTRON, '6-31G*', ('EMSL_BASIS_SETS',),
                 ('POTENTIAL',), ('6-31Gx',), kind_type='all-electron', protocol='all-electron',
                 restriction='GAPW + ALL; audited element coverage only, no ECP substitution.'),

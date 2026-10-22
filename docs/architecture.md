@@ -1,11 +1,11 @@
-# cp2kkit v0.3.1 architecture
+# cp2kkit v0.3.2 architecture
 
 ## Design principles
 
 The initial analysis MVP baseline is preserved in [the roadmap](roadmap.md).
 Later requirements add an [input-generation](input-generation.md) subset.
 The [numbering/allocation guide](menu-numbering-draft.md) records implemented
-menu layout v1 (introduced in 0.2.9, retained in 0.3.1) plus separately labeled provisional future features.
+menu layout v1 (introduced in 0.2.9, retained in 0.3.2) plus separately labeled provisional future features.
 The current registry contains only implemented entries; no placeholder categories.
 No submission system or deferred Bader/PDOS/NEB post-processing is introduced.
 
@@ -36,7 +36,8 @@ cli.py
  |-- presentation.py (scrolling text, optional Rich; no batch rendering)
  |-- inputgen.py --- structure.py / spin_settings.py / method_profiles.py / models.py / io.py
  |-- xtb.py -- xtb_versions.py (GFN model/backend/count/data policy; tagged-version syntax and sources)
- |-- functional_registry.py (shared non-hybrid XC definitions/aliases, nonlocal/build/dispersion/scope policy)
+ |-- functional_registry.py (shared XC definitions/aliases, exact-exchange/nonlocal/build/dispersion/scope policy)
+ |-- hybrid.py (direct-HFX validation/operator/radius/data provenance; no executor)
  |-- method_profiles.py -- functional_registry.py / basis_resolution.py / data_catalog.py (XC, approvals, per-element resolution)
  |-- basis_registry.py (immutable allocated numbers/string IDs, roles/status, explicit legacy migration)
  |-- basis_resolution.py -- basis_registry.py / cp2k_data.py / data_catalog.py (ORB/potential protocol checks)
@@ -129,7 +130,7 @@ Do not guess labels, drop damaged final frames, or expand CP2K preprocessing.
 structures -> Structure + InputSettings -> validation -> CP2K text/manifest -> new input/JSON
 ```
 
-functional_registry defines the 15 non-hybrid profiles, aliases, exact XC
+functional_registry defines the 15 non-hybrid profiles plus PBE0/HSE06/B3LYP, aliases, exact XC
 components/native shortcuts, build/dispersion requirements and intrinsic nonlocal
 assembly. It is dependency-light and shared by basis policy, CLI, TUI and generation,
 not a parallel generator. method_profiles resolves explicit XC branches, per-element basis overrides and fixed-q
@@ -144,6 +145,16 @@ emitted filenames are recorded separately from runtime/numerical validation;
 CDD compares whole/A/B nonlocal identity before protected publication. Method
 metadata distinguishes catalog references from installed-data hashes and preserves
 actual potential library identity. No generic input-rewriting migration is introduced.
+hybrid.py validates explicit HF controls and resolves direct-four-center HFX
+operator/radius/resources and optional t_c_g.dat byte provenance. inputgen renders
+its HF section alongside the registry's ordered native XC parameters. Hybrid
+scope is target 2026.2, GPW classic MOLOPT/UCL, Gamma, NONE/XYZ,
+ENERGY/ENERGY_FORCE/GEO_OPT without +U/smearing. Periodic global hybrids use
+face-spacing-bounded truncated Coulomb; isolated ones use full Coulomb; HSE06
+uses matching XC/HF omega=0.11 bohr^-1. No ADMM/RI-HFX or UZH-PBE0 protocol
+is activated. Existing density/CDD and staged publication are reused. HF control
+edits at menu 120 share CLI/config/replay semantics; inactive nondefault requests
+fail rather than silently disappearing. Defaults add no HF section to pure DFT.
 This is not the deferred ARC-3 prepared-state/render/manifest separation.
 
 Do not inherit original electronic settings. Unknown PBC, electron/spin conflicts,

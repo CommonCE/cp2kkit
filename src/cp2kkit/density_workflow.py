@@ -103,6 +103,8 @@ def generate_difference(structure, settings):
                     raise KitError(f'Fragment {label} changes {element} {key}; provide consistent explicit data sources')
         if report['nonlocal_correlation'] != whole['nonlocal_correlation']:
             raise KitError(f'Fragment {label} changes nonlocal correlation/kernel identity; provide consistent data sources')
+        if report['method_profile'].get('hfx') != whole['method_profile'].get('hfx'):
+            raise KitError(f'Fragment {label} changes HFX operator/radius/data identity; provide consistent settings/data sources')
         if report['generated_structure']['cell'] != cell or report['generated_structure']['positions'] != positions:
             raise KitError('Fragment generation changed shared geometry/cell')
         components['fragment_'+label.lower()] = report

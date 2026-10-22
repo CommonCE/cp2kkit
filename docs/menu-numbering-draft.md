@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-**Software 0.3.1 retains the 0.2.9 menu layout v1 and adds GFN-xTB methods; distant feature
+**Software 0.3.2 retains the 0.2.9 menu layout v1, GFN-xTB methods and adds bounded direct-HFX hybrids; distant feature
 allocations remain a draft, not a frozen future registry or a release claim.**
 
 Schema stays **0.1.0**. The authoritative implemented function registry is
@@ -166,12 +166,12 @@ Owns the electronic state and physical model, not SCF numerical tolerances.
 | 101 | Total charge | Existing |
 | 102 | Spin multiplicity | Existing; auto resolves whole-system electron parity (even 1, odd 2), explicit values override |
 | 103 | Magnetic initialization: auto, UKS, element/atom moment seeds | Existing; moments are initial guesses, not constraints |
-| 110 | XC functional / electronic-structure method | Existing: 15 non-hybrid profiles plus 30 GFN1-xTB / 31 GFN0-xTB / 32 GFN2-xTB; hybrids deferred |
+| 110 | XC functional / electronic-structure method | Existing: 15 non-hybrid profiles, 16 PBE0 / 17 HSE06 / 18 B3LYP, plus 30 GFN1-xTB / 31 GFN0-xTB / 32 GFN2-xTB |
 | 111 | Dispersion correction | Existing subset; new models need validation |
 | 112 | DFT+U | Existing explicit Ueff/L, MULLIKEN subset |
 | 113 | Target Libxc support assertion | Existing; user assertion, not build detection |
 | 114 | Explicit permission for unmatched-functional GTH-PBE approximation | Existing; never automatic |
-| 120 | Hybrid-exchange parameters | Planned |
+| 120 | Hybrid-exchange parameters | Implemented in 0.3.2: direct-HFX EPS_SCHWARZ, MAX_MEMORY [MiB per MPI process], periodic-global-hybrid radius [angstrom]; no fraction/omega tuning |
 | 121 | RI-HFX settings | Planned |
 | 122 | ADMM settings | Planned; auxiliary bases belong to 223 |
 | 130 | Constrained DFT target charges/spins | Planned |
@@ -188,7 +188,9 @@ selecting a DFT functional there explicitly returns to DFT. Existing DFT chooser
 positions are retained; only the new xTB numbers mirror Multiwfn.
 The 0.3.0 non-hybrid expansion changes choices at existing ID 110, not function
 IDs or basis numbers. Build assertion 113 follows Libxc requirements (including
-BEEF-vdW); 114 is available outside PBE/BLYP. Upstream chooser numbers are not
+BEEF-vdW); 114 is available outside PBE/BLYP and the three hybrids. Since 0.3.2,
+B3LYP uses the BLYP potential family and PBE0/HSE06 use PBE without approval;
+hidden approval values are retained. Upstream chooser numbers are not
 new local function IDs; xTB does not inherit GPW basis/dispersion settings.
 Hidden incompatible requests remain retained and fail validation until explicitly reset.
 GFN1 supports checked targets 2024.2-2026.2; GFN0 requires >=2025.1 and

@@ -77,7 +77,7 @@ class BasisRegistryTests(unittest.TestCase):
         for number in (0, 10, 19, 23, 29, 30, 31, 32, 33, 39, 40, 49, 60, 79, 80, 99, 100, 199, 200, 901):
             with self.subTest(number=number), self.assertRaises(ValueError):
                 numbered_basis(number)
-        with self.assertRaisesRegex(KitError, 'hybrid/HF/ADMM'):
+        with self.assertRaisesRegex(KitError, 'Paired UZH-PBE0 protocol is not enabled'):
             self.generate(basis='uzh-pbe0-tzvp')
 
     def test_roles_are_distinct_and_auxiliary_roles_are_not_orb(self):

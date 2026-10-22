@@ -1,8 +1,8 @@
-"""Curated non-hybrid XC definitions, shared by basis policy, CLI and generator.
+"""Curated XC definitions, shared by basis policy, CLI and generator.
 
 Reference-based assembly: Multiwfn 2026.10.1 cp2kmate.f90/outCP2Kinp.
 See third_party/multiwfn/PROVENANCE.md for hashes, terms and validation limits.
-No external executable, numerical library or hybrid method is enabled here.
+No external executable or numerical library is invoked here.
 """
 from dataclasses import dataclass
 
@@ -19,6 +19,9 @@ class FunctionalProfile:
     nonlocal_type: str | None = None
     kernel_file: str | None = None
     nonlocal_parameters: tuple[float, ...] = ()
+    exact_exchange_fraction: float = 0.0
+    omega: float | None = None  # bohr^-1; fixed HSE06 definition, not HSE03.
+    xc_parameters: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = ()
 
     @property
     def restricted(self):
@@ -49,7 +52,19 @@ FUNCTIONAL_PROFILES = {
                                  kernel_file='rVV10_kernel_table.dat', nonlocal_parameters=(6.0, 0.01)),
     # Native shortcut expands to BEEF exchange + PBEc + Libxc LDA_C_PW.
     'BEEFVDW': FunctionalProfile(libxc=True, dispersion=('none',), nonlocal_type='LMKLL', kernel_file='vdW_kernel_table.dat'),
+    'PBE0': FunctionalProfile(family='hybrid-GGA', exact_exchange_fraction=0.25,
+        xc_parameters=(('PBE', (('SCALE_X', '0.75'), ('SCALE_C', '1.0'))),)),
+    'HSE06': FunctionalProfile(family='hybrid-GGA', exact_exchange_fraction=0.25, omega=0.11,
+        xc_parameters=(('XWPBE', (('SCALE_X', '-0.25'), ('SCALE_X0', '1.0'), ('OMEGA', '0.11'))),
+                       ('PBE', (('SCALE_X', '0.0'), ('SCALE_C', '1.0'))))),
+    'B3LYP': FunctionalProfile(family='hybrid-GGA', exact_exchange_fraction=0.20,
+        xc_parameters=(('LYP', (('SCALE_C', '0.81'),)), ('BECKE88', (('SCALE_X', '0.72'),)),
+                       ('VWN', (('FUNCTIONAL_TYPE', 'VWN3'), ('SCALE_C', '0.19'))),
+                       ('XALPHA', (('SCALE_X', '0.08'),)))),
 }
+# Standard semilocal-family GTH choices when no exact hybrid entry is available.
+# Multiwfn outCP2Kinp uses BLYP for B3LYP and PBE for PBE0/HSE06.
+HYBRID_POTENTIAL_FAMILIES = {'PBE0': 'PBE', 'HSE06': 'PBE', 'B3LYP': 'BLYP'}
 FUNCTIONALS = tuple(FUNCTIONAL_PROFILES)
 ALIASES = {'LDA': 'PADE', 'BP': 'BP86', 'MN15-L': 'MN15L', 'BEEF-VDW': 'BEEFVDW'}
 
@@ -61,7 +76,7 @@ def parse_functional(value):
         name = ALIASES.get(name, name)
         if name in FUNCTIONAL_PROFILES:
             return name
-    raise ValueError(f'Unsupported functional: {value}; choose a supported non-hybrid profile')
+    raise ValueError(f'Unsupported functional: {value}; choose a supported XC profile')
 
 
 def potential_tag(functional):

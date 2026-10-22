@@ -226,7 +226,7 @@ class InputGenerationTests(unittest.TestCase):
                dict(eps_scf=-1.), dict(vacuum=float("inf")), dict(max_scf=0), dict(max_iter=-1),
                dict(project="../escape"), dict(project="x\n@INCLUDE evil"), dict(cell=(0, 1, 1)),
                dict(multiplicity=1.5), dict(kpoints=(1, 0, 1)), dict(pressure=float("nan")),
-               dict(functional="PBE0"), dict(basis="fake"), dict(dispersion="d4")]
+               dict(functional="PBEh"), dict(basis="fake"), dict(dispersion="d4")]
         for values in bad:
             with self.subTest(values=values), self.assertRaises(KitError):
                 generate_input(self.water, replace(self.settings, **values))

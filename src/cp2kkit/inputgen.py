@@ -36,6 +36,7 @@ from .basis_registry import DEFAULT_BASIS, basis_option, migrate_basis
 from .cp2k_data import cp2k_long_path
 from .constraints import CONSTRAINT_REFERENCE, resolve_fixed_atoms
 from .functional_registry import parse_functional
+from .hybrid import validate_hfx_controls, resolve_hfx, hf_lines
 
 MULTIWFN_CITATIONS = (
     "Tian Lu, Feiwu Chen, J. Comput. Chem. 33, 580-592 (2012). DOI: 10.1002/jcc.22885",
@@ -125,6 +126,9 @@ class InputSettings:
     method: str = 'DFT'  # xTB is a separate model, not an XC functional.
     tblite_available: bool = False  # User build assertion, never detected.
     xtb_accuracy: float = 1.0  # Dimensionless tblite numerical accuracy factor.
+    hf_eps_schwarz: float = 1e-6
+    hf_memory: int = 512  # MiB per MPI process, not total job memory.
+    hf_cutoff_radius: float | None = None  # angstrom, periodic global hybrids only.
 
     @classmethod
     def from_config(cls, values, source_version=None):
@@ -361,6 +365,7 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
     atom_labels, kind_specs = atomic_kinds(structure.symbols, magnetism)
     method_profile, basis_overrides, element_records, method_warnings = resolve_method(s, elements, electron_counts, kind_specs)
     s = replace(s, basis_overrides=basis_overrides)
+    validate_hfx_controls(s, method_profile)
     gapw = resolve_gapw(s, element_records) if all_electron else None
     ot_algorithm = (gapw['ot_algorithm'] if gapw else (s.ot_algorithm or 'STRICT')) if s.scf == 'ot' else None
     ngrids = _common_ngrids if _common_ngrids is not None else resolve_ngrids(element_records)
@@ -457,6 +462,10 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
         _, data_sources['dispersion'] = read_text(files['dispersion'])
     elif s.dispersion != 'none':
         warnings.append('Dispersion data dftd3.dat have not been checked; the file is resolved by CP2K at runtime.')
+    hfx, hfx_warnings = resolve_hfx(s, method_profile, periodic, cell, data_root)
+    warnings.extend(hfx_warnings)
+    if hfx and hfx['truncated_gamma_source']:
+        data_sources['hfx_truncated_gamma'] = hfx['truncated_gamma_source']
     nonlocal_xc = {'enabled': method_profile.nonlocal_type is not None,
                    'type': method_profile.nonlocal_type, 'kernel_file': method_profile.kernel_file,
                    'parameters': list(method_profile.nonlocal_parameters) or None,
@@ -520,7 +529,7 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
         if s.smearing is not None:
             lines += ["      &SMEAR", "        METHOD FERMI_DIRAC", f"        ELECTRONIC_TEMPERATURE [K] {num(s.smearing)}", "      &END SMEAR"]
     lines += ['      &PRINT', '        &RESTART', '          BACKUP_COPIES 0',
-              '        &END RESTART', '      &END PRINT', '    &END SCF', '    &XC', *xc_lines(s.functional)]
+              '        &END RESTART', '      &END PRINT', '    &END SCF', '    &XC', *xc_lines(s.functional), *hf_lines(hfx)]
     if s.dispersion != "none":
         lines += ["      &VDW_POTENTIAL", "        POTENTIAL_TYPE PAIR_POTENTIAL", "        &PAIR_POTENTIAL",
                   f"          TYPE {'DFTD3' if s.dispersion == 'd3' else 'DFTD3(BJ)'}",
@@ -632,9 +641,9 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
     manifest['method_profile'] = {
         'functional': s.functional, 'qs_method': qs_method, 'gapw': gapw,
         'family': method_profile.family, 'xc_components': list(method_profile.components),
-        'native_shortcut': None if method_profile.components or method_profile.parametrization else (method_profile.native or s.functional),
+        'native_shortcut': None if method_profile.components or method_profile.parametrization or method_profile.xc_parameters else (method_profile.native or s.functional),
         'pbe_parametrization': method_profile.parametrization,
-        'exact_exchange_fraction': 0.0, 'kinetic_energy_density': method_profile.family == 'meta-GGA',
+        'exact_exchange_fraction': method_profile.exact_exchange_fraction, 'kinetic_energy_density': method_profile.family == 'meta-GGA',
         'generator_scope': 'GPW Gamma ENERGY/ENERGY_FORCE/GEO_OPT without +U' if method_profile.restricted else 'existing GPW/GAPW and task restrictions',
         'ot_algorithm': (ot_algorithm or 'STRICT') if s.scf == 'ot' else None, 'ngrids': ngrids,
         'ngrids_selection': 'whole-system workflow lock' if _common_ngrids is not None else 'effective orbital basis policy',
@@ -645,6 +654,13 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
         'catalog_reference_version': None if all_electron else '2026.2',
         'catalog_sources': [dict(source) for source in (AE_SOURCES if all_electron else CATALOG_SOURCES)], 'runtime_validated': False,
         'potential_approximations': [el for el, r in element_records.items() if r['potential_approximation']]}
+    if hfx:
+        manifest['method_profile']['hfx'] = hfx
+        manifest['method_profile']['xc_parameters'] = [
+            {'component': component, 'parameters': dict(parameters)}
+            for component, parameters in method_profile.xc_parameters]
+        manifest['method_profile']['generator_scope'] = 'GPW classic MOLOPT/UCL Gamma NONE/XYZ ENERGY/ENERGY_FORCE/GEO_OPT without +U or smearing'
+        manifest['emitted_data_files']['hfx_truncated_gamma'] = hfx['truncated_gamma_file']
     if hubbard or magnetism is not None:
         manifest['electronic_extensions'] = {
             'uks': uks, 'atom_kinds': atom_labels, 'atom_index_base': 1,

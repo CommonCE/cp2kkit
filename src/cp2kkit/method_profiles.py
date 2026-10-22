@@ -1,7 +1,7 @@
-"""Explicit non-hybrid GPW/GAPW profiles and checked basis/potential selections.
+"""Explicit XC GPW/GAPW profiles and checked basis/potential selections.
 
 Multiwfn organization informed the XC branches; see recorded provenance.
-No physical parameters, build detection, automatic q changes or runtime validation.
+No build detection, automatic q changes or runtime validation.
 """
 from pathlib import Path
 
@@ -10,7 +10,8 @@ from .errors import KitError
 from .structure import ELEMENTS, ELEMENT_ORDER
 from .basis_registry import basis_option, parse_basis
 from .basis_resolution import BasisResolver, alternatives
-from .functional_registry import FUNCTIONAL_PROFILES, FUNCTIONALS, FunctionalProfile, potential_tag
+from .functional_registry import (FUNCTIONAL_PROFILES, FUNCTIONALS, HYBRID_POTENTIAL_FAMILIES,
+                                  FunctionalProfile, potential_tag)
 
 LEGACY_BASES = ('SZV-MOLOPT-SR-GTH', 'DZVP-MOLOPT-SR-GTH', 'DZVP-MOLOPT-GTH',
                 'TZVP-MOLOPT-GTH', 'TZV2P-MOLOPT-GTH')
@@ -96,6 +97,16 @@ def resolve_method(settings, elements, valences, kind_specs=None):
     if settings.dispersion not in profile.dispersion:
         raise KitError(f'No checked {settings.dispersion} combination for {settings.functional}; '
                        'required nonlocal correlation is intrinsic, not an extra pair correction')
+    if profile.exact_exchange_fraction:
+        if (all_electron or settings.kpoints != (1, 1, 1) or settings.run_type == 'CELL_OPT'
+                or settings.dft_plus_u or settings.smearing is not None):
+            raise KitError(f'{settings.functional} direct HFX currently supports GPW Gamma '
+                           'ENERGY/ENERGY_FORCE/GEO_OPT without DFT+U or smearing; '
+                           'GAPW, non-Gamma, CELL_OPT and +U require separate validation')
+        selected = dict(normalize_basis_overrides(settings.basis_overrides, elements))
+        if any(basis_option(selected.get(el, settings.basis)).protocol != 'classic' for el in elements):
+            raise KitError('Initial direct HFX profiles require classic MOLOPT/UCL orbital bases; '
+                           'UZH-PBE0, custom bases, ADMM and RI-HFX are not enabled')
     if profile.restricted:
         if all_electron or settings.kpoints != (1, 1, 1) or settings.run_type == 'CELL_OPT' or settings.dft_plus_u:
             raise KitError(f'{settings.functional} currently supports GPW Gamma ENERGY/ENERGY_FORCE/GEO_OPT '
@@ -114,13 +125,20 @@ def resolve_method(settings, elements, valences, kind_specs=None):
         try:
             if option.protocol == 'classic' or option.protocol == 'custom' and not settings.custom_potential_file:
                 if not resolver.potential_available(option, el, q, potential_functional, POTENTIAL_CATALOG):
-                    if potential_functional in {'PBE', 'BLYP'}:
-                        raise KitError(f'No verified GTH-{potential_functional}-q{q} preset for {el}')
-                    if not settings.allow_pbe_potential:
-                        raise KitError(f'No matched GTH-{potential_tag(potential_functional)}-q{q} preset for {el}; explicitly approve the GTH-PBE approximation with --allow-pbe-potential (menu 114), or change the functional')
-                    if not resolver.potential_available(option, el, q, 'PBE', POTENTIAL_CATALOG):
-                        raise KitError(f'No verified GTH-PBE-q{q} approximation for {el}')
-                    potential_functional = 'PBE'
+                    family = HYBRID_POTENTIAL_FAMILIES.get(potential_functional)
+                    if family is not None:
+                        if not resolver.potential_available(option, el, q, family, POTENTIAL_CATALOG):
+                            raise KitError(f'No verified family GTH-{family}-q{q} preset for {el} with {settings.functional}; '
+                                           'no cross-family or valence fallback is applied')
+                        potential_functional = family
+                    else:
+                        if potential_functional in {'PBE', 'BLYP'}:
+                            raise KitError(f'No verified GTH-{potential_functional}-q{q} preset for {el}')
+                        if not settings.allow_pbe_potential:
+                            raise KitError(f'No matched GTH-{potential_tag(potential_functional)}-q{q} preset for {el}; explicitly approve the GTH-PBE approximation with --allow-pbe-potential (menu 114), or change the functional')
+                        if not resolver.potential_available(option, el, q, 'PBE', POTENTIAL_CATALOG):
+                            raise KitError(f'No verified GTH-PBE-q{q} approximation for {el}')
+                        potential_functional = 'PBE'
             records[el], extra_warnings = resolver.resolve(option, el, q, potential_functional)
             warnings.extend(extra_warnings)
         except KitError as exc:
@@ -141,7 +159,12 @@ def resolve_method(settings, elements, valences, kind_specs=None):
                        '--libxc-available (menu 113). Build support is not detected by cp2kkit')
     approximate = [el for el, r in records.items() if r['potential_approximation']]
     if approximate:
-        warnings.append(f'User-approved GTH-PBE pseudopotential approximation for {settings.functional}: '+', '.join(approximate)+'. This is not a matched-functional potential; validate the target property.')
+        family = HYBRID_POTENTIAL_FAMILIES.get(settings.functional)
+        if family is not None:
+            warnings.append(f'Standard family GTH-{family} pseudopotential for {settings.functional}: '+', '.join(approximate)+
+                            '. This is a semilocal-family potential, not an exact hybrid-functional potential; validate the target property.')
+        else:
+            warnings.append(f'User-approved GTH-PBE pseudopotential approximation for {settings.functional}: '+', '.join(approximate)+'. This is not a matched-functional potential; validate the target property.')
     if profile.libxc:
         definition = ('uses Libxc '+ ' + '.join(profile.components)) if profile.components else 'uses a native shortcut requiring Libxc internally (LDA_C_PW)'
         warnings.append(f'{settings.functional} {definition}. '
@@ -164,6 +187,13 @@ def resolve_method(settings, elements, valences, kind_specs=None):
 
 def xc_lines(functional):
     profile = FUNCTIONAL_PROFILES[functional]
+    if profile.xc_parameters:
+        return ['      &XC_FUNCTIONAL',
+                *(line for component, parameters in profile.xc_parameters
+                  for line in (f'        &{component}',
+                               *(f'          {key} {value}' for key, value in parameters),
+                               f'        &END {component}')),
+                '      &END XC_FUNCTIONAL']
     if profile.parametrization:
         return ['      &XC_FUNCTIONAL', '        &PBE',
                 f'          PARAMETRIZATION {profile.parametrization}',

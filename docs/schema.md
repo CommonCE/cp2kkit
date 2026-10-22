@@ -177,14 +177,58 @@ Fields/units/schema 0.1.0 are unchanged.
 - syntax_reference_checked/runtime_validated describe density-print validation,
   not certification of the entire generator.
 
+## Generated input JSON: direct HFX (software 0.3.2)
+
+Software 0.3.2 retains this schema: standard hybrid family potentials record
+`kinds.*.potential_functional=BLYP` for B3LYP or `PBE` for PBE0/HSE06, with
+`potential_approximation=true` (not an exact-hybrid potential). The existing
+`method_profile.potential_approximations` list includes affected elements even
+though family selection no longer requires explicit approximation approval.
+Actual exact-hybrid entries remain preferred and set the flag false.
+
+
+Schema remains **0.1.0**; these are additive generator settings/profile metadata,
+not changes to analysis records. Legacy configurations default new fields.
+
+- settings.functional additionally accepts PBE0, HSE06 and B3LYP (chooser 16/17/18).
+  settings.hf_eps_schwarz defaults to 1e-6, hf_memory to 512 [MiB per MPI process],
+  hf_cutoff_radius to null (automatic, angstrom). Nondefault controls on pure
+  DFT/xTB fail instead of silently being ignored. Method definitions (fraction,
+  HSE06 omega, VWN3) are not arbitrary user-editable XC fragments.
+- Hybrid method_profile.family is hybrid-GGA; exact_exchange_fraction is 0.25
+  for PBE0/HSE06 or 0.20 for B3LYP; native_shortcut=null, xc_backend=CP2K-native,
+  libxc_required=false. xc_components retains its Libxc-only meaning (empty);
+  **xc_parameters** records ordered native component names and keyword/value
+  strings, including VWN FUNCTIONAL_TYPE=VWN3. generator_scope records the
+  bounded GPW/classic/Gamma/NONE-or-XYZ task policy.
+- Hybrid-only method_profile.hfx records algorithm=direct_four_center, fraction,
+  interaction_potential=COULOMB/TRUNCATED/SHORTRANGE; omega and omega_unit
+  (0.11, bohr^-1 for HSE06; null otherwise), cutoff_radius_angstrom (periodic
+  global hybrids only), cutoff_policy and minimum_cell_face_spacing_angstrom.
+  Automatic radius is min(6 angstrom, minimum emitted-cell face spacing/2.01);
+  settings retains null while hfx records the effective radius.
+- hfx also records eps_schwarz, screen_on_initial_p=false,
+  max_memory_mib_per_mpi_process, eps_storage_scaling=0.1, admm=false,
+  ri_hfx=false, build_verified=false and runtime_validated=false.
+- truncated_gamma_file/source and data_validation distinguish not_required,
+  not_checked and source_bytes_only. If a data directory is supplied, the
+  truncated table has a protected absolute path/raw-byte SHA-256/size in
+  data_sources.hfx_truncated_gamma; otherwise it is an unchecked basename.
+  emitted_data_files.hfx_truncated_gamma records the same effective filename.
+  No table is needed for COULOMB/SHORTRANGE.
+- hfx.keyword_reference_version=2026.2 and sources contain inspected tagged-source
+  URLs/hashes. Static references, build requirements and bytes are not executable
+  support, numerical-table validity, derivative accuracy or scientific validation.
+  Existing data_sources/quality/protection semantics are unchanged.
+
 ## Generated input JSON: non-hybrid XC additions (software 0.3.0)
 
 Schema remains 0.1.0; analysis/CSV and existing config/replay names are unchanged.
 
 - settings.functional uses one of 15 canonical non-hybrid IDs (PBESOL, REVPBE,
   R2SCAN, B97M-RV, BEEFVDW, etc.). Documented aliases normalize on generation;
-  previous names remain accepted. No hybrid or xTB XC profile is enabled;
-  xTB is a separate method branch since 0.3.1.
+  previous names remain accepted. Software 0.3.2 additionally enables three
+  hybrid IDs as documented above; xTB is a separate method branch since 0.3.1.
 - method_profile adds family, xc_components (ordered emitted Libxc subsections;
   empty for native/parametrized shortcuts), native_shortcut, pbe_parametrization,
   exact_exchange_fraction=0.0, kinetic_energy_density and generator_scope.
