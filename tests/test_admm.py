@@ -99,7 +99,7 @@ class ADMMTests(unittest.TestCase):
                                 self.assertIn('      EXCH_CORRECTION_FUNC DEFAULT', text)
                                 self.assertEqual(text.count('&AUXILIARY_DENSITY_MATRIX_METHOD\n'), 1)
                                 self.assertEqual(text.count('BASIS_SET AUX_FIT '), 2)
-                                expected_files = sorted((str(self.orb.resolve()), str(self.aux.resolve())))
+                                expected_files = sorted((self.orb.name, self.aux.name))
                                 emitted_files = [line.strip().split(None, 1)[1] for line in text.splitlines()
                                                  if line.strip().startswith('BASIS_SET_FILE_NAME ')]
                                 self.assertEqual(emitted_files, expected_files)
@@ -218,11 +218,14 @@ class ADMMTests(unittest.TestCase):
                 text, manifest = self.generate(**sources)
                 emitted = [line.strip().split(None, 1)[1] for line in text.splitlines()
                            if line.strip().startswith('BASIS_SET_FILE_NAME ')]
-                self.assertEqual(emitted, sorted((str(self.orb.resolve()), str(self.aux.resolve()))))
+                expected_orb = str(self.orb.resolve()) if sources.get('basis_files') else self.orb.name
+                expected_aux = str(self.aux.resolve()) if sources.get('aux_basis_files') else self.aux.name
+                self.assertEqual(emitted, sorted((expected_orb, expected_aux)))
                 self.assertEqual(manifest['emitted_data_files']['basis'], emitted)
+                runtime_files = [str(self.data/file) if not Path(file).is_absolute() else file for file in emitted]
                 for element, q in (('O', 6), ('H', 1)):
                     alias = manifest['kinds'][element]['aux_fit']['basis']
-                    entry, name, actual_q = Libraries().select(emitted, 'AUX_FIT', element, (alias,), q)
+                    entry, name, actual_q = Libraries().select(runtime_files, 'AUX_FIT', element, (alias,), q)
                     self.assertEqual((name, actual_q, entry.validate()), (alias, q, q))
 
     def test_duplicate_auxiliary_aliases_are_checked(self):
@@ -347,8 +350,8 @@ class ADMMTests(unittest.TestCase):
         m = json.loads(Path(str(out)+'.json').read_text())
         text = out.read_text()
         self.assertIn('BASIS_SET AUX_FIT admm-tzp-q6', text)
-        self.assertIn('BASIS_SET_FILE_NAME '+str(self.aux.resolve())+'\n', text)
-        self.assertEqual(m['emitted_data_files']['basis'], sorted((str(self.orb.resolve()), str(self.aux.resolve()))))
+        self.assertIn('BASIS_SET_FILE_NAME '+self.aux.name+'\n', text)
+        self.assertEqual(m['emitted_data_files']['basis'], sorted((self.orb.name, self.aux.name)))
         self.assertTrue(m['method_profile']['hfx']['admm'])
         self.assertFalse(m['runtime_validated'])
 

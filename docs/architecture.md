@@ -1,11 +1,11 @@
-# cp2kkit v0.3.4 architecture
+# cp2kkit v0.3.5 architecture
 
 ## Design principles
 
 The initial analysis MVP baseline is preserved in [the roadmap](roadmap.md).
 Later requirements add an [input-generation](input-generation.md) subset.
 The [numbering/allocation guide](menu-numbering-draft.md) records implemented
-menu layout v1 (introduced in 0.2.9, retained in 0.3.4) plus separately labeled provisional future features.
+menu layout v1 (introduced in 0.2.9, retained in 0.3.5) plus separately labeled provisional future features.
 The current registry contains only implemented entries; no placeholder categories.
 No submission system or deferred Bader/PDOS/NEB post-processing is introduced.
 
@@ -37,7 +37,8 @@ cli.py
  |-- inputgen.py --- structure.py / spin_settings.py / method_profiles.py / models.py / io.py
  |-- xtb.py -- xtb_versions.py (GFN model/backend/count/data policy; tagged-version syntax and sources)
  |-- functional_registry.py (shared XC definitions/aliases, exact-exchange/nonlocal/build/dispersion/scope policy)
- |-- hybrid.py (direct-HFX validation/operator/radius/data provenance; no executor)
+ |-- hybrid.py (shared HFX validation/operator/radius/data provenance and direct/RI rendering; no executor)
+ |-- ri_hfx.py (bounded Gamma RI controls/AUTO_BASIS/metric identity and hybrid acceleration policy matrix)
  |-- admm.py -- auxiliary_basis.py (bounded projection/purification/correction and independent AUX_FIT registry)
  |-- auxiliary_basis.py -- basis_registry.py / basis_resolution.py / cp2k_data.py (checked auxiliary q/payload, final ORB/AUX file union)
  |-- method_profiles.py -- functional_registry.py / basis_resolution.py / data_catalog.py (XC, approvals, per-element resolution)
@@ -62,6 +63,18 @@ __main__.py / pyproject.toml: module/console-script entry points
 
 Conventional src layout. No plugins, database, workflow engine, or configuration
 framework yet; avoid complexity exceeding MVP value.
+
+## Hybrid hardening (0.3.5)
+
+The shared hybrid module separates absolute checked source identities from runtime
+data names. Only automatic files resolving to the same source under the selected
+data root are rebased; explicit file overrides are not. Source/data publication
+protection still uses absolute evidence, including hardlink checks. HSE06 range
+preflight solves the documented screening equation and compares with rounded-cell
+face spacing; its estimate is never a runtime observation or model repair.
+Input generation explicitly enables FORCE_EVAL/PRINT/FORCES for hybrid
+ENERGY_FORCE, independently of the retained global LOW verbosity. No execution,
+stderr ingestion, scheduler integration or automatic SIGSEGV recovery is added.
 
 ## Density input bundle (0.2.9)
 
@@ -159,7 +172,8 @@ scope is target 2026.2, GPW classic MOLOPT/UCL, Gamma, NONE/XYZ,
 ENERGY/ENERGY_FORCE/GEO_OPT without +U/smearing. Periodic global hybrids use
 face-spacing-bounded truncated Coulomb; isolated ones use full Coulomb; HSE06
 uses matching XC/HF omega=0.11 bohr^-1. ADMM is separately opt-in for
-PBE0/HSE06 since 0.3.4; no RI-HFX or UZH-PBE0 protocol is activated. Existing density/CDD and staged publication are reused. HF control
+PBE0/HSE06 since 0.3.4. Version 0.3.5 separately enables PBE0/HSE06 Gamma
+RI-HFX through ri_hfx.py, never RI+ADMM or UZH-PBE0. Existing density/CDD and staged publication are reused. HF control
 edits at menu 120 share CLI/config/replay semantics; inactive nondefault requests
 fail rather than silently disappearing. Defaults add no HF section to pure DFT.
 ADMM assembly lives in admm.py, not the XC definitions or HF operator resolver.
@@ -172,6 +186,21 @@ with selected-entry/q checks and duplicate checks across the final emitted union
 Only used files are emitted, deduplicated, hash-recorded and writer-protected.
 Kinds carry aux_fit metadata; CDD compares per-element auxiliary identity and
 global ADMM settings as well as HFX identity. No calculation is invoked.
+RI-HFX instead requires actual ORB sources and delegates auxiliary construction to
+CP2K via AUTO_BASIS RI_HFX, with SORT_BASIS EXP. Its role is distinct from
+AUX_FIT/RI_AUX; no manual RI library resolver or new basis numbers are introduced.
+The effective hfx object carries RI basis size/parent/metric identity, tensor
+filtering and batching; the existing CDD HFX equality check covers these fields.
+Default RI metric HFX inherits the shared operator/omega/radius; explicit
+TRUNCATED has a required independent radius, bounded using emitted-cell face
+spacing for XYZ. All RI operators resolve/protect the shared T_C_G_DATA table
+because RI initialization checks it even without truncation. Full-path threshold
+metadata separates explicit input, source-derived QS precision and native RI
+defaults; qs_eps_default is shared with rendering. None is runtime evidence.
+HF/MEMORY is omitted
+under RI and effective direct-only resources are null; nondefault retained
+hf_memory is rejected. Hybrid manifests include a generator-policy capability
+matrix, not executable/build detection. All interfaces share these checks.
 This is not the deferred ARC-3 prepared-state/render/manifest separation.
 
 Do not inherit original electronic settings. Unknown PBC, electron/spin conflicts,

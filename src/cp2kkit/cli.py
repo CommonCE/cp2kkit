@@ -77,6 +77,19 @@ def build_parser():
                      help='Direct HFX MAX_MEMORY [MiB per MPI process], not total job memory; default 512')
     gen.add_argument('--hf-cutoff-radius', type=float,
                      help='Periodic global-hybrid truncation radius [angstrom]; default min(6, minimum face spacing/2.01)')
+    from .ri_hfx import RI_BASIS_SIZES, RI_METRICS
+    gen.add_argument('--ri-hfx', action='store_true',
+                     help='PBE0/HSE06 Gamma RI-HFX at target 2026.2; actual ORB files required; no ADMM combination')
+    gen.add_argument('--ri-basis-size', type=str.upper, choices=RI_BASIS_SIZES, default='MEDIUM',
+                     help='AUTO_BASIS RI_HFX size (default MEDIUM); not an ADMM AUX_FIT selection')
+    gen.add_argument('--ri-eps-filter', type=float, default=1e-9,
+                     help='RI tensor filtering threshold (default 1e-9); requires --ri-hfx for nondefault values')
+    gen.add_argument('--ri-metric', type=str.upper, choices=RI_METRICS, default='HFX',
+                     help='RI operator (default HFX inherits exchange); TRUNCATED requires --ri-cutoff-radius')
+    gen.add_argument('--ri-cutoff-radius', type=float,
+                     help='Independent TRUNCATED RI metric radius [angstrom]; required explicitly, no automatic radius')
+    gen.add_argument('--ri-memory-cut', type=int, default=3,
+                     help='RI tensor batching factor (positive integer, default 3), not a memory cap')
     gen.add_argument('--admm', action='store_true', help='PBE0/HSE06 only: enable checked AUX_FIT exchange approximation (target 2026.2)')
     gen.add_argument('--admm-purification', type=str.upper, choices=('MO_DIAG', 'NONE'),
                      help='Default auto: OT MO_DIAG, diagonalization NONE; MO_DIAG requires OT')

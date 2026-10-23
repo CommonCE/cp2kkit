@@ -6,7 +6,10 @@
 all three GFN-xTB models; 0.3.2 adds PBE0, HSE06 and B3LYP direct-HFX input
 generation within the bounded initial scope. Version 0.3.3 adds BHandHLYP,
 M06-2X and explicit-fraction PBEh. Version 0.3.4 adds bounded PBE0/HSE06 ADMM
-and independent checked AUX_FIT selection.** All 21 profiles now have bounded generation
+and independent checked AUX_FIT selection. Version 0.3.5 adds bounded PBE0/HSE06
+Gamma RI-HFX and a hybrid acceleration capability matrix. Version 0.3.5 fixes
+hybrid runtime filenames, force printing and periodic HSE06 preflight warnings
+following returned native runs; RI-HFX remains experimental.** All 21 profiles now have bounded generation
 support, not unrestricted combination coverage or native validation. See the [implemented capability matrix](input-generation.md#non-hybrid-xc-profiles-030).
 This plan alone authorizes no calculations, installation, further version/default
 changes, commit or push. Later release assignments remain to be agreed.
@@ -127,8 +130,12 @@ ENERGY/ENERGY_FORCE/GEO_OPT only. Stage 4 is partially delivered in 0.3.2:
 PBE0/HSE06/B3LYP, direct HFX, target 2026.2, GPW classic MOLOPT/UCL Gamma
 NONE/XYZ ENERGY/ENERGY_FORCE/GEO_OPT without +U or smearing. Broader xTB scope,
 version 0.3.3 adds the remaining three hybrid profiles. Version 0.3.4 adds bounded
-PBE0/HSE06 ADMM and independent AUX_FIT data checks. RI-HFX and stage 6 expansion
-remain future work; the initial capability
+PBE0/HSE06 ADMM and independent AUX_FIT data checks. Version 0.3.5 adds
+PBE0/HSE06 Gamma RI-HFX with actual ORB-backed AUTO_BASIS, default HFX metric inheritance,
+optional explicitly bounded independent TRUNCATED metric/radius, full-path
+source-qualified threshold metadata and shared RI initialization-table protection,
+size/filter/batching controls and the acceleration matrix. RI+ADMM, other-hybrid RI,
+manual RI bases and broader stage 6 expansion remain future work; the initial capability
 matrix is already documented. The list retains the series-level audit goals.
 
 1. **Inventory and registry:** use the fixed upstream menu as the acceptance
@@ -200,7 +207,8 @@ build is still required and not detected. PBE0/HSE06 use 25% HF; B3LYP uses 20%
 and explicit VWN3. Isolated global hybrids use COULOMB; XYZ global hybrids use
 TRUNCATED with a face-spacing-bounded radius; HSE06 uses SHORTRANGE omega=0.11
 bohr^-1. EPS_SCHWARZ/memory/radius have explicit controls at menu 120.
-RI-HFX 121 and UZH-PBE0 30-32 remain unavailable. Version 0.3.4 separately
+RI-HFX 121 becomes available separately in 0.3.5 for PBE0/HSE06, not RI+ADMM.
+UZH-PBE0 30-32 remain unavailable. Version 0.3.4 separately
 enables PBE0/HSE06 ADMM at 122 and AUX_FIT selection at 223, not implicitly
 by selecting a hybrid. Default pure-DFT input text is unchanged. No CP2K
 calculation, syntax acceptance, convergence or property validation in this round.

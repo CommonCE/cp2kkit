@@ -2,7 +2,7 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.3.4 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.3.5 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 - Analysis remains read-only: no submission/execution or modification of existing
@@ -30,7 +30,56 @@ input generation; version 0.3.3 adds BHandHLYP, M06-2X and configurable PBEh.
 All 21 referenced DFT selections now have bounded generation support; this is
 not full Multiwfn feature/combination coverage.
 
-## Current version: 0.3.4
+## Current version: 0.3.5
+
+Software remains **0.3.5** by explicit user request; the returned-run corrections
+below are part of the same acceptance refinement, not a new release number.
+
+Version **0.3.5** hardens hybrid generation after review of user-returned native
+runs: automatic hybrid data files resolvable in the selected data directory use
+short runtime filenames (explicit overrides retain paths); checked source paths
+and hashes remain protected provenance. Set `CP2K_DATA_DIR` on the execution
+machine or stage the matching files. `T_C_G_DATA` always uses `t_c_g.dat`.
+Hybrid `ENERGY_FORCE` explicitly prints atom-resolved forces to stdout in
+hartree/bohr despite global LOW verbosity. A source-derived periodic HSE06 range
+preflight warns without changing the cell, operator or screening thresholds.
+CLI/config/menu IDs, physical defaults and schema **0.1.0** are unchanged.
+
+**RI-HFX remains experimental.** The returned suite supplied 71 input-matched,
+SCF-converged outputs, but all 71 reported late SIGSEGV with `_dl_fini` frames;
+one reference remained a stale path-error result. All 16 geometry optimizations
+reported convergence, but force accuracy and reliable speedup remain unverified.
+Periodic HSE06 also raised range/cell warnings. These observations are not clean
+execution or scientific certification, and the new generator fixes have not been
+rerun natively. See [findings and compatibility](docs/input-generation.md#hybrid-returned-run-hardening-035).
+
+Version **0.3.5** adds opt-in **PBE0/HSE06 Gamma RI-HFX** at menu **121** /
+`--ri-hfx`, plus a [hybrid acceleration capability matrix](docs/input-generation.md#ri-hfx-and-hybrid-acceleration-matrix-035).
+Target 2026.2; GPW classic MOLOPT/UCL, NONE/XYZ, ENERGY/ENERGY_FORCE/GEO_OPT,
+RKS/UKS, OT/diag without smearing or +U. RI-HFX + ADMM and the other four
+hybrid profiles remain blocked for RI. Defaults stay RI-off.
+
+RI uses `AUTO_BASIS RI_HFX MEDIUM` from actual checked ORB files (not ADMM
+AUX_FIT), `SORT_BASIS EXP`, and default metric HFX inheriting the exchange operator.
+Optional `--ri-metric TRUNCATED --ri-cutoff-radius R` uses an explicit independent
+RI radius in angstrom (periodically bounded by emitted-cell face spacing), not an
+automatic Multiwfn-matching radius. All RI modes resolve/protect `T_C_G_DATA` for
+CP2K initialization, including non-truncated exchange. Metadata/review distinguish
+full-path QS and HF/RI thresholds and their explicit/derived/native-default origins;
+source expectations are not runtime observations.
+Size SMALL/MEDIUM/LARGE/HUGE, EPS_FILTER (default 1e-9) and MEMORY_CUT
+(default 3, batching factor, **not a memory cap**) are configurable.
+Direct-HFX MAX_MEMORY is not emitted under RI; nondefault `--hf-memory`
+must be reset. CLI/TUI/config/replay and CDD share the same implementation.
+
+```bash
+cp2kkit generate-input water.xyz -o water-pbe0-ri.inp --periodic NONE \
+  --functional PBE0 --ri-hfx --data-dir /path/to/cp2k/data --write-json
+```
+
+Actual ORB data checks are not generated auxiliary convergence, native CP2K
+acceptance, speedup or scientific validation. No CP2K execution/submission is
+included. Schema remains 0.1.0. The prior 0.3.4 ADMM follow-up is retained below.
 
 The ADMM follow-up retains version 0.3.4 by user request and fixes auxiliary-library emission: ADMM inputs generated with
 `--data-dir` or `CP2K_DATA_DIR` retain the resolved `BASIS_ADMM_UZH` path,
@@ -64,7 +113,8 @@ cp2kkit generate-input water.xyz -o water-pbe0-admm.inp --periodic NONE \
 Explicit sources use `--basis-file` and repeatable `--aux-basis-file`;
 menu 223's **f** edits the auxiliary-file list. Config/replay, split magnetic
 KINDs, density bundles and source-file overwrite protection share this resolution.
-RI-HFX, UZH-PBE0, GAPW and ADMM with the other four hybrids remain unavailable.
+UZH-PBE0, GAPW and ADMM with the other four hybrids remain unavailable.
+RI-HFX is separately opt-in in 0.3.5, not combinable with ADMM.
 Checked data/q is not auxiliary-basis convergence, physical-pairing certification,
 native CP2K acceptance or scientific validation. See
 [ADMM details](docs/input-generation.md#admm-and-auxiliary-bases-034).
@@ -74,8 +124,8 @@ native CP2K acceptance or scientific validation. See
 The shared CLI/API/TUI generator now supports these six hybrid profiles for target
 **CP2K 2026.2**, with classic MOLOPT/UCL GPW bases, Gamma points, NONE/XYZ PBC,
 ENERGY/ENERGY_FORCE/GEO_OPT, RKS or collinear UKS, and OT or diagonalization
-without smearing. DFT+U, GAPW, CELL_OPT, non-Gamma, RI-HFX and UZH-PBE0
-protocols remain outside this hybrid scope. ADMM is separately opt-in for PBE0/HSE06 only.
+without smearing. DFT+U, GAPW, CELL_OPT, non-Gamma and UZH-PBE0
+protocols remain outside this hybrid scope. ADMM and RI-HFX are separately opt-in for PBE0/HSE06 only, not together.
 
 - **PBE0**: 25% HF + 75% PBE exchange + full PBE correlation.
 - **HSE06**: 25% short-range HF with matching XC/HF ω=0.11 bohr⁻¹.

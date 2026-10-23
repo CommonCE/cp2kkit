@@ -4,6 +4,149 @@ This records facts, not permission inferred from labels such as "reference-based
 or "rewritten in another language". Prefer version/file/subroutine/SHA-256;
 line numbers are auxiliary. Do not invent upstream commits, inspection dates, or grants.
 
+## Returned hybrid-run hardening (0.3.5)
+
+- Local: hybrid.py/inputgen.py runtime filename separation, HSE06 range preflight,
+  explicit hybrid ENERGY_FORCE force printing, RI warnings and regression tests.
+  These are deployment/output corrections, not a new Multiwfn code port, new
+  scientific parameter set or authorization/licensing change.
+- Checked CP2K target-2026.2 manuals:
+  [FORCES](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/PRINT/FORCES.html)
+  specifies default HIGH print threshold, ON, FILENAME __STD_OUT__ and
+  FORCE_UNIT hartree/bohr;
+  [INTERACTION_POTENTIAL](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/XC/HF/INTERACTION_POTENTIAL.html)
+  specifies the omitted short-range cutoff equation erfc(omega*r)/r=EPS_SCHWARZ.
+  The Python bisection is a source-qualified estimate, not copied Fortran or a
+  runtime observation. RI can extend the range; no physical defaults change.
+- User-returned native evidence: local ignored artifacts
+  test-workspace/ri-hfx-035-native-analysis-JHBwYX/REPORT.md and
+  native-review/results.json, verification.json and source-checksums.sha256.
+  CP2K banners identify 2026.2/git:c92cc08, not verified official-tag purity.
+  Seventy-one refreshed input-matched outputs converge SCF but all report late
+  SIGSEGV with _dl_fini frames; one direct reference is stale. Thirty energy
+  comparisons are provisional, all 16 geometry optimizations report convergence,
+  and 18 periodic HSE06 cases warn about range/cell compatibility. No atom-resolved
+  force accuracy, auxiliary-size/radius convergence, reliable speedup or clean
+  native acceptance is established. The full raw logs are local, not distributed
+  as synthetic fixtures. No account, host, partition or runtime-library settings
+  are copied into maintained project files.
+- New code tests are synthetic and never execute CP2K/Multiwfn or submit jobs.
+  Existing results/restarts/dispatch identities are untouched. The 0.3.5 output
+  fixes require fresh authorized native verification; no library-specific crash
+  cause or recovery is claimed. Existing Multiwfn source identities/citations and
+  recorded terms remain unchanged.
+
+## RI-HFX bounded refinement (same user-assigned 0.3.5 work)
+
+- Keep HFX as the default metric; expose independent TRUNCATED only with an
+  explicit positive angstrom radius and an emitted-cell face-spacing bound for
+  XYZ. No automatic Multiwfn-matching radius, SCF or restart policy is adopted.
+  Threshold/path and initialization-table evidence is documented below.
+- Fresh actual-data CLI checks in test-workspace/ri-hfx-035-refinement-m3RaS4/
+  pass 48 generation/API/config-replay cases (PBE0/HSE06, NONE/XYZ, OT/diag,
+  three tasks, HFX/TRUNCATED) and 10 expected rejections with target/JSON
+  protection. Twenty default PBE/direct-HFX/ADMM texts match the preserved
+  pre-RI HEAD tree. summary.json, identity.json, runner, per-case argv/exit
+  records, complete stdout/stderr and input/JSON files establish this evidence.
+  Checked source/data hashes are unchanged. No new Multiwfn or CP2K process,
+  native acceptance, numerical convergence, speedup or scientific validation.
+  No new upstream permission or licensing claim.
+
+## RI-HFX executable-generator comparison (0.3.5 follow-up)
+
+- User-authorized fresh checks under
+  test-workspace/ri-hfx-0.3.5-comparison-0iKiEQ/ actually invoked cp2kkit
+  **0.3.5** via /home/xwp/python/claude/bin/python -m cp2kkit and
+  /home/xwp/soft/multiwfn/Multiwfn. Every paired process banner identifies
+  Multiwfn **2026.10.18**, distinct from the 2026.10.1 source reference below.
+  Binary/settings/helper/runner hashes and Python identity are in matrix/identity.json.
+- 32 paired water cases passed policy-aware input/data checks: PBE0/HSE06,
+  NONE/XYZ, OT/diag and ENERGY/ENERGY_FORCE/GEO_OPT for neutral singlets;
+  eight additional ENERGY combinations use charge +1, multiplicity 2.
+  All use DZVP-MOLOPT-SR-GTH, matching GTH-PBE numerical payloads, 400/55 Ry,
+  AUTO_BASIS RI_HFX MEDIUM, Gamma and no ADMM. HF fractions, XC components,
+  omega/radius, coordinates/cell, state/solver and auxiliary roles were checked.
+- Six cp2kkit-only actual-data CLI cases passed for SMALL/LARGE/HUGE with
+  EPS_FILTER=1e-10 and MEMORY_CUT=5. Twelve CLI invalid-combination/control
+  cases returned validation exit 2, preserved existing input sentinels and
+  created no JSON. These 18 cases are not paired Multiwfn comparisons.
+- Important non-equivalence: all 16 XYZ pairs use metric HFX in cp2kkit but
+  TRUNCATED with a separate 1.5 angstrom RI radius in Multiwfn. Multiwfn also
+  explicitly emits QS EPS_PGF_ORB=1e-5, task-dependent EPS_SCF and restart
+  requests; cp2kkit retains its documented QS/SCF/restart policy. No physical
+  model/default was silently changed to eliminate these differences.
+- Evidence: summary.json, difference-summary.json, matrix/summary.json,
+  controls/summary.json, per-case command/stdin/process records, full stdout/
+  stderr, generated inputs, JSON and input.diff. Protected source/data/binary
+  hashes were unchanged during testing. Two initial pilot generator pairs
+  succeeded but the checker used unsupported .inp suffix dispatch; that checker
+  defect was corrected before the fresh matrix. Pilot artifacts and its original
+  runner remain preserved and are not counted as passed acceptance cases.
+- No CP2K invocation or scheduler submission, native acceptance, convergence,
+  energies/forces, speedup or scientific validation. This follow-up changes no
+  generator implementation, version, upstream permission or licensing claim.
+
+## Gamma RI-HFX and hybrid acceleration policy (0.3.5)
+
+- Local: ri_hfx.py, shared hybrid.py/inputgen.py and CLI/TUI/menu guards/tests.
+  Reference-based Python input assembly; no Fortran, generated auxiliary
+  coefficients, basis/potential payloads or new external process is bundled.
+- Reference: Multiwfn **2026.10.1**, cp2kmate.f90/outCP2Kinp, development locator
+  ../Multiwfn_2026.10.1_src_Linux/cp2kmate.f90; rechecked SHA-256
+  f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402.
+  Inspected opt-in chooser around 936-962, AUTO_BASIS RI_HFX MEDIUM and
+  SORT_BASIS EXP around 1724-1726, and HF direct/RI branch around 2168-2240.
+  Existing citations in generator text/JSON and custom terms remain applicable.
+- Retained organization: opt-in RI, runtime automatic RI_HFX auxiliary generation,
+  exponent sorting and nested HF/RI section. Differences: only PBE0/HSE06,
+  classic GPW Gamma subset; actual ORB data mandatory; independent size/filter/
+  batching controls; default metric HFX in both isolated and periodic cases,
+  not the upstream periodic-Gamma TRUNCATED 1.5 angstrom metric. The bounded
+  follow-up adds optional TRUNCATED with an explicitly required independent
+  radius, never an automatic 1.5 angstrom choice. No KP controls,
+  incremental Fock request, solver/basis/spin repair or RI+ADMM is introduced.
+  Direct-only memory is omitted under RI and inactive nondefault requests fail.
+- Target keyword/manual evidence: CP2K 2026.2
+  [Gamma RI-HFX guide](https://manual.cp2k.org/cp2k-2026_2-branch/methods/dft/hartree-fock/ri_gamma.html),
+  [HF/RI reference](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/XC/HF/RI.html)
+  and [AUTO_BASIS reference](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT.html).
+  The guide documents nuclear force support, non-universal performance and
+  tensor batching semantics. It cites Bussy2023; auto_basis.F cites Stoychev2016.
+  Research users should retain the applicable CP2K method citations.
+- Inspected local CP2K tree /home/xwp/soft/cp2k-2026.2, REVISION **git:c92cc08**.
+  This is inspected local identity, not an unmodified official-tag certificate.
+  ri_hfx.py records the exact source hashes for input_cp2k_hfx.F,
+  input_cp2k_dft.F, input_cp2k_qs.F, cp_control_utils.F, qs_environment.F, auto_basis.F,
+  hfx_types.F and hfx_ri.F.
+  cp_control_utils.F maps AUTO_BASIS sizes; qs_environment.F constructs RI_HFX
+  from ORB (or AUX_FIT with ADMM, deliberately not enabled here). auto_basis.F
+  uses orbital exponents/products; hfx_types.F inherits the HFX metric operator,
+  omega and cutoff and passes screening to RI. hfx_ri.F has nuclear-force paths.
+  Follow-up source inspection: hfx_types.F/hfx_ri_init_read_input_from_hfx
+  checks T_C_G_DATA even for COULOMB/SHORTRANGE RI; all RI modes now resolve,
+  emit, hash and protect that initialization table. hfx_ri_init_read_input
+  supports an independent TRUNCATED metric/radius. For SHORTRANGE, the metric
+  range uses EPS_SCHWARZ while the HFX range is separately extended using
+  EPS_FILTER_2C during RI setup; no numeric runtime range is inferred.
+  cp_control_utils.F derives QS/EPS_PGF_ORB from sqrt(EPS_DEFAULT), distinct
+  from HF/RI/EPS_PGF_ORB=1e-5 in input_cp2k_hfx.F. Full-path threshold metadata
+  reports these source expectations without changing QS/SCF/restart defaults.
+  No code-path inspection proves numerical derivative accuracy or completeness.
+- Validation: synthetic generation, section/parameter/provenance,
+  invalid-combination, interface/replay, CDD and publication protection tests.
+  Eight additional water RI input-generation cases passed using local actual
+  CP2K data (PBE0/HSE06, NONE/XYZ, OT/diag, ENERGY, neutral singlet; default
+  DZVP-MOLOPT-SR-GTH with GTH-PBE family potentials, AUTO_BASIS MEDIUM).
+  Twenty PBE/direct-HFX/ADMM default input texts matched pre-change HEAD;
+  these comparisons do not include numeric calculation results.
+  At the initial implementation checkpoint no executable Multiwfn comparison,
+  CP2K invocation, job submission, convergence, auxiliary completeness, performance
+  or scientific accuracy was claimed. The separate executable-generator follow-up
+  above adds input comparisons, not CP2K/native or scientific validation.
+- Authorization: no new separate grant, relicensing permission or paid-distribution
+  conclusion is inferred. Existing [terms](TERMS.md), required Multiwfn papers
+  and [third-party notices](../../THIRD_PARTY_NOTICES.md) remain unchanged.
+
 ## ADMM emitted-library correction and executable comparison (0.3.4, version retained)
 
 The fix retains software version 0.3.4 by explicit user request. The comparison

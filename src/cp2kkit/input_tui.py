@@ -23,6 +23,7 @@ from .functional_registry import FUNCTIONAL_PROFILES, HYBRID_POTENTIAL_FAMILIES,
 from .constraints import parse_fixed_atoms
 from .hybrid import HFX_FIELDS
 from .admm import ADMM_FIELDS, ADMM_FUNCTIONALS
+from .ri_hfx import RI_FIELDS, RI_FUNCTIONALS, RI_BASIS_SIZES, RI_METRICS
 from .auxiliary_basis import auxiliary_option, numbered_auxiliary_basis, parse_auxiliary_basis
 from .spin_settings import (parse_dft_plus_u, parse_magnetism,
                             format_dft_plus_u, format_magnetism)
@@ -65,6 +66,12 @@ GROUPS = (
         Field('hf_eps_schwarz', 'Direct HFX EPS_SCHWARZ (0 < threshold < 1)', 'float', positive=True),
         Field('hf_memory', 'HFX MAX_MEMORY [MiB per MPI process, not total job memory]', 'int', minimum=1),
         Field('hf_cutoff_radius', 'Periodic global-hybrid radius [angstrom] (auto: min(6, face spacing/2.01))', 'float', optional=True, positive=True),
+        Field('ri_hfx', 'Enable Gamma RI-HFX (PBE0/HSE06; actual ORB files; no ADMM)', 'bool'),
+        Field('ri_basis_size', 'AUTO_BASIS RI_HFX size (not AUX_FIT)', choices=RI_BASIS_SIZES),
+        Field('ri_eps_filter', 'RI EPS_FILTER (0 < threshold < 1; convergence required)', 'float', positive=True),
+        Field('ri_memory_cut', 'RI MEMORY_CUT (batching factor, not a memory cap)', 'int', minimum=1),
+        Field('ri_metric', 'RI metric (HFX inherits exchange; TRUNCATED requires an independent radius)', choices=RI_METRICS),
+        Field('ri_cutoff_radius', 'Independent RI metric cutoff radius [angstrom] (TRUNCATED only)', 'float', optional=True, positive=True),
         Field('admm', 'Enable ADMM approximation (PBE0/HSE06 only; checked AUX_FIT data required)', 'bool'),
         Field('admm_purification', 'ADMM purification (auto: OT MO_DIAG, diagonalization NONE)', choices=('MO_DIAG', 'NONE'), optional=True),
         Field('aux_basis', 'AUX_FIT basis (independent immutable number or stable ID; f edits explicit files)', 'aux_basis'),
@@ -138,7 +145,7 @@ def visible_fields(fields, values):
     except KitError:
         has_ae = True  # Invalid drafts stay editable; authoritative review gives the error.
     xtb = values.get('method', 'DFT') != 'DFT'
-    dft_only = {*HFX_FIELDS, *ADMM_FIELDS, 'basis', 'basis_overrides', 'basis_files', 'potential_files', 'custom_basis_file',
+    dft_only = {*HFX_FIELDS, *ADMM_FIELDS, *RI_FIELDS, 'basis', 'basis_overrides', 'basis_files', 'potential_files', 'custom_basis_file',
                 'custom_basis_name', 'custom_potential_file', 'custom_potential_name', 'gapw_profile',
                 'dispersion', 'libxc_available', 'allow_pbe_potential', 'dft_plus_u', 'magnetism',
                 'cutoff', 'rel_cutoff', 'electron_density', 'spin_density', 'cube_stride', 'density_difference',
@@ -146,6 +153,11 @@ def visible_fields(fields, values):
     non_scf = values.get('method') == 'GFN0-xTB'
     return tuple(f for f in fields
                  if not (xtb and f.name in dft_only)
+                 and not (f.name in RI_FIELDS and values.get('functional') not in RI_FUNCTIONALS)
+                 and not (f.name in RI_FIELDS[1:] and not values.get('ri_hfx'))
+                 and not (f.name == 'ri_cutoff_radius' and values.get('ri_metric') != 'TRUNCATED'
+                          and values.get('ri_cutoff_radius') is None)
+                 and not (f.name == 'hf_memory' and values.get('ri_hfx'))
                  and not (f.name in ADMM_FIELDS and values.get('functional') not in ADMM_FUNCTIONALS)
                  and not (f.name in {'aux_basis', 'aux_basis_files'} and not values.get('admm'))
                  and not (f.name == 'admm_purification' and not values.get('admm') and values.get('admm_purification') is None)
@@ -462,10 +474,20 @@ class Menu:
             self.show(f"XC backend: {manifest['method_profile']['xc_backend']}; target build verified: False")
             hfx = manifest['method_profile'].get('hfx')
             if hfx:
-                self.show(f"Direct HFX: fraction={hfx['fraction']}; operator={hfx['interaction_potential']}; "
+                label = 'RI-HFX' if hfx['ri_hfx'] else 'Direct HFX'
+                self.show(f"{label}: fraction={hfx['fraction']}; operator={hfx['interaction_potential']}; "
                           f"omega={hfx['omega']} bohr^-1; radius={hfx['cutoff_radius_angstrom']} angstrom")
-                self.show(f"EPS_SCHWARZ={hfx['eps_schwarz']}; MAX_MEMORY={hfx['max_memory_mib_per_mpi_process']} MiB per MPI process; "
-                          "ADMM/RI-HFX: off; runtime validated: False")
+                self.show(f"EPS_SCHWARZ={hfx['eps_schwarz']}; ADMM={hfx['admm']}; RI-HFX={hfx['ri_hfx']}; runtime validated: False")
+                if hfx['ri_hfx']:
+                    ri = hfx['ri']
+                    self.show(f"RI_HFX: AUTO_BASIS {ri['basis_size']}; metric {ri['metric']} ({ri['effective_metric_operator']}); "
+                              f"RI radius={ri['effective_metric_cutoff_radius_angstrom']} angstrom; "
+                              f"EPS_FILTER={ri['eps_filter']}; MEMORY_CUT={ri['memory_cut']} (batching, not a memory cap)")
+                    self.show("Threshold expectations from target 2026.2 sources, not runtime observations:")
+                    for path, threshold in ri['thresholds'].items():
+                        self.show(f"  {path}={threshold['value']:.12g} ({threshold['selection']})")
+                else:
+                    self.show(f"MAX_MEMORY={hfx['max_memory_mib_per_mpi_process']} MiB per MPI process (not total job memory)")
             nonlocal_xc = manifest['nonlocal_correlation']
             if nonlocal_xc['enabled']:
                 self.show(f"Required nonlocal correlation: {nonlocal_xc['type']}; kernel: {nonlocal_xc['kernel_file']}; "

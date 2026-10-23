@@ -1,6 +1,52 @@
 # Development status and next steps
 
-Current software: **0.3.4**; schema: **0.1.0**.
+Current software: **0.3.5**; schema: **0.1.0**.
+
+## Returned-run hardening (0.3.5)
+
+- Automatic hybrid data files use portable runtime names when they resolve to
+  the checked sources in the selected data root. Explicit overrides remain
+  unchanged; absolute source evidence remains protected. T_C_G_DATA uses t_c_g.dat.
+- Hybrid ENERGY_FORCE explicitly prints forces to stdout in hartree/bohr.
+  Periodic HSE06 range preflight warns using the documented screening equation
+  and emitted-cell face spacing, without model/threshold changes.
+- User-returned native 2026.2/git:c92cc08 evidence contains 71 input-matched
+  SCF-converged outputs, all with late SIGSEGV, plus one stale failed reference;
+  all 16 GEO_OPT cases report convergence. Eighteen HSE06/XYZ cases warn about
+  range/cell compatibility. Thirty RI/direct energy pairs are provisional;
+  force accuracy, finite differences, RI size/radius convergence and speedup
+  remain unverified. No clean-exit acceptance or stable RI release claim.
+- Next: resolve runtime shutdown failures, recover the missing fresh reference,
+  review periodic HSE06 models and collect actual force/convergence evidence in
+  separately authorized new run directories. Existing inputs/results are not
+  repaired or resubmitted. Menu IDs, physical defaults and schema are unchanged.
+
+## RI-HFX and hybrid acceleration matrix implemented (0.3.5)
+
+- Add explicit PBE0/HSE06 Gamma RI-HFX at 121 for target 2026.2, retaining
+  classic GPW NONE/XYZ ENERGY/ENERGY_FORCE/GEO_OPT, RKS/UKS and OT/diag
+  without +U/smearing. Other-hybrid RI, RI+ADMM, non-Gamma, CELL_OPT,
+  GAPW, manual RI bases and UZH-PBE0 remain deferred.
+- Require actual ORB files and reuse selected payload/alias/q/hash checks;
+  AUTO_BASIS RI_HFX MEDIUM (optional SMALL/LARGE/HUGE), SORT_BASIS EXP,
+  metric HFX inheriting the shared exchange operator, RI_FLAVOR RHO.
+  This is not an AUX_FIT/RI_AUX registry expansion.
+- Optional independent TRUNCATED metric requires an explicit angstrom radius;
+  XYZ bounds use emitted-cell face spacing. HFX stays the default; no automatic
+  Multiwfn-matching radius. All RI modes resolve/protect T_C_G_DATA for startup.
+  Full-path threshold metadata/review separates QS source-derived precision from
+  HF/RI native defaults, without changing numerical inputs.
+- Shared CLI/TUI/config/replay exposes metric/radius, size, EPS_FILTER and MEMORY_CUT;
+  inactive nondefaults fail. MEMORY_CUT is batching, not total memory;
+  direct HF/MEMORY is not emitted and nondefault hf_memory conflicts with RI.
+- Publish the [hybrid acceleration capability matrix](input-generation.md#ri-hfx-and-hybrid-acceleration-matrix-035)
+  and additive effective metadata, reusing CDD HFX identity checks and protected
+  writers. Existing direct/ADMM input text defaults remain unchanged.
+- Initial implementation used target-version manual/local sources and synthetic
+  generation/regression only. Later returned-run observations and remaining
+  validation limits are recorded in the 0.3.5 section above; real checks still
+  require separate authorization and fresh run directories.
+
 
 ## ADMM auxiliary-library emission correction (0.3.4, version retained)
 

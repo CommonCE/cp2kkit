@@ -8,6 +8,87 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.3.5
+
+### Returned-run hardening (version retained by user request)
+
+- Keep software at 0.3.5 by explicit user request; schema remains 0.1.0.
+- Fix hybrid deployment after user-returned native testing: automatic basis,
+  AUX_FIT and potential files resolvable under the selected data root emit short
+  runtime names; explicit overrides and unrelated method policies remain intact.
+  Always emit T_C_G_DATA t_c_g.dat, avoiding its native 80-character limit.
+  Preserve absolute checked source paths/hashes and source/hardlink protection;
+  runtime CP2K_DATA_DIR or matching staged files are still required.
+- Fix hidden hybrid ENERGY_FORCE vectors under global LOW verbosity: explicitly
+  enable FORCE_EVAL/PRINT/FORCES ON to stdout in hartree/bohr. ENERGY/GEO_OPT
+  output policies remain unchanged. Add force_output provenance, without a new
+  CLI/config switch or schema bump.
+- Add source-derived periodic HSE06 range preflight using the documented
+  erfc(omega*r)/r=EPS_SCHWARZ equation and rounded-cell face spacing. Warn when
+  it exceeds half the cell; never change omega, cell, screening or physical
+  cutoff. Label the estimate non-runtime; RI can extend the range independently.
+- Record returned 2026.2/git:c92cc08 evidence honestly: 71 refreshed outputs
+  have SCF-converged totals and PROGRAM ENDED but all report late SIGSEGV;
+  one reference is stale. Sixteen geometry optimizations report convergence,
+  while force accuracy, clean process exits, RI convergence and speedup remain
+  unverified. Eighteen HSE06/XYZ outputs have range/cell warnings. RI-HFX stays
+  experimental, not stable native/scientific acceptance. No speculative runtime
+  library fix, numerical-default adjustment or automatic rerun.
+- Compatibility: affected hybrid input text changes intentionally; explicit
+  file paths, method/solver/spin defaults, menu/basis IDs and schema 0.1.0 stay
+  unchanged. Existing calculation artifacts and submission identities are not
+  modified. Regenerate to new run paths when native checks are authorized.
+- Software checks: 80 focused and 538 full regression tests passed, including
+  eight new synthetic/CLI regressions. Compileall, retained CLI version 0.3.5,
+  121 local Markdown file links, the updated documentation anchor and diff
+  checks passed. All 448 returned-acceptance source hashes remained unchanged.
+  No new CP2K execution, scheduler submission or installation.
+
+### Initial implementation and refinements
+
+- User-assigned version: add bounded PBE0/HSE06 Gamma RI-HFX for target 2026.2,
+  classic MOLOPT/UCL GPW, NONE/XYZ, ENERGY/ENERGY_FORCE/GEO_OPT, RKS/UKS and
+  OT/diag without smearing or +U. RI+ADMM and the other four hybrid RI profiles
+  remain rejected; no UZH-PBE0, GAPW, non-Gamma or CELL_OPT expansion.
+- Add menu 121 and --ri-hfx / --ri-basis-size / --ri-eps-filter /
+  --ri-memory-cut with shared API/config/replay validation. Defaults remain
+  RI-off; nondefault hidden/inactive requests fail instead of disappearing.
+- Require actual checked ORB files; emit AUTO_BASIS RI_HFX MEDIUM by default,
+  optional SMALL/LARGE/HUGE, SORT_BASIS EXP, RI_METRIC HFX and RI_FLAVOR RHO.
+  Default metric parameters inherit the existing HF interaction potential. No manual
+  RI basis, AUX_FIT reuse, numerical coefficients or new basis numbers.
+- EPS_FILTER defaults to 1e-9; MEMORY_CUT defaults to 3 and is tensor batching,
+  not a memory cap. Reject nondefault direct-only hf_memory with RI, omit
+  HF/MEMORY and record null effective direct-memory/storage controls.
+- Add hybrid acceleration matrix in docs and generator metadata; record RI
+  parent/basis-size/operator/filter/batching/source identity in hfx.ri. Reuse
+  complete HFX equality for CDD and existing protected publication. Fix review
+  text to report actual ADMM/RI state rather than hard-coded off.
+- Complete the same user-assigned 0.3.5 work with optional --ri-metric HFX/TRUNCATED
+  and --ri-cutoff-radius [angstrom] across API/CLI/TUI/config/replay/CDD. HFX
+  remains default; TRUNCATED requires an explicit radius, periodically bounded
+  by half emitted-cell face spacing. No automatic 1.5 angstrom choice.
+- Correct all RI modes to resolve/protect/hash and emit T_C_G_DATA, since target
+  RI initialization checks it even for non-truncated operators. A supplied data
+  directory must contain the table; unchecked runtime lookup remains disclosed
+  for explicit ORB files without a data directory.
+- Record full-path threshold expectations and origins (explicit, source-derived,
+  native-default) in metadata/review, especially the distinct QS and HF/RI
+  EPS_PGF_ORB paths. Keep QS/SCF numerical defaults and inactive restart policy.
+- Existing direct-HFX/ADMM default input text and basis/menu IDs remain unchanged.
+  Schema remains 0.1.0 with additive settings/metadata; no new dependencies.
+- Initial-checkpoint verification: 112 focused tests and 524 full regression tests passed;
+  compileall, CLI version, modified Markdown local file links and diff checks
+  passed. Eight actual-data RI input-generation cases passed; 20 PBE/direct-HFX/
+  ADMM input texts matched pre-change HEAD. These are software/data checks, not
+  CP2K execution, native syntax acceptance, auxiliary convergence, speedup or
+  scientific validation. No scheduler jobs, commit or push.
+- Refinement verification: 118 focused / 530 full tests passed; 48 fresh
+  actual-data CLI generation/replay cases and 10 expected CLI rejections passed,
+  preserving targets/data. Twenty default PBE/direct-HFX/ADMM input texts still
+  match the preserved pre-RI HEAD tree. Artifacts:
+  test-workspace/ri-hfx-035-refinement-m3RaS4/. No CP2K or new Multiwfn execution.
+
 ## 0.3.4
 
 ### ADMM auxiliary-library correction (version retained by user request)

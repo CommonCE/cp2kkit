@@ -177,6 +177,83 @@ Fields/units/schema 0.1.0 are unchanged.
 - syntax_reference_checked/runtime_validated describe density-print validation,
   not certification of the entire generator.
 
+## Generated input JSON: hybrid hardening (software 0.3.5)
+
+Schema remains **0.1.0**; no settings or CLI/config fields are added.
+
+- `force_output` records `explicit_print`, nullable `section`, `destination` and
+  `unit`, plus `runtime_validated=false`. Explicit printing applies only to hybrid
+  ENERGY_FORCE: FORCE_EVAL/PRINT/FORCES, __STD_OUT__, hartree/bohr. False means no
+  explicit print override, not that forces are zero or never computed.
+- Automatic hybrid basis/potential references resolvable under the selected data
+  root use short filenames; explicit files retain their paths. Existing UZH aliases
+  remain intact. `data_sources` and KIND/method source identities retain absolute
+  checked paths/hashes. `emitted_data_files` describes literal runtime references,
+  not files proven to exist on another machine. T_C_G_DATA uses t_c_g.dat while
+  `truncated_gamma_source` retains the checked absolute source when available.
+- `method_profile.hfx.short_range_cutoff_estimate` is null for non-screened
+  hybrids. For HSE06 it contains `value_angstrom`, `selection=source_derived`,
+  `derivation`, `runtime_observed=false`, nullable
+  `half_minimum_cell_face_spacing_angstrom` and `exceeds_half_cell`, and `scope`.
+  NONE has no cell bound (null); XYZ uses half the minimum rounded-cell face
+  spacing. The equation is erfc(omega*r)/r = EPS_SCHWARZ with r in bohr. RI can
+  independently extend the range; a false warning flag is not runtime or physical
+  validation. No explicit exchange cutoff, omega or screening change is implied.
+- Generator manifests still set runtime_validated=false. Historical returned-run
+  observations are documented separately, never substituted for per-input checks.
+
+## Generated input JSON: RI-HFX and acceleration policy (software 0.3.5)
+
+Schema remains **0.1.0**. Old configs default to ri_hfx=false,
+ri_basis_size=MEDIUM, ri_eps_filter=1e-9, ri_memory_cut=3, ri_metric=HFX and
+ri_cutoff_radius=null. TRUNCATED requires an explicit finite positive radius
+[angstrom]; HFX rejects an independent radius. Periodic TRUNCATED RI radii are
+strictly bounded by half the emitted cell's minimum perpendicular face spacing.
+Nondefault RI controls when disabled, malformed values, unsupported combinations
+and nondefault direct-only hf_memory with RI fail before publication.
+Settings serialize semantic fields, never new basis/function menu numbers.
+
+- Hybrid-only method_profile.hybrid_acceleration_capabilities records target
+  version, common scope, supported profile lists for direct_hfx/admm/ri_hfx,
+  ri_metrics=[HFX,TRUNCATED], ri_truncated_radius_policy,
+  ri_hfx_admm=false, uzh_pbe0_protocol=false, ri_basis_policy and
+  runtime_validated=false. It describes generator policy, not a build probe.
+- Enabled RI changes hfx.algorithm to ri_gamma and hfx.ri_hfx to true;
+  hfx.admm remains false. Fraction, operator, omega/radius, screening and
+  truncated-table identity retain their existing definitions. All RI modes now
+  resolve/protect/hash and emit T_C_G_DATA because RI initialization checks it,
+  even for non-truncated operators. The existing hfx_truncated_gamma keys under
+  data_sources/emitted_data_files refer to this shared initialization table.
+- hfx.max_memory_mib_per_mpi_process and hfx.eps_storage_scaling are null:
+  direct HF/MEMORY is not emitted. settings.hf_memory=512 is an inactive raw
+  default, not an effective RI allocation.
+- Enabled-only hfx.ri records basis_role=RI_HFX, basis_generation=AUTO_BASIS,
+  basis_size, basis_parent_role=ORB, parent-source-only basis_validation,
+  sort_basis=EXP, metric (HFX default or TRUNCATED), effective_metric_operator,
+  effective_metric_omega_bohr_inverse and effective_metric_cutoff_radius_angstrom.
+  A null short-range cutoff means CP2K determines it, not zero or infinite range.
+  metric_parameter_policy records inheritance or explicit independent RI truncation.
+  metric_cutoff_exclusive_limit_angstrom is the periodic independent-radius bound,
+  otherwise null. The metric omega is null when not applicable (TRUNCATED).
+  truncated_gamma_requirement explains the shared initialization-table requirement.
+- ri.thresholds maps full keyword paths to {value, unit, selection, emitted,
+  derivation, keyword_reference_version, runtime_observed=false}. selection is
+  explicit_input, source_derived or native_default. QS/EPS_PGF_ORB is derived
+  from sqrt(QS/EPS_DEFAULT), while HF/RI/EPS_PGF_ORB is independently 1e-5 by
+  native default. These expected values have inspected-source provenance through
+  ri.source_hashes/source_identity, not measured runtime evidence. EPS_DEFAULT,
+  EPS_FILTER, EPS_FILTER_2C, EPS_SCHWARZ and EPS_SCF are also recorded.
+- ri also records eps_filter (dimensionless), memory_cut (batching factor),
+  ri_flavor=RHO, two_center_matrix_functions=CHOLESKY (native default),
+  keyword_reference_version, inspected local source identity/hash map and false
+  build_verified/runtime_validated. Source identity is not an official-tag certificate.
+- Actual ORB source files/entries/hashes remain in kinds and data_sources.
+  No generated auxiliary coefficients, numerical validation, manual RI basis,
+  AUX_FIT substitution or new auxiliary registry number is implied.
+- Existing CDD complete hfx equality checks include the RI model across whole/A/B;
+  split KINDs reuse their resolved ORB data. This is not actual CUBE/reference-state
+  compatibility, convergence, timing or scientific validation.
+
 ## Generated input JSON: ADMM / AUX_FIT (software 0.3.4)
 
 Schema stays **0.1.0**. Legacy configs default to admm=false,
@@ -257,7 +334,9 @@ not changes to analysis records. Legacy configurations default new fields.
   truncated table has a protected absolute path/raw-byte SHA-256/size in
   data_sources.hfx_truncated_gamma; otherwise it is an unchecked basename.
   emitted_data_files.hfx_truncated_gamma records the same effective filename.
-  No table is needed for COULOMB/SHORTRANGE.
+  No table is needed for direct COULOMB/SHORTRANGE without RI. Since 0.3.5
+  the emitted table reference is always t_c_g.dat; absolute checked source paths
+  remain provenance only.
 - hfx.keyword_reference_version=2026.2 and sources contain inspected tagged-source
   URLs/hashes. Static references, build requirements and bytes are not executable
   support, numerical-table validity, derivative accuracy or scientific validation.

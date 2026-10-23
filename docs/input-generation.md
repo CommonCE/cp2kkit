@@ -1,6 +1,6 @@
 # CP2K input generation
 
-This guide describes cp2kkit **0.3.4**. Older defaults and migration notes are in
+This guide describes cp2kkit **0.3.5**. Older defaults and migration notes are in
 [the changelog](../CHANGELOG.md). AE automatic setup is described in
 [the basis guide](basis-selection.md#all-electron-automatic-setup-027).
 The [registry-v1 basis guide](basis-selection.md) defines permanent numbering toward
@@ -491,7 +491,7 @@ Standard-library readers preserve original hashes and do not run Gaussian/VASP/M
 - Restart provides **geometry only**: original KIND labels merge by element;
   method/U/constraints/moments/charge/solvent are not inherited. This is a new template,
   not a complete restart of the original job.
-- Hybrids beyond the six bounded profiles, ADMM beyond PBE0/HSE06, RI-HFX,
+- Hybrids beyond the six bounded profiles, ADMM/RI-HFX beyond PBE0/HSE06, their combination,
   MD, frequencies, NEB, TDDFT, solvents, external fields, richer
   constraints beyond fixed atoms, and other advanced Multiwfn branches are not implemented.
   Electron/spin cubes are supported; potential/ELF/MO cubes are not.
@@ -514,14 +514,14 @@ arbitrary XC mixtures remain unsupported.
 | k-points / SCF | Gamma only; OT or diagonalization; no smearing |
 | Dispersion | PBE0/HSE06/B3LYP: none/D3/D3(BJ); M06-2X: none/D3 (reference M062X); BHandHLYP/PBEh: none only |
 | Density | Existing GPW electron/spin cubes and explicit whole/A/B CDD inputs; reference states and actual cube-grid compatibility still need validation |
-| Excluded | GAPW/AE, +U, UZH-PBE0/custom orbital protocols, RI-HFX, non-Gamma, correlated methods; ADMM is separately opt-in for PBE0/HSE06 only |
+| Excluded | GAPW/AE, +U, UZH-PBE0/custom orbital protocols, non-Gamma, correlated methods; ADMM and RI-HFX are separately opt-in for PBE0/HSE06 only, not together |
 
 `FUNCTIONALS` retains the original 15 entries, then PBE0/HSE06/B3LYP,
 then BHANDHLYP/M06-2X/PBEH (canonical IDs; names are case-insensitive).
 The method chooser **1/110** uses local positions **16/17/18** (not a claim of
 Multiwfn number equivalence), then **19/20/21** for the added profiles;
 xTB remains **30/31/32**. Menu **120** edits the three direct-HFX numerical
-controls in sequence, followed by the HF fraction for PBEh only. **121 remains planned**;
+controls in sequence (MAX_MEMORY hidden for RI), followed by the HF fraction for PBEh only. **121** edits the bounded RI-HFX subset;
 **122** explicitly enables the bounded ADMM subset below. Neither ADMM nor
 RI-HFX is enabled by selecting a hybrid. Basis IDs are unchanged;
 UZH-PBE0 30-32 remain unavailable pending their own paired-data/protocol audit.
@@ -628,6 +628,204 @@ References: CP2K v2026.2
 and [qs_dispersion_utils.F](https://github.com/cp2k/cp2k/blob/v2026.2/src/qs_dispersion_utils.F).
 Exact inspected hashes are in hybrid.py and [feature provenance](../third_party/multiwfn/PROVENANCE.md).
 The derivative path was inspected, not numerically validated.
+
+## Hybrid returned-run hardening (0.3.5)
+
+These fixes change hybrid deployment/output text, not the selected physical model.
+They apply to newly generated inputs; existing inputs, outputs, wavefunctions and
+submission records are not modified or resubmitted.
+
+- Automatic hybrid ORB/AUX_FIT and potential files use short runtime filenames
+  when the corresponding basename in the selected data root resolves to the
+  checked source. Explicit `--basis-file`, `--aux-basis-file` and
+  `--potential-file` overrides retain their paths; files outside that root are
+  not blindly rebased. Existing UZH aliases remain unchanged. Absolute source
+  paths/hashes remain in provenance and publication protection. Pure-DFT and
+  xTB filename policies are unchanged.
+- `T_C_G_DATA` always emits `t_c_g.dat`, avoiding the native char_t 80-character
+  limit. A supplied data root still requires the readable source and records its
+  absolute path/hash. On the execution machine, set **CP2K_DATA_DIR** to matching
+  data or stage matching files in the actual run directory. Short names do not
+  certify the contents of another machine's libraries.
+- Hybrid **ENERGY_FORCE** explicitly enables **FORCE_EVAL/PRINT/FORCES ON**, with
+  FILENAME __STD_OUT__ and FORCE_UNIT hartree/bohr. The target-2026.2 default
+  print threshold is HIGH, so retaining GLOBAL PRINT_LEVEL LOW alone had hidden
+  the vectors despite force computation. ENERGY/GEO_OPT and non-hybrid print
+  policies are unchanged; global verbosity is not raised.
+- Periodic HSE06 preflight estimates the initial HFX range by solving
+  erfc(omega*r)/r = EPS_SCHWARZ in bohr and compares with half the minimum
+  perpendicular spacing of the rounded emitted cell. It warns, never resizes
+  the cell or changes omega, screening or an exchange cutoff. The estimate is
+  source-derived, **not runtime-observed**; RI may extend the range further.
+  An independent TRUNCATED RI metric radius does not fix this exchange range.
+
+### Returned native evidence and limits
+
+User-returned water tests identify CP2K **2026.2, git:c92cc08**, with GPW
+DZVP-MOLOPT-SR-GTH/GTH-PBE, 400/55 Ry grids, EPS_SCF=1e-6 and 16 Angstrom cells.
+Neutral singlets and charge +1 doublets were tested; charged XYZ is a software
+smoke model, not an ionization benchmark. All 71 refreshed, input-hash-matched
+outputs have SCF-converged energy records and PROGRAM ENDED, but **all 71 stderr
+files report SIGSEGV with _dl_fini frames**. This includes direct HFX as well as
+RI, so no RI-only cause or responsible library is established. One direct-HFX
+reference is still an old absolute-path failure, not a new-input failure.
+
+All 16 GEO_OPT cases report optimization convergence. All 24 ENERGY_FORCE cases
+have force-computation timing entries, but no atom-resolved vectors were retained;
+force accuracy/finite differences remain unverified. Thirty available RI/direct
+pairs give positive total-energy differences of approximately 1.103-1.868 mHa
+(1 mHa = 0.001 hartree) with AUTO_BASIS MEDIUM and optional independent RI radius
+1.7 Angstrom. These are provisional pre-crash observations, not converged RI
+approximation errors or a chemical-accuracy guarantee. Eighteen HSE06/XYZ cases
+warn about an effective range of 14.279 Angstrom versus a half-cell spacing of
+8.000 Angstrom, including eight of those energy pairs. Such totals require a
+physical model/range review. No reliable speedup is established.
+
+**RI-HFX remains experimental.** Check stderr, actual process/scheduler exit,
+SCF/geometry convergence and numerical/model convergence separately.
+PROGRAM ENDED and sbatch acceptance alone are not clean execution. Resolve the
+shutdown failure, recover the missing fresh reference, assess periodic HSE06 and
+collect forces/RI size-radius convergence before release acceptance. Full local
+evidence is retained under
+`test-workspace/ri-hfx-035-native-analysis-JHBwYX/REPORT.md` and `native-review/`
+(ignored artifacts, not shipped fixtures). The 0.3.5 generator fixes have only
+software/static validation until separately authorized new native runs.
+
+References: target-2026.2 [FORCES](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/PRINT/FORCES.html)
+and [INTERACTION_POTENTIAL](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/XC/HF/INTERACTION_POTENTIAL.html).
+
+## RI-HFX and hybrid acceleration matrix (0.3.5)
+
+RI-HFX is opt-in at **121** / `--ri-hfx`, independent of functional selection
+and ADMM. The first subset supports **PBE0/HSE06**, target **2026.2**, classic
+MOLOPT/UCL GPW, Gamma, NONE/XYZ, ENERGY/ENERGY_FORCE/GEO_OPT, RKS/UKS and
+OT/diagonalization without smearing or +U. Force paths are source-inspected,
+not numerically validated. These are generator limits, not CP2K-wide restrictions.
+
+| Profile | Direct HFX | ADMM + four-center HFX | RI-HFX | RI-HFX + ADMM |
+|---|---|---|---|---|
+| PBE0 | Supported | Supported | Supported | Blocked: separate combination audit deferred |
+| HSE06 | Supported | Supported | Supported | Blocked: separate combination audit deferred |
+| B3LYP | Supported | Blocked: correction audit deferred | Blocked: profile audit deferred | Blocked |
+| BHandHLYP | Supported, Libxc assertion | Blocked: correction audit deferred | Blocked: profile audit deferred | Blocked |
+| M06-2X | Supported, Libxc assertion | Blocked: correction audit deferred | Blocked: profile audit deferred | Blocked |
+| PBEh | Supported, explicit HF fraction | Blocked: correction audit deferred | Blocked: profile audit deferred | Blocked |
+
+All supported columns retain the common hybrid task/model/spin/solver gates
+above. None enables GAPW, low-dimensional PBC, non-Gamma, CELL_OPT/stress,
+smearing, +U, custom orbital bases, UZH-PBE0 protocols or correlated methods.
+Required build support is not detected. No column is certified by native CP2K runs.
+
+```bash
+cp2kkit generate-input water.xyz -o water-pbe0-ri.inp --periodic NONE \
+  --functional PBE0 --ri-hfx --data-dir /path/to/cp2k/data --write-json
+cp2kkit generate-input solid.extxyz -o solid-hse06-ri.inp \
+  --functional HSE06 --ri-hfx --ri-basis-size LARGE \
+  --ri-eps-filter 1e-10 --ri-memory-cut 5 --data-dir /path/to/cp2k/data
+```
+
+RI auxiliary policy is **AUTO_BASIS RI_HFX**, default **MEDIUM**, with explicit
+SMALL/MEDIUM/LARGE/HUGE sizes. Actual selected ORB files, Gaussian payloads,
+aliases/q and hashes are checked using existing resolution; use `--data-dir`,
+CP2K_DATA_DIR or explicit `--basis-file`. Catalog-only RI templates are rejected.
+CP2K constructs the RI basis from ORB at runtime; cp2kkit neither constructs nor
+certifies those auxiliary functions. No new basis number, coefficients, manual
+RI basis selection, RI_AUX selection or AUX_FIT substitution is introduced.
+AUX_FIT remains the separate ADMM role at 223. SORT_BASIS EXP is emitted for RI.
+
+The HF/RI section explicitly enables RI and uses RI_FLAVOR RHO. The default
+**RI_METRIC HFX** follows the existing HF interaction operator and parameters:
+PBE0/NONE uses full COULOMB; PBE0/XYZ inherits the face-spacing-bounded TRUNCATED
+radius; HSE06 uses SHORTRANGE with omega=0.11 bohr^-1 and a CP2K-determined
+metric cutoff from EPS_SCHWARZ. CP2K separately extends the short-range HFX
+operator range using RI/EPS_FILTER_2C during RI setup; no numeric runtime range
+is claimed here. Consistent metric inheritance is not a claim of optimal sparsity.
+
+An optional **RI_METRIC TRUNCATED** uses an independent, explicitly required
+`ri_cutoff_radius` in angstrom, without changing HF fraction, exchange operator,
+omega or exchange radius. NONE and XYZ are supported within the same bounded
+profile/task/solver scope. For XYZ the RI radius must be strictly below half the
+minimum perpendicular face spacing of the emitted, rounded cell, including skew
+cells. Invalid radii fail, never clip or change the cell. No automatic 1.5 angstrom
+choice or independent RI omega editor is introduced. Radius/metric accuracy and
+performance require separate numerical convergence checks.
+
+```bash
+cp2kkit generate-input solid.extxyz -o solid-pbe0-ri-truncated.inp \
+  --functional PBE0 --ri-hfx --ri-metric TRUNCATED --ri-cutoff-radius 1.7 \
+  --data-dir /path/to/cp2k/data --write-json
+```
+
+All RI modes resolve and emit INTERACTION_POTENTIAL/T_C_G_DATA: the inspected
+2026.2 RI initialization checks this file even for non-truncated operators. A
+supplied data directory requires readable t_c_g.dat; its raw bytes/hash are
+recorded and protected. With explicit ORB files but no data directory, the
+runtime filename remains t_c_g.dat with an unchecked-data warning. File presence
+is not validation of the table's numerical contents. Since 0.3.5, the emitted
+reference is always the short t_c_g.dat name; absolute paths remain provenance.
+The shared hybrid filename/force-output fixes above supersede the original
+0.3.5 default-text preservation, without changing physical defaults.
+
+Numerical controls at 121 share CLI/config/replay validation:
+
+- `ri_metric` / `--ri-metric`: HFX (default) or TRUNCATED.
+- `ri_cutoff_radius` / `--ri-cutoff-radius`: finite positive angstrom value,
+  required explicitly for TRUNCATED, rejected with HFX; independent of
+  `hf_cutoff_radius`, and subject to the periodic bound above.
+- `ri_basis_size` / `--ri-basis-size`: MEDIUM default; size is not convergence.
+- `ri_eps_filter` / `--ri-eps-filter`: finite dimensionless value in (0,1),
+  default 1e-9, emitted as EPS_FILTER. Converge accuracy; values above 1e-8
+  are not recommended by the target-version guide.
+- `ri_memory_cut` / `--ri-memory-cut`: positive integer, default 3,
+  emitted as MEMORY_CUT. This batches tensor contractions, **not a memory cap**.
+- Other RI numerical controls retain CP2K defaults; in particular
+  2C_MATRIX_FUNCTIONS=CHOLESKY may fail for ill-conditioned auxiliary bases.
+  Automatic fallback or eigenvalue repair is not implemented.
+
+Nondefault RI controls while RI is off fail instead of disappearing. They remain
+editable through 121 for explicit reset after disabling. Other unsupported
+functional/model requests fail without changing charge, spin, PBC, task or solver.
+RI + ADMM is explicitly rejected in either selection order. Direct four-center
+`hf_memory` has no RI meaning: nondefault values fail with RI; its default 512 is
+retained in raw settings but **HF/MEMORY is not emitted**, and effective
+max_memory_mib_per_mpi_process/eps_storage_scaling are null. EPS_SCHWARZ remains
+a shared HF screening setting, not a replacement for RI EPS_FILTER.
+
+Hybrid manifests include a generator-policy acceleration matrix and enabled RI
+metadata under method_profile.hfx.ri, with basis role/parent/size, metric,
+effective metric operator/omega/radius, thresholds, batching and inspected
+source identity. CDD reuses the existing complete HFX-identity check for whole/A/B;
+split magnetic KINDs retain the same element-specific ORB parent. Generated
+auxiliary completeness, actual CUBE reference/grid consistency and physical
+accuracy are unverified. Defaults remain RI-off; 0.3.5 changes only the documented
+hybrid data filenames and ENERGY_FORCE print text. Schema stays 0.1.0 with
+additive fields.
+
+RI metadata and review identify thresholds by complete keyword path, with
+`selection` = explicit_input, source_derived or native_default and `emitted`
+flags. QS/EPS_DEFAULT remains 1e-11 for ENERGY and 1e-12 for forces/optimization.
+Omitted **FORCE_EVAL/DFT/QS/EPS_PGF_ORB** is source-derived as its square root:
+approximately 3.1623e-6 or 1e-6 respectively. This is distinct from omitted
+**FORCE_EVAL/DFT/XC/HF/RI/EPS_PGF_ORB**, whose native default is 1e-5. Both are
+recorded as expected source values, **not runtime observations**. EPS_FILTER,
+EPS_FILTER_2C, EPS_SCHWARZ and EPS_SCF are also qualified by full path. Numerical
+input defaults remain unchanged; EPS_SCF stays 1e-6 and restart remains inactive.
+
+RI-HFX is not universally faster: large sparse periodic systems can favor
+four-center exchange. Compare representative energies/forces with direct HFX
+and converge RI size/filtering, orbital bases, SCF and cell/radius independently.
+Generation/source checks and synthetic tests establish neither native syntax
+acceptance, linked-build support, convergence, speedup nor scientific validity.
+The generator and software tests do not run CP2K or submit jobs. User-returned
+native observations and their limitations are recorded in the 0.3.5 section above.
+
+References: target-2026.2 [Gamma RI-HFX guide](https://manual.cp2k.org/cp2k-2026_2-branch/methods/dft/hartree-fock/ri_gamma.html),
+[HF/RI keywords](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/XC/HF/RI.html)
+and [DFT AUTO_BASIS](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT.html).
+The guide cites Bussy2023 for RI-HFX; the inspected auto-basis source cites
+Stoychev2016. Follow CP2K's method references for research use. Exact local
+source identities, Multiwfn references and differences are recorded in
+[provenance](../third_party/multiwfn/PROVENANCE.md).
 
 ## ADMM and auxiliary bases (0.3.4)
 
@@ -1058,7 +1256,8 @@ The registry follow-up enables paired UZH-PBE DZVP/TZVP/TZV2P for target 2026.2
 and explicit custom pseudopotential ORB files. Version 0.3.0 adds the bounded
 meta-GGA/nonlocal subset above; 0.3.1 adds the separate bounded xTB branch.
 Versions 0.3.2/0.3.3 add the six bounded direct-HFX hybrids; 0.3.4 separately
-adds PBE0/HSE06 ADMM and checked AUX_FIT families. RI-HFX, UZH-PBE0 templates,
+adds PBE0/HSE06 ADMM and checked AUX_FIT families. Version 0.3.5 adds the
+bounded PBE0/HSE06 Gamma RI-HFX subset above. UZH-PBE0 templates,
 arbitrary q changes, broader auxiliary and reserved families remain unimplemented; see [basis selection](basis-selection.md).
 
 ## DFT+U and magnetic initialization (112 / 103)

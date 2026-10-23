@@ -40,6 +40,7 @@ ENTRIES = (
     MenuEntry(113, 'libxc_available', 'Target CP2K has Libxc (user assertion)'),
     MenuEntry(114, 'allow_pbe_potential', 'Allow GTH-PBE approximation'),
     MenuEntry(120, 'hf_eps_schwarz', 'HFX parameters', editor='hybrid'),
+    MenuEntry(121, 'ri_hfx', 'RI-HFX approximation and tensor controls', editor='ri_hfx'),
     MenuEntry(122, 'admm', 'ADMM projection and purification', editor='admm'),
     MenuEntry(140, 'method', 'DFT / GFN-xTB model'),
     MenuEntry(141, 'tblite_available', 'Target CP2K has tblite (user assertion)'),

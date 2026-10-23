@@ -293,9 +293,10 @@ class HybridTests(unittest.TestCase):
         text, report = generate_input(structure, settings)
         source = report['data_sources']['hfx_truncated_gamma']
         self.assertEqual(source['sha256'], hashlib.sha256(table.read_bytes()).hexdigest())
-        # T_C_G_DATA is char_t, unlike lchar_t basis/kernel filenames: quote spaces.
-        self.assertIn('T_C_G_DATA "'+str(table)+'"', text)
-        self.assertEqual(report['emitted_data_files']['hfx_truncated_gamma'], str(table))
+        # T_C_G_DATA is char_t: a checked absolute path is provenance only.
+        self.assertIn('T_C_G_DATA t_c_g.dat\n', text)
+        self.assertEqual(source['path'], str(table.resolve()))
+        self.assertEqual(report['emitted_data_files']['hfx_truncated_gamma'], 't_c_g.dat')
         self.assertEqual(report['method_profile']['hfx']['data_validation'], 'source_bytes_only')
         with self.assertRaises(KitError):
             write_input(structure, settings, table)

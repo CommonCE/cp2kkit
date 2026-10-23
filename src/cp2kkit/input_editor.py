@@ -6,6 +6,7 @@ from pathlib import Path
 from .errors import KitError
 from .functional_registry import parse_functional
 from .hybrid import HFX_FIELDS
+from .ri_hfx import RI_FIELDS
 from .input_tui import (Cancelled, SessionExit, Menu, GROUPS, field_display,
                         parse_value, visible_fields)
 from .inputgen import InputSettings, generate_input, write_input
@@ -282,11 +283,24 @@ def edit_entry(menu, values, entry):
             except ValueError as exc:
                 menu.show(f'Invalid input: {exc}')
     elif entry.editor == 'hybrid':
-        menu.show('HFX parameters; ADMM is explicit at 122, never automatic. RI-HFX is unavailable. Radius applies only to periodic global hybrids; auto clears it.')
+        menu.show('HFX parameters; ADMM is explicit at 122, never automatic. RI-HFX is explicit at 121. Radius applies only to periodic global hybrids; auto clears it.')
         for name in HFX_FIELDS:
+            if name == 'hf_memory' and values.get('ri_hfx'):
+                continue
             if name == 'pbeh_fraction' and values.get('functional') != 'PBEH':
                 continue
             values[name] = menu.edit(FIELDS[name], values[name], values)
+    elif entry.editor == 'ri_hfx':
+        menu.show('PBE0/HSE06 Gamma RI-HFX; AUTO_BASIS from checked ORB files, default metric HFX inherits exchange; TRUNCATED needs an explicit independent radius. No ADMM combination. MEMORY_CUT is not a memory cap.')
+        values['ri_hfx'] = menu.edit(FIELDS['ri_hfx'], values['ri_hfx'], values)
+        # Keep nondefault retained controls editable so users can reset them after disabling.
+        defaults = asdict(InputSettings())
+        for name in RI_FIELDS[1:]:
+            if (name == 'ri_cutoff_radius' and values['ri_metric'] != 'TRUNCATED'
+                    and values[name] is None):
+                continue
+            if values['ri_hfx'] or values[name] != defaults[name]:
+                values[name] = menu.edit(FIELDS[name], values[name], values)
     elif entry.editor == 'admm':
         menu.show('PBE0/HSE06 ADMM approximation; select AUX_FIT at 223. Auto purification: OT MO_DIAG / diagonalization NONE. No solver changes.')
         values['admm'] = menu.edit(FIELDS['admm'], values['admm'], values)

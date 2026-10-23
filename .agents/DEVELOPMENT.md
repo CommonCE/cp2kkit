@@ -224,6 +224,36 @@ port or evidence of validation with the actual software.
   and global ADMM identity. Nondefault inactive requests fail until reset.
   No RI-HFX, UZH-PBE0, GAPW, custom/per-element auxiliary names or other-hybrid
   ADMM is implied. Source/data checks are not native/scientific validation.
+- 0.3.5 adds explicit PBE0/HSE06 Gamma RI-HFX at 121 for target 2026.2,
+  retaining existing hybrid task/model/spin/solver gates. Require checked actual
+  ORB files; emit AUTO_BASIS RI_HFX (SMALL/MEDIUM/LARGE/HUGE, MEDIUM default)
+  and SORT_BASIS EXP. No manual RI basis, AUX_FIT/RI_AUX substitution or new
+  basis numbers. RI_METRIC HFX inherits the existing exchange operator/omega/
+  radius by default; optional RI_METRIC TRUNCATED requires an explicit independent
+  finite positive angstrom radius, strictly below half emitted-cell face spacing
+  for XYZ. No automatic Multiwfn-matching RI radius. All RI modes resolve/protect
+  T_C_G_DATA for initialization, even with non-truncated exchange. Thresholds in
+  review/metadata use full paths and distinguish explicit, source-derived and
+  native-default expectations, never runtime observations. RI_FLAVOR RHO.
+  EPS_FILTER defaults 1e-9, MEMORY_CUT 3 is batching,
+  not a memory cap. Reject RI+ADMM, other-hybrid RI, retained inactive
+  nondefault RI controls and nondefault direct-only hf_memory with RI.
+  Do not emit HF/MEMORY under RI; effective direct-resource metadata is null.
+  CLI/TUI/config/replay and CDD use the same effective HFX identity. The hybrid
+  acceleration matrix describes generator policy, not native/build validation.
+- 0.3.5 returned-run hardening: automatic hybrid basis/potential files may use
+  short runtime names only when they resolve to the checked source under the
+  selected data root; explicit overrides retain paths and absolute source/hash
+  protection. T_C_G_DATA always uses t_c_g.dat (char_t length limit). Hybrid
+  ENERGY_FORCE explicitly enables FORCE_EVAL/PRINT/FORCES ON to stdout in
+  hartree/bohr, keeping global LOW verbosity. Periodic HSE06 preflight uses the
+  documented erfc(omega*r)/r=EPS_SCHWARZ range estimate and rounded-cell face
+  spacing; label it source-derived, not runtime-observed. RI can extend that
+  range independently. Never resize cells or relax screening to hide warnings.
+  Returned SCF convergence/PROGRAM ENDED with stderr SIGSEGV is not a clean
+  exit or release acceptance. Keep RI experimental; preserve physical defaults,
+  existing results and submission identities. These documented output fixes
+  supersede the earlier default-text preservation for affected hybrid inputs.
 - Do not start expensive calculations. Actual CP2K validation requires explicit
   authorization and a new run directory.
 - For failed-job diagnosis, load `qchem-error-diagnosis`, collect software/version

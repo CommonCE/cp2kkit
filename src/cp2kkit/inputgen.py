@@ -36,8 +36,9 @@ from .basis_registry import DEFAULT_BASIS, basis_option, migrate_basis
 from .cp2k_data import cp2k_long_path
 from .constraints import CONSTRAINT_REFERENCE, resolve_fixed_atoms
 from .functional_registry import parse_functional
-from .hybrid import validate_hfx_controls, resolve_hfx, hf_lines
+from .hybrid import validate_hfx_controls, resolve_hfx, hf_lines, hybrid_runtime_file
 from .admm import validate_admm, resolve_admm, admm_lines
+from .ri_hfx import validate_ri_hfx, resolve_ri_hfx, ri_dft_lines, acceleration_capabilities, qs_eps_default
 from .auxiliary_basis import DEFAULT_AUXILIARY_BASIS, auxiliary_option, parse_auxiliary_basis
 
 MULTIWFN_CITATIONS = (
@@ -136,6 +137,12 @@ class InputSettings:
     admm_purification: str | None = None  # auto: OT MO_DIAG, diagonalization NONE.
     aux_basis: str = DEFAULT_AUXILIARY_BASIS  # Independent AUX_FIT registry ID, not ORB/RI.
     aux_basis_files: tuple[str, ...] = ()  # Actual Gaussian libraries; no header-only fallback.
+    ri_hfx: bool = False
+    ri_basis_size: str = 'MEDIUM'  # AUTO_BASIS RI_HFX size, not an AUX_FIT ID.
+    ri_eps_filter: float = 1e-9  # Dimensionless tensor filtering threshold.
+    ri_memory_cut: int = 3  # Tensor batching factor, not a memory cap.
+    ri_metric: str = 'HFX'  # Independent RI operator; exchange operator is unchanged.
+    ri_cutoff_radius: float | None = None  # Required only for TRUNCATED RI metric [angstrom].
 
     @classmethod
     def from_config(cls, values, source_version=None):
@@ -311,6 +318,7 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
                 added_mos=settings.added_mos if settings.added_mos is not None else
                 (max(30, (len(structure.symbols)+1)//2) if settings.scf == 'diag' and settings.smearing is not None else 0))
     validate_admm(s)
+    validate_ri_hfx(s)
     if s.multiplicity is None:
         s = replace(s, multiplicity=automatic_multiplicity(structure, s))
     if s.cp2k_version not in CP2K_VERSIONS:
@@ -481,6 +489,7 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
         warnings.append('Dispersion data dftd3.dat have not been checked; the file is resolved by CP2K at runtime.')
     hfx, hfx_warnings = resolve_hfx(s, method_profile, periodic, cell, data_root)
     warnings.extend(hfx_warnings)
+    warnings.extend(resolve_ri_hfx(s, element_records, hfx, periodic, cell))
     if hfx and hfx['truncated_gamma_source']:
         data_sources['hfx_truncated_gamma'] = hfx['truncated_gamma_source']
     nonlocal_xc = {'enabled': method_profile.nonlocal_type is not None,
@@ -526,10 +535,20 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
     emitted_potential = ('POTENTIAL_UZH' if not s.potential_files and
                          all(r['basis_protocol'] == 'uzh-pbe' for r in element_records.values())
                          else files['potential'])
+    if hfx is not None:
+        explicit_basis_sources = {str(Path(file).resolve()) for file in (*s.basis_files, *s.aux_basis_files)}
+        emitted_basis_files = sorted({hybrid_runtime_file(file, data_root, explicit=file in explicit_basis_sources)
+                                      for file in emitted_basis_files})
+        emitted_potential = hybrid_runtime_file(emitted_potential, data_root, explicit=bool(s.potential_files))
+        if data_root is not None:
+            warnings.append('Automatic hybrid data files in the selected data directory use short runtime filenames; '
+                            'set CP2K_DATA_DIR to the corresponding data directory on the execution machine or stage '
+                            'the same files in the run directory. Explicit file overrides retain their paths. '
+                            'Absolute checked source paths/hashes remain provenance, not deployment validation.')
     lines += ['  &DFT', *(f'    BASIS_SET_FILE_NAME {cp2k_long_path(file)}' for file in emitted_basis_files),
               f'    POTENTIAL_FILE_NAME {cp2k_long_path(emitted_potential)}', f"    CHARGE {s.charge}",
-              f"    MULTIPLICITY {s.multiplicity}", f"    UKS {'T' if uks else 'F'}",
-              "    &QS", f"      METHOD {qs_method}", f"      EPS_DEFAULT {scientific_number(1e-11 if s.run_type == 'ENERGY' else 1e-12)}",
+              f"    MULTIPLICITY {s.multiplicity}", f"    UKS {'T' if uks else 'F'}", *ri_dft_lines(hfx),
+              "    &QS", f"      METHOD {qs_method}", f"      EPS_DEFAULT {scientific_number(qs_eps_default(s.run_type))}",
               *(f"      {key} {scientific_number(value)}" for key, value in (gapw['qs'] if gapw else {}).items()), "    &END QS",
               "    &MGRID", f"      CUTOFF [Ry] {num(s.cutoff)}", f"      REL_CUTOFF [Ry] {num(s.rel_cutoff)}",
               *([f"      NGRIDS {ngrids}"] if ngrids is not None else []), "    &END MGRID",
@@ -592,7 +611,13 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
             lines += ['      &DFT_PLUS_U ON', f'        L {angular}',
                       f'        U_MINUS_J [eV] {num(energy)}', '      &END DFT_PLUS_U']
         lines.append('    &END KIND')
-    lines += ["  &END SUBSYS", "&END FORCE_EVAL"]
+    lines += ["  &END SUBSYS"]
+    explicit_forces = hfx is not None and s.run_type == 'ENERGY_FORCE'
+    if explicit_forces:
+        # FORCES defaults to HIGH, so GLOBAL PRINT_LEVEL LOW otherwise hides it.
+        lines += ['  &PRINT', '    &FORCES ON', '      FILENAME __STD_OUT__',
+                  '      FORCE_UNIT hartree/bohr', '    &END FORCES', '  &END PRINT']
+    lines += ['&END FORCE_EVAL']
     lines += motion_lines(s, fixed_atoms)
     text = "\n".join(lines) + "\n"
     effective = Structure(structure.symbols.copy(), positions, [row.copy() for row in cell],
@@ -620,6 +645,11 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
                 "wavefunction_output": {"restart_enabled": True, "restart_backup_copies": 0,
                                         "section": "FORCE_EVAL/DFT/SCF/PRINT/RESTART",
                                         "runtime_validated": False},
+                "force_output": {"explicit_print": explicit_forces,
+                                 "section": "FORCE_EVAL/PRINT/FORCES" if explicit_forces else None,
+                                 "destination": "__STD_OUT__" if explicit_forces else None,
+                                 "unit": "hartree/bohr" if explicit_forces else None,
+                                 "runtime_validated": False},
                 "motion_output": {"enabled": optimizing,
                                   "trajectory_format": s.trajectory_format if optimizing else None,
                                   "restart_backup_copies": 0 if optimizing else None,
@@ -678,6 +708,7 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
         'potential_approximations': [el for el, r in element_records.items() if r['potential_approximation']]}
     if hfx:
         manifest['method_profile']['hfx'] = hfx
+        manifest['method_profile']['hybrid_acceleration_capabilities'] = acceleration_capabilities()
         manifest['method_profile']['xc_parameters'] = [
             {'component': component, 'parameters': dict(parameters)}
             for component, parameters in method_profile.xc_parameters]
