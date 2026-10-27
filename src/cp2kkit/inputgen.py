@@ -144,6 +144,8 @@ class InputSettings:
     ri_metric: str = 'HFX'  # Independent RI operator; exchange operator is unchanged.
     ri_cutoff_radius: float | None = None  # Required only for TRUNCATED RI metric [angstrom].
 
+    admm_variant: str = 'BASIS_PROJECTION'  # Explicit ADMMS never follows automatically from RI.
+
     @classmethod
     def from_config(cls, values, source_version=None):
         """Load settings or a generator sidecar; numeric legacy choices need a version."""
@@ -447,7 +449,7 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
         initial_sum = sum(kind_specs[label][1] or 0. for label in atom_labels)
         if magnetism and not math.isclose(initial_sum, s.multiplicity-1, abs_tol=1e-10):
             warnings.append(f'Requested initial atomic moments sum to {initial_sum:g}, while MULTIPLICITY-1 is {s.multiplicity-1}; check the intended magnetic state. Neither value is adjusted automatically.')
-    admm, auxiliary, admm_warnings = resolve_admm(s, element_records)
+    admm, auxiliary, admm_warnings = resolve_admm(s, element_records, periodic=periodic)
     warnings.extend(admm_warnings)
     kinds = {}
     u_by_element = {el: (angular, energy) for el, angular, energy in hubbard}
@@ -489,7 +491,7 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
         warnings.append('Dispersion data dftd3.dat have not been checked; the file is resolved by CP2K at runtime.')
     hfx, hfx_warnings = resolve_hfx(s, method_profile, periodic, cell, data_root)
     warnings.extend(hfx_warnings)
-    warnings.extend(resolve_ri_hfx(s, element_records, hfx, periodic, cell))
+    warnings.extend(resolve_ri_hfx(s, element_records, hfx, periodic, cell, auxiliary=auxiliary))
     if hfx and hfx['truncated_gamma_source']:
         data_sources['hfx_truncated_gamma'] = hfx['truncated_gamma_source']
     nonlocal_xc = {'enabled': method_profile.nonlocal_type is not None,
@@ -712,7 +714,12 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
         manifest['method_profile']['xc_parameters'] = [
             {'component': component, 'parameters': dict(parameters)}
             for component, parameters in method_profile.xc_parameters]
-        manifest['method_profile']['generator_scope'] = 'GPW classic MOLOPT/UCL Gamma NONE/XYZ ENERGY/ENERGY_FORCE/GEO_OPT without +U or smearing'
+        manifest['method_profile']['generator_scope'] = (
+            manifest['method_profile']['hybrid_acceleration_capabilities']['ri_hfx_admm_scope']
+            if s.admm and s.ri_hfx else
+            manifest['method_profile']['hybrid_acceleration_capabilities']['admms_scope']
+            if s.admm_variant == 'ADMMS' else
+            'GPW classic MOLOPT/UCL Gamma NONE/XYZ ENERGY/ENERGY_FORCE/GEO_OPT without +U or smearing')
         manifest['emitted_data_files']['hfx_truncated_gamma'] = hfx['truncated_gamma_file']
     if admm is not None:
         manifest['method_profile']['admm'] = admm

@@ -1,6 +1,53 @@
 # Development status and next steps
 
-Current software: **0.3.5**; schema: **0.1.0**.
+Current software: **0.3.6**; schema: **0.1.0**.
+
+The sections below record implementation and preparation milestones. Subsequent
+small-system smoke checks do not broaden the supported combinations or establish
+general scientific accuracy, force accuracy or performance.
+
+## Native validation preparation (0.3.6; no calculations)
+
+- [Preparation protocol](admm-ri-native-validation.md) and example helper stage
+  six water ENERGY cases: direct HFX, ordinary ADMM, ADMMS, independent RI,
+  ordinary ADMM+RI and ADMMS+RI. Identical PBE0/RKS/OT/NONE geometry, cell,
+  charge/spin, ORB/potential and common numerical settings isolate the declared
+  approximation/backend differences. Inputs/data are written to a new directory.
+- Byte provenance, portable case-local data links and null pending result fields
+  accompany the inputs. Synthetic helper tests do not establish native acceptance.
+- Native syntax/build, clean exit, SCF convergence, paired energy differences,
+  convergence studies and timing/memory each have separate acceptance gates.
+  No binary probe, CP2K/MPI run or scheduler submission is performed; actual
+  execution still requires explicit authorization, resources and new run paths.
+
+## Explicit ADMMS Stage 2 (0.3.6)
+
+- Explicit `admm_variant` / `--admm-variant` / menu 122 selection defaults to
+  BASIS_PROJECTION, preserving legacy meaning. ADMMS is never implied by RI.
+- ADMMS resolves charge-constrained projection, NONE purification and MERLOT
+  scaling with DEFAULT correction. MO_DIAG is rejected, not overridden.
+- Initial scope: target 2026.2 PBE0 classic GPW Gamma NONE RKS OT ENERGY,
+  without explicit magnetism/CDD; optional RI requires metric HFX. Broader
+  independent ordinary ADMM behavior is unchanged.
+- Config/manifest/CLI/TUI replay and protected publication are covered by synthetic
+  tests; native syntax/build, convergence, accuracy and performance remain unverified.
+  Actual calculations require separate authorization and new run directories.
+
+## Ordinary ADMM + RI-HFX Stage 1 (0.3.6)
+
+- Implement the [audited minimum](admm-ri-hfx-audit.md): target 2026.2 PBE0,
+  classic GPW Gamma NONE closed-shell RKS OT ENERGY / RI_METRIC HFX only.
+  Explicit magnetism and CDD bundles are excluded, independent modes unchanged.
+- Reuse checked AUX_FIT identity as the automatic RI parent. Preserve ordinary
+  BASIS_PROJECTION, purification, scaling NONE and DEFAULT correction; no ADMMS.
+- CLI/TUI/config/manifest replay share validation and existing protected writers.
+  Parent/source checks and synthetic tests are not native or numerical validation.
+- Stage 2 adds explicit ADMMS above. Deferred: broader combination scopes, native syntax,
+  convergence, comparison with ADMM/direct HFX and performance checks. Native
+  work requires separate authorization and new run directories.
+
+The following version sections describe historical implementation stages;
+0.3.6 supersedes their blanket RI+ADMM exclusion only for the intersection above.
 
 ## Returned-run hardening (0.3.5)
 

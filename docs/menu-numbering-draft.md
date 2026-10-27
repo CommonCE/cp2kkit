@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-**Software 0.3.5 retains the 0.2.9 menu layout v1, GFN-xTB and bounded hybrids, with independent opt-in PBE0/HSE06 ADMM and RI-HFX (not together); distant feature
+**Software 0.3.6 retains the 0.2.9 menu layout v1, GFN-xTB and bounded hybrids, with opt-in PBE0/HSE06 ADMM and RI-HFX (together only for isolated PBE0 RKS OT ENERGY / metric HFX, no explicit magnetism/CDD); distant feature
 allocations remain a draft, not a frozen future registry or a release claim.**
 
 Schema stays **0.1.0**. The authoritative implemented function registry is
@@ -172,8 +172,8 @@ Owns the electronic state and physical model, not SCF numerical tolerances.
 | 113 | Target Libxc support assertion | Existing; user assertion, not build detection |
 | 114 | Explicit permission for unmatched-functional GTH-PBE approximation | Existing; never automatic |
 | 120 | Hybrid-exchange parameters | Implemented in 0.3.2: direct-HFX EPS_SCHWARZ, MAX_MEMORY [MiB per MPI process], periodic-global-hybrid radius [angstrom]; 0.3.3 adds explicit PBEh fraction in (0,1] (not percent); other fractions/omega stay fixed |
-| 121 | RI-HFX settings | Implemented 0.3.5: PBE0/HSE06 Gamma opt-in, AUTO_BASIS size, EPS_FILTER, MEMORY_CUT, HFX/TRUNCATED metric and explicit independent RI radius; actual ORB required, no ADMM combination |
-| 122 | ADMM settings | Implemented 0.3.4: PBE0/HSE06 opt-in, purification auto/MO_DIAG/NONE; auxiliary bases belong to 223 |
+| 121 | RI-HFX settings | Implemented 0.3.5: PBE0/HSE06 Gamma opt-in, AUTO_BASIS size, EPS_FILTER, MEMORY_CUT, HFX/TRUNCATED metric and explicit independent RI radius; actual ORB required; 0.3.6 ordinary ADMM combination only for isolated PBE0 RKS OT ENERGY / HFX metric, no explicit magnetism/CDD |
+| 122 | ADMM settings | Implemented 0.3.4: PBE0/HSE06 opt-in, purification auto/MO_DIAG/NONE; auxiliary bases belong to 223; same bounded 0.3.6 RI combination policy as 121; Stage 2 adds explicit BASIS_PROJECTION/ADMMS variant, ADMMS only isolated PBE0 RKS OT ENERGY, no CDD |
 | 130 | Constrained DFT target charges/spins | Planned |
 | 140 | DFT / GFN-xTB model | Implemented in 0.3.1: DFT or upstream chooser 30/31/32; other semiempiricals/DFTB deferred |
 | 141 | Target tblite support assertion | Implemented for GFN2 only; not build detection |

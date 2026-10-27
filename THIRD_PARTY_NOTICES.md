@@ -48,7 +48,9 @@ including explicit VWN3; no numerical table payload),
 `src/cp2kkit/ri_hfx.py` (0.3.5 bounded Gamma RI-HFX AUTO_BASIS/SORT_BASIS/HF-RI
 organization, default HFX or explicitly radius-bounded TRUNCATED metric,
 size/filter/batching controls and source-qualified thresholds; no generated
-auxiliary coefficients or RI+ADMM protocol),
+auxiliary coefficients; 0.3.6 adds ordinary ADMM + RI in the audited minimum,
+then explicitly selectable ADMMS in the same bounded physical scope; unlike
+Multiwfn, RI never automatically changes the ADMM variant),
 `src/cp2kkit/admm.py` and `src/cp2kkit/auxiliary_basis.py` (0.3.4 bounded
 PBE0/HSE06 projection, solver-dependent purification and checked AUX_FIT
 family/q organization; reference-based Multiwfn/CP2K assembly, no coefficients),

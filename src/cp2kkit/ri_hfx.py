@@ -52,8 +52,9 @@ def validate_ri_hfx(settings):
         raise KitError('ri_metric TRUNCATED requires an explicit ri_cutoff_radius [angstrom]; no automatic radius is chosen')
     if settings.method != 'DFT' or settings.functional not in RI_FUNCTIONALS or settings.cp2k_version != '2026.2':
         raise KitError('RI-HFX currently supports PBE0/HSE06 DFT at target 2026.2 only')
-    if settings.admm:
-        raise KitError('RI-HFX + ADMM is not enabled in this initial subset; disable one explicitly')
+    if settings.admm and (settings.functional != 'PBE0' or settings.scf != 'ot'
+                         or settings.run_type != 'ENERGY' or settings.ri_metric != 'HFX'):
+        raise KitError('ADMM + RI-HFX requires PBE0, OT, ENERGY and RI_METRIC HFX; no settings are changed automatically')
     if settings.hf_memory != 512:
         raise KitError('hf_memory controls direct four-center HFX only; reset it before enabling RI-HFX. '
                        'Use ri_memory_cut for RI batching, not as a total memory cap')
@@ -85,12 +86,27 @@ def ri_thresholds(settings):
             for path, value, selection, derivation in entries}
 
 
-def resolve_ri_hfx(settings, records, hfx, periodic, cell):
+def resolve_ri_hfx(settings, records, hfx, periodic, cell, *, auxiliary=None):
     validate_ri_hfx(settings)
     if not settings.ri_hfx:
         return []
     if any(record['basis_source'] is None for record in records.values()):
         raise KitError('RI-HFX AUTO_BASIS requires checked actual orbital basis files; supply --basis-file or --data-dir/CP2K_DATA_DIR')
+    if settings.admm:
+        # Called after multiplicity, magnetic requests and geometry are resolved.
+        if periodic != 'NONE' or settings.multiplicity != 1 or settings.magnetism is not None:
+            raise KitError('ADMM + RI-HFX requires isolated PERIODIC NONE and closed-shell RKS without explicit magnetism/UKS')
+        if not auxiliary or set(auxiliary) != set(records):
+            raise KitError('ADMM + RI-HFX requires complete resolved AUX_FIT parent records')
+        for element, parent in auxiliary.items():
+            if not isinstance(parent, dict):
+                raise KitError(f'ADMM + RI-HFX requires checked AUX_FIT parent identity for {element}')
+            source = parent.get('basis_source')
+            if (parent.get('role') != 'AUX_FIT' or not parent.get('basis') or not parent.get('id')
+                    or not parent.get('basis_file') or parent.get('basis_q') != records[element]['explicit_electrons']
+                    or parent.get('data_validation') != 'data_checked' or not isinstance(source, dict)
+                    or any(not source.get(key) for key in ('path', 'sha256', 'entry_line', 'entry_sha256'))):
+                raise KitError(f'ADMM + RI-HFX requires checked AUX_FIT parent identity for {element}')
     limit = None
     if settings.ri_metric == 'TRUNCATED' and periodic == 'XYZ':
         from .hybrid import cell_heights
@@ -105,7 +121,7 @@ def resolve_ri_hfx(settings, records, hfx, periodic, cell):
                eps_storage_scaling=None)
     hfx['ri'] = {
         'basis_role': 'RI_HFX', 'basis_generation': 'AUTO_BASIS',
-        'basis_size': settings.ri_basis_size, 'basis_parent_role': 'ORB',
+        'basis_size': settings.ri_basis_size, 'basis_parent_role': 'AUX_FIT' if settings.admm else 'ORB',
         'basis_validation': 'parent_source_checked; generated_auxiliary_not_checked',
         'sort_basis': 'EXP', 'metric': settings.ri_metric,
         'effective_metric_operator': hfx['interaction_potential'] if inherited else 'TRUNCATED',
@@ -124,9 +140,15 @@ def resolve_ri_hfx(settings, records, hfx, periodic, cell):
         'source_hashes': dict(RI_SOURCE_HASHES),
         'build_verified': False, 'runtime_validated': False,
     }
+    if settings.admm:
+        # Reuse the checked resolver records, not inferred names or generated coefficients.
+        hfx['ri']['basis_parents'] = {element: dict(parent) for element, parent in sorted(auxiliary.items())}
+    comparison = ('and compare with ADMM to isolate RI error, and direct HFX for total approximation error. '
+                  'Actual ORB and AUX_FIT parent bytes are checked, not the generated RI basis. '
+                  if settings.admm else
+                  'and compare energies/forces with direct HFX. Actual ORB bytes are checked, not the generated RI basis. ')
     return ['RI-HFX adds a resolution-of-identity approximation; converge AUTO_BASIS size and EPS_FILTER '
-            'and compare energies/forces with direct HFX. Actual ORB bytes are checked, not the generated RI basis. '
-            'Metric choice and any independent RI radius require convergence checks; no optimal radius or performance is claimed. '
+            + comparison + 'Metric choice and any independent RI radius require convergence checks; no optimal radius or performance is claimed. '
             'CHOLESKY uses the CP2K default and may fail for ill-conditioned auxiliary bases.',
             'RI MEMORY_CUT is a tensor batching factor, not a total memory cap; HF MAX_MEMORY is not emitted. '
             'RI-HFX is experimental and not universally faster than direct HFX. Check stderr and process/scheduler '
@@ -156,6 +178,10 @@ def acceleration_capabilities():
             'direct_hfx': ['PBE0', 'HSE06', 'B3LYP', 'BHANDHLYP', 'M06-2X', 'PBEH'],
             'admm': ['PBE0', 'HSE06'], 'ri_hfx': list(RI_FUNCTIONALS),
             'ri_metrics': list(RI_METRICS), 'ri_truncated_radius_policy': 'explicit angstrom; periodic bound uses emitted-cell face spacing',
-            'ri_hfx_admm': False, 'uzh_pbe0_protocol': False,
-            'ri_basis_policy': 'AUTO_BASIS RI_HFX only; actual ORB files required; no manual RI/AUX_FIT substitution',
+            'admm_variants': ['BASIS_PROJECTION', 'ADMMS'],
+            'admms_scope': 'PBE0 GPW classic MOLOPT/UCL Gamma NONE RKS OT ENERGY; optional RI_METRIC HFX; no explicit magnetism/CDD/+U/smearing',
+            'ri_hfx_admm': True,
+            'ri_hfx_admm_scope': 'PBE0 GPW classic MOLOPT/UCL Gamma NONE RKS OT ENERGY; RI_METRIC HFX; no explicit magnetism/CDD/+U/smearing',
+            'uzh_pbe0_protocol': False,
+            'ri_basis_policy': 'AUTO_BASIS RI_HFX only; checked ORB parent independently, checked AUX_FIT parent with ADMM; no manual RI basis',
             'runtime_validated': False}

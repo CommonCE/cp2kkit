@@ -4,6 +4,72 @@ This records facts, not permission inferred from labels such as "reference-based
 or "rewritten in another language". Prefer version/file/subroutine/SHA-256;
 line numbers are auxiliary. Do not invent upstream commits, inspection dates, or grants.
 
+## Explicit ADMMS Stage 2 (0.3.6)
+
+- Local: admm.py explicit variant resolution/emission, InputSettings, CLI/menu
+  122/review, capability metadata and tests/test_admm_ri_hfx.py. No new payload,
+  parser, upstream Fortran or runtime dependency is bundled.
+- Reference remains Multiwfn 2026.10.1 cp2kmate.f90/outCP2Kinp, SHA-256
+  f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402,
+  approximately 1962-1988: its RI combination selects ADMM_TYPE ADMMS.
+  Unlike that policy, cp2kkit requires explicit variant selection and keeps
+  BASIS_PROJECTION as default, independently of RI.
+- Reinspected local CP2K cp_control_utils.F 306-345 under the audit reference
+  root (REVISION git:c92cc08), SHA-256
+  da04a34bb800c6ccc9314a9e434abca7b0f1482a250f1672bb0cd27adff6aa39:
+  ADMMS expands to CHARGE_CONSTRAINED_PROJECTION / NONE / MERLOT.
+  Emit expanded keywords without the named shortcut; retain the previously
+  inspected DEFAULT correction policy and AUX_FIT/RI parent resolution.
+- Initial ADMMS scope: target 2026.2 isolated PBE0 classic GPW Gamma RKS OT
+  ENERGY, no magnetism/CDD; optional RI_METRIC HFX. Retained MO_DIAG fails.
+  No broader ADMMS force/periodic/UKS/HSE06 support is claimed.
+- Synthetic software checks only, not native syntax/build, convergence, physical
+  pairing, approximation accuracy or speedup certification. Existing custom
+  terms/citations and unknown separate authorization remain unchanged.
+
+## Ordinary ADMM + RI-HFX Stage 1 (0.3.6)
+
+- Local: ri_hfx.py bounded combination gates/parent identity, inputgen.py passing
+  already resolved AUX_FIT, admm.py truthful warnings, density_workflow.py CDD
+  exclusion, CLI/editor/TUI policy and tests/test_admm_ri_hfx.py. No new parser,
+  numerical payload, native executor or external runtime dependency.
+- Rehashed supplied Multiwfn 2026.10.1 cp2kmate.f90, outCP2Kinp:
+  SHA-256 `f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402`.
+  Reinspected approximately 1962-1989: its independent RI flag selects
+  ADMM_TYPE ADMMS with ADMM, otherwise ordinary BASIS_PROJECTION with
+  solver-derived purification. Retain prior AUTO_BASIS/SORT_BASIS/RI organization,
+  but deliberately do not adopt its ADMMS combination/model policy.
+- Rechecked local CP2K /home/xwp/soft/cp2k-2026.2, REVISION git:c92cc08:
+  - src/cp_control_utils.F 306-345 expands ordinary vs named ADMMS semantics,
+    SHA-256 `da04a34bb800c6ccc9314a9e434abca7b0f1482a250f1672bb0cd27adff6aa39`.
+  - src/qs_environment.F 1371-1388 selects AUX_FIT as auto-RI parent under ADMM,
+    SHA-256 `51acf59832239e5610dcb8b3c7117d1311f42d5eb5beb39400591b724ed5e777`.
+  - src/hfx_admm_utils.F create_admm_xc_section 1468-1560 reads actual HF
+    operator/fraction; DEFAULT/full-Coulomb constructs PBE exchange correction,
+    SHA-256 `41bdcc775ad8a7461d9f811a8058434195da7004135651d7308fe27b5bb0c0ed`.
+  - src/input_cp2k_dft.F identity also rechecked,
+    SHA-256 `93887178d0208020a96826b794459bac9937a66cec8ff6a69b7d4e1d393d5648`.
+  - tests/QS/regtest-hfx-ri/CH3-ADMM.inp and TEST_FILES.toml demonstrate registered
+    ordinary BASIS_PROJECTION/MO_DIAG/OT plus HF/RI and PBE 25% exchange.
+    Not run here; open-shell and IGNORE_CONVERGENCE_FAILURE/limited iterations
+    are not copied into this closed-shell generator/convergence policy.
+- [Audit and manual locators](../../docs/admm-ri-hfx-audit.md) record the source
+  context. Local hashes are byte identities, not official release/binary proof.
+  First scope is target 2026.2 PBE0 classic GPW Gamma NONE RKS OT ENERGY with
+  metric HFX, actual ORB/AUX data and no explicit magnetism/CDD. Keep existing
+  BASIS_PROJECTION, purification, NONE scaling and DEFAULT correction. Broader
+  combination scopes remain deferred; explicit ADMMS is added separately in Stage 2 above.
+- Existing Multiwfn custom terms/copyright and 2012/2024 citations remain in
+  source/headers/manifests/notices. No new author permission, relicensing or
+  paid-distribution grant is inferred. This is reference-based assembly, not a
+  clean-room claim or bundled Fortran/data port.
+- Validation: local-source reinspection and synthetic generation, identity,
+  invalid-combination, config/replay, CLI/TUI and protected-publication tests only.
+  No CP2K/Multiwfn execution/submission or native syntax/build/convergence,
+  generated RI completeness, ORB/AUX pairing, force, accuracy or speedup claim.
+  Earlier entries below remain historical; 0.3.6 supersedes their blanket RI+ADMM
+  exclusion only within this minimum intersection.
+
 ## Returned hybrid-run hardening (0.3.5)
 
 - Local: hybrid.py/inputgen.py runtime filename separation, HSE06 range preflight,

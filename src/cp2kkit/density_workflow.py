@@ -63,6 +63,10 @@ def generate_difference(structure, settings):
 
     if type(settings.density_difference) is not bool or not settings.density_difference:
         raise KitError('density_difference must be enabled as Boolean true')
+    if settings.admm_variant == 'ADMMS':
+        raise KitError('ADMMS does not support CDD bundles')
+    if settings.admm and settings.ri_hfx:
+        raise KitError('ADMM + RI-HFX does not support CDD bundles; independent ADMM or RI-HFX remains available')
     if settings.run_type != 'ENERGY':
         raise KitError('Density-difference input generation requires ENERGY; task is not changed automatically')
     for name in ('fragment_a_charge', 'fragment_b_charge', 'fragment_a_multiplicity', 'fragment_b_multiplicity'):

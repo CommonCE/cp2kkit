@@ -87,7 +87,7 @@ def generate_xtb(structure, settings):
                  'gapw_profile', 'allow_pbe_potential', 'libxc_available', 'dft_plus_u', 'magnetism',
                  'electron_density', 'spin_density', 'cube_stride', 'cutoff', 'rel_cutoff',
                  'hf_eps_schwarz', 'hf_memory', 'hf_cutoff_radius', 'pbeh_fraction',
-                 'admm', 'admm_purification', 'aux_basis', 'aux_basis_files',
+                 'admm', 'admm_variant', 'admm_purification', 'aux_basis', 'aux_basis_files',
                  'ri_hfx', 'ri_basis_size', 'ri_eps_filter', 'ri_memory_cut', 'ri_metric', 'ri_cutoff_radius')
     sequence_fields = {'basis_overrides', 'basis_files', 'potential_files', 'aux_basis_files', 'dft_plus_u'}
     active = [name for name in conflicts

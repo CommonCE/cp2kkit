@@ -22,7 +22,7 @@ from .method_profiles import parse_basis_overrides, format_basis_overrides
 from .functional_registry import FUNCTIONAL_PROFILES, HYBRID_POTENTIAL_FAMILIES, parse_functional
 from .constraints import parse_fixed_atoms
 from .hybrid import HFX_FIELDS
-from .admm import ADMM_FIELDS, ADMM_FUNCTIONALS
+from .admm import ADMM_FIELDS, ADMM_FUNCTIONALS, ADMM_VARIANTS
 from .ri_hfx import RI_FIELDS, RI_FUNCTIONALS, RI_BASIS_SIZES, RI_METRICS
 from .auxiliary_basis import auxiliary_option, numbered_auxiliary_basis, parse_auxiliary_basis
 from .spin_settings import (parse_dft_plus_u, parse_magnetism,
@@ -66,14 +66,15 @@ GROUPS = (
         Field('hf_eps_schwarz', 'Direct HFX EPS_SCHWARZ (0 < threshold < 1)', 'float', positive=True),
         Field('hf_memory', 'HFX MAX_MEMORY [MiB per MPI process, not total job memory]', 'int', minimum=1),
         Field('hf_cutoff_radius', 'Periodic global-hybrid radius [angstrom] (auto: min(6, face spacing/2.01))', 'float', optional=True, positive=True),
-        Field('ri_hfx', 'Enable Gamma RI-HFX (PBE0/HSE06; actual ORB files; no ADMM)', 'bool'),
+        Field('ri_hfx', 'Enable Gamma RI-HFX (checked ORB; with ADMM: isolated PBE0 RKS OT ENERGY / HFX metric only)', 'bool'),
         Field('ri_basis_size', 'AUTO_BASIS RI_HFX size (not AUX_FIT)', choices=RI_BASIS_SIZES),
         Field('ri_eps_filter', 'RI EPS_FILTER (0 < threshold < 1; convergence required)', 'float', positive=True),
         Field('ri_memory_cut', 'RI MEMORY_CUT (batching factor, not a memory cap)', 'int', minimum=1),
         Field('ri_metric', 'RI metric (HFX inherits exchange; TRUNCATED requires an independent radius)', choices=RI_METRICS),
         Field('ri_cutoff_radius', 'Independent RI metric cutoff radius [angstrom] (TRUNCATED only)', 'float', optional=True, positive=True),
         Field('admm', 'Enable ADMM approximation (PBE0/HSE06 only; checked AUX_FIT data required)', 'bool'),
-        Field('admm_purification', 'ADMM purification (auto: OT MO_DIAG, diagonalization NONE)', choices=('MO_DIAG', 'NONE'), optional=True),
+        Field('admm_variant', 'ADMM variant (explicit; ADMMS never selected by RI)', choices=ADMM_VARIANTS),
+        Field('admm_purification', 'ADMM purification (auto: ordinary OT MO_DIAG / diagonalization NONE; ADMMS NONE)', choices=('MO_DIAG', 'NONE'), optional=True),
         Field('aux_basis', 'AUX_FIT basis (independent immutable number or stable ID; f edits explicit files)', 'aux_basis'),
         Field('aux_basis_files', 'Explicit AUX_FIT files (JSON list)', 'paths'),
         Field("basis", "Orbital basis (immutable registry number or stable ID/name; 0 returns)", 'basis'),
@@ -161,6 +162,7 @@ def visible_fields(fields, values):
                  and not (f.name in ADMM_FIELDS and values.get('functional') not in ADMM_FUNCTIONALS)
                  and not (f.name in {'aux_basis', 'aux_basis_files'} and not values.get('admm'))
                  and not (f.name == 'admm_purification' and not values.get('admm') and values.get('admm_purification') is None)
+                 and not (f.name == 'admm_variant' and not values.get('admm') and values.get('admm_variant') == 'BASIS_PROJECTION')
                  and not (f.name == 'pbeh_fraction' and values.get('functional') != 'PBEH')
                  and not (f.name in HFX_FIELDS and not getattr(FUNCTIONAL_PROFILES.get(values.get('functional')), 'hybrid', False))
                  and not (non_scf and f.name in {'scf', 'eps_scf', 'max_scf', 'max_outer_scf', 'ot_algorithm'})
@@ -483,6 +485,7 @@ class Menu:
                     self.show(f"RI_HFX: AUTO_BASIS {ri['basis_size']}; metric {ri['metric']} ({ri['effective_metric_operator']}); "
                               f"RI radius={ri['effective_metric_cutoff_radius_angstrom']} angstrom; "
                               f"EPS_FILTER={ri['eps_filter']}; MEMORY_CUT={ri['memory_cut']} (batching, not a memory cap)")
+                    self.show(f"RI parent: {ri['basis_parent_role']}; checked source identity only, generated RI basis not validated")
                     self.show("Threshold expectations from target 2026.2 sources, not runtime observations:")
                     for path, threshold in ri['thresholds'].items():
                         self.show(f"  {path}={threshold['value']:.12g} ({threshold['selection']})")
@@ -503,7 +506,7 @@ class Menu:
             self.show(f"Basis files: {', '.join(manifest['method_profile']['basis_files'])}")
             admm = manifest['method_profile'].get('admm')
             if admm:
-                self.show(f"ADMM: {admm['method']}; purification {admm['purification']}; operator-consistent DEFAULT correction; exchange scaling NONE")
+                self.show(f"ADMM: {admm['method']}; purification {admm['purification']}; operator-consistent DEFAULT correction; exchange scaling {admm['exchange_scaling_model']}; variant {admm['variant']}")
                 self.show('AUX_FIT: '+', '.join(f"{label}={kind['aux_fit']['basis']}" for label, kind in manifest['kinds'].items()))
             if settings.basis_overrides:
                 self.show(f"Element basis overrides: {format_basis_overrides(settings.basis_overrides)}")

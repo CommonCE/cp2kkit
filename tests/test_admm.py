@@ -434,7 +434,7 @@ class ADMMTests(unittest.TestCase):
         log = TTY()
         settings = replace(self.settings, admm=False)
         code = run_interactive(str(self.source), -1, settings=settings, output=str(out),
-                               stdin=TTY('122\ny\nauto\n223\n202\nr\n\n0\n'), stdout=log, plain=True)
+                               stdin=TTY('122\ny\n\nauto\n223\n202\nr\n\n0\n'), stdout=log, plain=True)
         self.assertEqual(code, 0, log.getvalue())
         self.assertIn('BASIS_SET AUX_FIT admm-tzp-q6', out.read_text())
         self.assertIn('ADMM:', log.getvalue())

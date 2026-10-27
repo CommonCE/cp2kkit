@@ -1,11 +1,11 @@
-# cp2kkit v0.3.5 architecture
+# cp2kkit v0.3.6 architecture
 
 ## Design principles
 
 The initial analysis MVP baseline is preserved in [the roadmap](roadmap.md).
 Later requirements add an [input-generation](input-generation.md) subset.
 The [numbering/allocation guide](menu-numbering-draft.md) records implemented
-menu layout v1 (introduced in 0.2.9, retained in 0.3.5) plus separately labeled provisional future features.
+menu layout v1 (introduced in 0.2.9, retained in 0.3.6) plus separately labeled provisional future features.
 The current registry contains only implemented entries; no placeholder categories.
 No submission system or deferred Bader/PDOS/NEB post-processing is introduced.
 
@@ -173,7 +173,9 @@ ENERGY/ENERGY_FORCE/GEO_OPT without +U/smearing. Periodic global hybrids use
 face-spacing-bounded truncated Coulomb; isolated ones use full Coulomb; HSE06
 uses matching XC/HF omega=0.11 bohr^-1. ADMM is separately opt-in for
 PBE0/HSE06 since 0.3.4. Version 0.3.5 separately enables PBE0/HSE06 Gamma
-RI-HFX through ri_hfx.py, never RI+ADMM or UZH-PBE0. Existing density/CDD and staged publication are reused. HF control
+RI-HFX through ri_hfx.py. Version 0.3.6 combines ordinary ADMM and RI only
+for PBE0 GPW Gamma NONE RKS OT ENERGY / metric HFX, without explicit magnetism
+or CDD. UZH-PBE0 remains excluded. Existing density/CDD and staged publication are reused. HF control
 edits at menu 120 share CLI/config/replay semantics; inactive nondefault requests
 fail rather than silently disappearing. Defaults add no HF section to pure DFT.
 ADMM assembly lives in admm.py, not the XC definitions or HF operator resolver.
@@ -186,8 +188,20 @@ with selected-entry/q checks and duplicate checks across the final emitted union
 Only used files are emitted, deduplicated, hash-recorded and writer-protected.
 Kinds carry aux_fit metadata; CDD compares per-element auxiliary identity and
 global ADMM settings as well as HFX identity. No calculation is invoked.
-RI-HFX instead requires actual ORB sources and delegates auxiliary construction to
-CP2K via AUTO_BASIS RI_HFX, with SORT_BASIS EXP. Its role is distinct from
+RI-HFX requires actual ORB sources and delegates auxiliary construction to
+CP2K via AUTO_BASIS RI_HFX, with SORT_BASIS EXP. With ordinary ADMM the parent
+is AUX_FIT: inputgen passes the already resolved auxiliary records to ri_hfx,
+which checks complete parent identity and records it without duplicate parsing.
+Static combination gates live in validate_ri_hfx; resolved spin/magnetism/PBC
+are checked by resolve_ri_hfx. Existing method gates retain GPW/classic/Gamma
+and no +U/smearing policy. density_workflow rejects combination CDD at entry,
+before component generation or publication. Stage 2 resolves explicit
+admm_variant=ADMMS in admm.py to charge-constrained projection/NONE/MERLOT,
+with DEFAULT correction. It is bounded to isolated PBE0 RKS OT ENERGY with or
+without HFX-metric RI; resolved PBC/spin are checked before auxiliary resolution.
+The default BASIS_PROJECTION variant and old config meaning are retained; no
+variant follows automatically from RI. Expanded keywords avoid ADMM_TYPE override
+semantics. The RI basis role is distinct from
 AUX_FIT/RI_AUX; no manual RI library resolver or new basis numbers are introduced.
 The effective hfx object carries RI basis size/parent/metric identity, tensor
 filtering and batching; the existing CDD HFX equality check covers these fields.

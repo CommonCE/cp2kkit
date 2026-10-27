@@ -138,7 +138,7 @@ class RIHFXTests(unittest.TestCase):
         self.assertEqual(m['method_profile']['hfx']['ri']['eps_filter'], 1e-10)
 
     def test_unsupported_combinations_fail_before_writing(self):
-        cases = ({'admm': True}, {'functional': 'PBE'}, {'functional': 'B3LYP'},
+        cases = ({'functional': 'PBE'}, {'functional': 'B3LYP'},
                  {'functional': 'BHANDHLYP', 'libxc_available': True},
                  {'functional': 'M06-2X', 'libxc_available': True},
                  {'functional': 'PBEH', 'pbeh_fraction': .3}, {'cp2k_version': '2026.1'},
@@ -408,7 +408,8 @@ class RIHFXTests(unittest.TestCase):
         caps = acceleration_capabilities()
         self.assertEqual(caps['ri_hfx'], ['PBE0', 'HSE06'])
         self.assertEqual(len(caps['direct_hfx']), 6)
-        self.assertFalse(caps['ri_hfx_admm'])
+        self.assertTrue(caps['ri_hfx_admm'])
+        self.assertIn('PBE0', caps['ri_hfx_admm_scope'])
         self.assertFalse(caps['runtime_validated'])
         _, m = self.generate()
         self.assertEqual(m['method_profile']['hybrid_acceleration_capabilities'], caps)

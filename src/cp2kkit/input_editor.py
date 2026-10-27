@@ -291,7 +291,7 @@ def edit_entry(menu, values, entry):
                 continue
             values[name] = menu.edit(FIELDS[name], values[name], values)
     elif entry.editor == 'ri_hfx':
-        menu.show('PBE0/HSE06 Gamma RI-HFX; AUTO_BASIS from checked ORB files, default metric HFX inherits exchange; TRUNCATED needs an explicit independent radius. No ADMM combination. MEMORY_CUT is not a memory cap.')
+        menu.show('PBE0/HSE06 Gamma RI-HFX; AUTO_BASIS from checked ORB (AUX_FIT with ADMM). Default metric HFX inherits exchange; TRUNCATED needs an explicit independent radius. With either ADMM variant: isolated PBE0 RKS OT ENERGY / metric HFX only, no CDD. MEMORY_CUT is not a memory cap.')
         values['ri_hfx'] = menu.edit(FIELDS['ri_hfx'], values['ri_hfx'], values)
         # Keep nondefault retained controls editable so users can reset them after disabling.
         defaults = asdict(InputSettings())
@@ -302,8 +302,10 @@ def edit_entry(menu, values, entry):
             if values['ri_hfx'] or values[name] != defaults[name]:
                 values[name] = menu.edit(FIELDS[name], values[name], values)
     elif entry.editor == 'admm':
-        menu.show('PBE0/HSE06 ADMM approximation; select AUX_FIT at 223. Auto purification: OT MO_DIAG / diagonalization NONE. No solver changes.')
+        menu.show('PBE0/HSE06 ADMM approximation; select AUX_FIT at 223. Ordinary auto purification: OT MO_DIAG / diagonalization NONE. Explicit ADMMS: charge-constrained projection, NONE purification, MERLOT scaling; isolated PBE0 RKS OT ENERGY only, no CDD. With RI-HFX: metric HFX only. No automatic variant or solver changes.')
         values['admm'] = menu.edit(FIELDS['admm'], values['admm'], values)
+        if values['admm'] or values['admm_variant'] != 'BASIS_PROJECTION':
+            values['admm_variant'] = menu.edit(FIELDS['admm_variant'], values['admm_variant'], values)
         if values['admm'] or values['admm_purification'] is not None:
             values['admm_purification'] = menu.edit(FIELDS['admm_purification'], values['admm_purification'], values)
     elif entry.editor == 'source':

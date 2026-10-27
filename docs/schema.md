@@ -202,6 +202,54 @@ Schema remains **0.1.0**; no settings or CLI/config fields are added.
 - Generator manifests still set runtime_validated=false. Historical returned-run
   observations are documented separately, never substituted for per-input checks.
 
+## Generated input JSON: explicit ADMMS (software 0.3.6 Stage 2)
+
+Schema remains **0.1.0**. Additive `settings.admm_variant` defaults to
+`BASIS_PROJECTION` when absent, retaining legacy configs and generated-input text.
+The other supported value is `ADMMS`; it requires `admm=true` and the bounded
+isolated PBE0 GPW classic Gamma RKS OT ENERGY scope, without magnetism or CDD.
+RI remains independently selected and requires metric HFX when combined.
+Unknown/null/non-string variants and inactive nondefault variants fail.
+
+Enabled `method_profile.admm.variant` records the selection. ADMMS resolves
+`method=CHARGE_CONSTRAINED_PROJECTION`, `purification=NONE`,
+`exchange_scaling_model=MERLOT`, `exchange_correction_functional=DEFAULT`.
+Auto purification has `purification_selection=variant-derived`; explicit NONE
+has `explicit`. MO_DIAG fails rather than being overridden. Ordinary ADMM keeps
+its previous effective values and solver-derived/explicit origin.
+Capabilities add `admm_variants` and the restrictive `admms_scope`; the effective
+`generator_scope` is bounded for ADMMS even without RI. AUX_FIT/RI parent records,
+HF/XC identity and resource null semantics are unchanged. Replay retains the
+variant and effective model. No runtime validation is implied.
+
+## Generated input JSON: ordinary ADMM + RI-HFX (software 0.3.6)
+
+Schema remains **0.1.0**; existing semantic settings and replay need no new
+configuration fields. Both approximations remain opt-in. Together they require
+target 2026.2 PBE0 classic GPW Gamma NONE closed-shell RKS OT ENERGY / metric HFX,
+without explicit magnetism or CDD. Independent modes retain their existing scope.
+
+- `method_profile.hybrid_acceleration_capabilities.ri_hfx_admm` becomes true and
+  the additive `ri_hfx_admm_scope` string qualifies the exact bounded intersection.
+  Combined `method_profile.generator_scope` uses this same bounded scope rather
+  than the broader independent-hybrid description. This is generator policy,
+  not runtime capability detection.
+- Combined `hfx.admm` and `hfx.ri_hfx` are both true; `algorithm=ri_gamma`.
+  The ordinary `method_profile.admm` effective model is unchanged (apart from
+  the additive variant identity above). Physical
+  fraction/operator/correction and direct-resource null semantics are retained.
+- `hfx.ri.basis_parent_role=AUX_FIT` in combination mode. The enabled-only,
+  additive `basis_parents` object maps each element to the resolved record also
+  stored at `kinds[*].aux_fit`: registry ID/number/version/role, basis name/q,
+  basis_file, basis_source (path, file SHA-256, selected entry_line/entry_sha256),
+  data_validation and physical_pairing_validated=false. Unknown, unchecked or
+  incomplete parent identity fails instead of becoming an ORB default.
+- Independent RI keeps `basis_parent_role=ORB` and its existing identity in
+  kinds/data_sources; no per-element parent map is added to its HFX identity,
+  preserving independent-mode CDD whole/fragment equality behavior.
+- No generated RI coefficients or physical/runtime validation is represented.
+  Config and manifest replay re-resolve current checked data, not cached trust.
+
 ## Generated input JSON: RI-HFX and acceleration policy (software 0.3.5)
 
 Schema remains **0.1.0**. Old configs default to ri_hfx=false,
@@ -216,10 +264,11 @@ Settings serialize semantic fields, never new basis/function menu numbers.
 - Hybrid-only method_profile.hybrid_acceleration_capabilities records target
   version, common scope, supported profile lists for direct_hfx/admm/ri_hfx,
   ri_metrics=[HFX,TRUNCATED], ri_truncated_radius_policy,
-  ri_hfx_admm=false, uzh_pbe0_protocol=false, ri_basis_policy and
+  ri_hfx_admm (false in 0.3.5; true with the bounded scope above in 0.3.6),
+  uzh_pbe0_protocol=false, ri_basis_policy and
   runtime_validated=false. It describes generator policy, not a build probe.
 - Enabled RI changes hfx.algorithm to ri_gamma and hfx.ri_hfx to true;
-  hfx.admm remains false. Fraction, operator, omega/radius, screening and
+  hfx.admm remains false for independent RI (true in the bounded combination above). Fraction, operator, omega/radius, screening and
   truncated-table identity retain their existing definitions. All RI modes now
   resolve/protect/hash and emit T_C_G_DATA because RI initialization checks it,
   even for non-truncated operators. The existing hfx_truncated_gamma keys under
@@ -228,7 +277,7 @@ Settings serialize semantic fields, never new basis/function menu numbers.
   direct HF/MEMORY is not emitted. settings.hf_memory=512 is an inactive raw
   default, not an effective RI allocation.
 - Enabled-only hfx.ri records basis_role=RI_HFX, basis_generation=AUTO_BASIS,
-  basis_size, basis_parent_role=ORB, parent-source-only basis_validation,
+  basis_size, basis_parent_role=ORB (AUX_FIT in the combination above), parent-source-only basis_validation,
   sort_basis=EXP, metric (HFX default or TRUNCATED), effective_metric_operator,
   effective_metric_omega_bohr_inverse and effective_metric_cutoff_radius_angstrom.
   A null short-range cutoff means CP2K determines it, not zero or infinite range.
@@ -249,7 +298,7 @@ Settings serialize semantic fields, never new basis/function menu numbers.
   build_verified/runtime_validated. Source identity is not an official-tag certificate.
 - Actual ORB source files/entries/hashes remain in kinds and data_sources.
   No generated auxiliary coefficients, numerical validation, manual RI basis,
-  AUX_FIT substitution or new auxiliary registry number is implied.
+  manual AUX_FIT-for-RI substitution or new auxiliary registry number is implied.
 - Existing CDD complete hfx equality checks include the RI model across whole/A/B;
   split KINDs reuse their resolved ORB data. This is not actual CUBE/reference-state
   compatibility, convergence, timing or scientific validation.

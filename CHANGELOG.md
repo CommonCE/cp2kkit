@@ -8,6 +8,82 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.3.6
+
+### Release checks
+
+- Final pre-push regression: 556 tests passed; compileall, CLI version 0.3.6,
+  local Markdown file-link checks and whitespace checks passed.
+- Small-system smoke checks do not broaden the supported combinations or certify
+  general scientific accuracy, force accuracy or performance. The milestones
+  below describe implementation-stage checks, not blanket runtime acceptance.
+- Software remains 0.3.6 and schema remains 0.1.0.
+
+### Native validation preparation (no calculations)
+
+- Add `examples/admm-ri-validation/prepare.py` and the linked native validation
+  protocol: six matched isolated water ENERGY inputs cover direct HFX, ordinary
+  ADMM, ADMMS, independent RI and both ADMM+RI combinations. Use the shared
+  generator with explicit common SCF/screening settings; preserve defaults/API.
+- Stage real data byte copies and relative case-local links in an entirely new
+  directory, with source/input hashes, full sidecars and pending result fields
+  left null. Refuse existing directories and symlinks; retain inspectable partial
+  preparation on failure. No CP2K, MPI, Multiwfn or scheduler execution.
+- Separate native syntax/build, process exit, SCF convergence, energy comparison,
+  approximation convergence and performance acceptance. Version stays 0.3.6;
+  schema stays 0.1.0. No new scientific support or validation claim.
+- Checks: 18 focused synthetic tests and 556 full regression tests passed;
+  compileall, version and diff checks passed. Six prepared inputs using local
+  reference data passed the conservative static input checker (0 hard errors),
+  input/data hash checks, replay and common physical-setting comparisons. These
+  are preparation checks only, not native syntax or calculation validation.
+
+### Stage 2: explicit ADMMS
+
+- Add `admm_variant` / `--admm-variant` at existing menu 122. Default
+  BASIS_PROJECTION retains old config meaning and ordinary input text; ADMMS
+  requires explicit selection with ADMM enabled, never follows from RI.
+- Bound ADMMS to target 2026.2 isolated PBE0 classic GPW Gamma closed-shell
+  RKS OT ENERGY without explicit magnetism/CDD, optionally with HFX-metric RI.
+  Resolve CHARGE_CONSTRAINED_PROJECTION / NONE / MERLOT / DEFAULT explicitly,
+  without a conflicting ADMM_TYPE shortcut. Reject retained MO_DIAG.
+- Record variant/effective settings and purification origin; review displays actual
+  scaling. Reuse checked AUX_FIT parents, HF/XC settings and protected publication.
+  Schema stays 0.1.0; no software version bump or calculation execution.
+- Checks: 111 relevant tests and 552 full regression tests passed; compileall,
+  CLI version 0.3.6 and diff checks passed. Six added synthetic tests cover
+  effective ADMMS settings, invalid/retained controls, legacy/config/CLI replay,
+  TUI ordering and explicit disable/reset, and protected publication. The first
+  regression found an unregistered child field in the menu coverage assertion;
+  updating that assertion for the existing 122 editor resolved it.
+- Native syntax/build acceptance, SCF convergence, approximation error, force
+  accuracy and performance remain unverified; no CP2K or Multiwfn was executed.
+
+### Stage 1: ordinary ADMM + RI-HFX
+
+- Keep software at 0.3.6 by explicit user request throughout ADMM/RI-HFX development.
+- Add ordinary ADMM + RI-HFX only for target 2026.2, PBE0 classic GPW Gamma,
+  PERIODIC NONE, closed-shell RKS without explicit magnetism, OT, ENERGY and
+  RI_METRIC HFX. Reject CDD bundles and unsupported combinations before publication.
+- Reuse checked AUX_FIT resolver records as RI parent provenance; independent RI
+  retains ORB parent behavior. Keep BASIS_PROJECTION, current purification,
+  scaling NONE, DEFAULT correction and physical HF/XC settings. No ADMMS.
+- Keep direct-only HF/MEMORY absent under RI, strict inactive controls and existing
+  source/hardlink/sidecar/rollback protections. CLI/config/replay and menu
+  121/122/223 share policy; effective review displays the actual parent role.
+- Compatibility: opt-in only; independent direct/ADMM/RI behavior and defaults
+  remain unchanged. Capability ri_hfx_admm becomes true with an explicit bounded
+  ri_hfx_admm_scope; combination RI adds basis_parents. Schema remains 0.1.0.
+- Software checks: 59 focused and 546 full regression tests passed; compileall,
+  CLI version 0.3.6, 161 local Markdown file links, the new combination anchor
+  and diff checks passed. Eight new synthetic combination tests cover generation,
+  parent identity, physical settings, invalid scope, CDD exclusion, config/replay,
+  CLI/TUI ordering and protected publication. The first full run found a prompt
+  missing the required English-language instruction; an additive rule fixed it.
+- Validation is synthetic software testing and local-source reinspection only;
+  no CP2K/Multiwfn execution, native syntax/build acceptance, convergence,
+  numerical approximation/error, force or performance certification.
+
 ## 0.3.5
 
 ### Returned-run hardening (version retained by user request)

@@ -254,6 +254,18 @@ port or evidence of validation with the actual software.
   exit or release acceptance. Keep RI experimental; preserve physical defaults,
   existing results and submission identities. These documented output fixes
   supersede the earlier default-text preservation for affected hybrid inputs.
+- Keep software version 0.3.6 by explicit user request during ADMM/RI-HFX
+  feature development; do not bump again within that work without a new decision.
+  0.3.6 supersedes the earlier RI+ADMM rejection only for target 2026.2,
+  PBE0 classic GPW Gamma NONE closed-shell RKS OT ENERGY / RI_METRIC HFX,
+  without explicit magnetism or CDD. Reuse checked AUX_FIT records as the RI
+  parent; preserve ordinary BASIS_PROJECTION, purification, scaling NONE and
+  DEFAULT correction by default. Stage 2 explicitly adds admm_variant=ADMMS,
+  bounded to isolated PBE0 classic GPW Gamma RKS OT ENERGY without magnetism/CDD,
+  with or without RI (HFX metric only). Resolve charge-constrained projection,
+  NONE purification and MERLOT scaling with DEFAULT correction; reject retained
+  MO_DIAG, never override it or infer ADMMS from RI. No other scope expansion. Independent
+  modes, source protections and schema 0.1.0 remain unchanged.
 - Do not start expensive calculations. Actual CP2K validation requires explicit
   authorization and a new run directory.
 - For failed-job diagnosis, load `qchem-error-diagnosis`, collect software/version

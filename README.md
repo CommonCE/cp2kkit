@@ -2,7 +2,7 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.3.5 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.3.6 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 - Analysis remains read-only: no submission/execution or modification of existing
@@ -30,10 +30,30 @@ input generation; version 0.3.3 adds BHandHLYP, M06-2X and configurable PBEh.
 All 21 referenced DFT selections now have bounded generation support; this is
 not full Multiwfn feature/combination coverage.
 
-## Current version: 0.3.5
+## Current version: 0.3.6
 
-Software remains **0.3.5** by explicit user request; the returned-run corrections
-below are part of the same acceptance refinement, not a new release number.
+Software stays at **0.3.6** by explicit user request during ADMM/RI-HFX development.
+Version **0.3.6** adds the minimal ordinary **ADMM + RI-HFX** combination:
+CP2K target 2026.2, PBE0, classic MOLOPT/UCL GPW, Gamma, PERIODIC NONE,
+closed-shell RKS without explicit magnetism, OT, ENERGY and RI_METRIC HFX only.
+Use `--admm --ri-hfx` with actual checked ORB and AUX_FIT files. Automatic RI
+construction uses AUX_FIT as its parent; entry/file identities are recorded.
+BASIS_PROJECTION, purification auto/MO_DIAG/NONE, scaling NONE and DEFAULT
+correction stay unchanged by default. Stage 2 adds explicit
+`--admm --admm-variant ADMMS` for the same isolated PBE0/RKS/OT/ENERGY scope,
+with or without RI (HFX metric only): charge-constrained projection, NONE
+purification and MERLOT scaling. Retained MO_DIAG is rejected, never overridden.
+CDD bundles and all modes
+outside this intersection fail without automatic repair. Independent direct HFX,
+ADMM and RI remain unchanged, as do menu IDs 121/122/223 and schema 0.1.0.
+Small-system smoke checks do not establish general scientific accuracy, force
+accuracy or speedup, or broaden the supported combinations. No Multiwfn execution
+is claimed. See [combination scope and limits](docs/input-generation.md#ordinary-admm--ri-hfx-036).
+A [six-case native validation preparation protocol](docs/admm-ri-native-validation.md)
+and `examples/admm-ri-validation/prepare.py` stage matched water inputs/data in a
+new directory only; they do not run CP2K or submit jobs.
+
+The earlier returned-run corrections below retained 0.3.5 by user request.
 
 Version **0.3.5** hardens hybrid generation after review of user-returned native
 runs: automatic hybrid data files resolvable in the selected data directory use
@@ -56,11 +76,11 @@ rerun natively. See [findings and compatibility](docs/input-generation.md#hybrid
 Version **0.3.5** adds opt-in **PBE0/HSE06 Gamma RI-HFX** at menu **121** /
 `--ri-hfx`, plus a [hybrid acceleration capability matrix](docs/input-generation.md#ri-hfx-and-hybrid-acceleration-matrix-035).
 Target 2026.2; GPW classic MOLOPT/UCL, NONE/XYZ, ENERGY/ENERGY_FORCE/GEO_OPT,
-RKS/UKS, OT/diag without smearing or +U. RI-HFX + ADMM and the other four
-hybrid profiles remain blocked for RI. Defaults stay RI-off.
+RKS/UKS, OT/diag without smearing or +U. The other four hybrid profiles remain blocked for RI; ADMM combination is
+limited to the 0.3.6 intersection above. Defaults stay RI-off.
 
-RI uses `AUTO_BASIS RI_HFX MEDIUM` from actual checked ORB files (not ADMM
-AUX_FIT), `SORT_BASIS EXP`, and default metric HFX inheriting the exchange operator.
+Independent RI uses `AUTO_BASIS RI_HFX MEDIUM` from actual checked ORB files
+(AUX_FIT is the parent only in the bounded ADMM combination), `SORT_BASIS EXP`, and default metric HFX inheriting the exchange operator.
 Optional `--ri-metric TRUNCATED --ri-cutoff-radius R` uses an explicit independent
 RI radius in angstrom (periodically bounded by emitted-cell face spacing), not an
 automatic Multiwfn-matching radius. All RI modes resolve/protect `T_C_G_DATA` for
@@ -114,7 +134,7 @@ Explicit sources use `--basis-file` and repeatable `--aux-basis-file`;
 menu 223's **f** edits the auxiliary-file list. Config/replay, split magnetic
 KINDs, density bundles and source-file overwrite protection share this resolution.
 UZH-PBE0, GAPW and ADMM with the other four hybrids remain unavailable.
-RI-HFX is separately opt-in in 0.3.5, not combinable with ADMM.
+RI-HFX is separately opt-in since 0.3.5; combination requires the 0.3.6 intersection above.
 Checked data/q is not auxiliary-basis convergence, physical-pairing certification,
 native CP2K acceptance or scientific validation. See
 [ADMM details](docs/input-generation.md#admm-and-auxiliary-bases-034).
@@ -125,7 +145,7 @@ The shared CLI/API/TUI generator now supports these six hybrid profiles for targ
 **CP2K 2026.2**, with classic MOLOPT/UCL GPW bases, Gamma points, NONE/XYZ PBC,
 ENERGY/ENERGY_FORCE/GEO_OPT, RKS or collinear UKS, and OT or diagonalization
 without smearing. DFT+U, GAPW, CELL_OPT, non-Gamma and UZH-PBE0
-protocols remain outside this hybrid scope. ADMM and RI-HFX are separately opt-in for PBE0/HSE06 only, not together.
+protocols remain outside this hybrid scope. ADMM and RI-HFX are opt-in for PBE0/HSE06; together only in the 0.3.6 intersection above.
 
 - **PBE0**: 25% HF + 75% PBE exchange + full PBE correlation.
 - **HSE06**: 25% short-range HF with matching XC/HF ω=0.11 bohr⁻¹.

@@ -79,7 +79,7 @@ def build_parser():
                      help='Periodic global-hybrid truncation radius [angstrom]; default min(6, minimum face spacing/2.01)')
     from .ri_hfx import RI_BASIS_SIZES, RI_METRICS
     gen.add_argument('--ri-hfx', action='store_true',
-                     help='PBE0/HSE06 Gamma RI-HFX at target 2026.2; actual ORB files required; no ADMM combination')
+                     help='PBE0/HSE06 Gamma RI-HFX at target 2026.2; checked ORB required; with ADMM only isolated PBE0 RKS OT ENERGY / metric HFX')
     gen.add_argument('--ri-basis-size', type=str.upper, choices=RI_BASIS_SIZES, default='MEDIUM',
                      help='AUTO_BASIS RI_HFX size (default MEDIUM); not an ADMM AUX_FIT selection')
     gen.add_argument('--ri-eps-filter', type=float, default=1e-9,
@@ -91,8 +91,11 @@ def build_parser():
     gen.add_argument('--ri-memory-cut', type=int, default=3,
                      help='RI tensor batching factor (positive integer, default 3), not a memory cap')
     gen.add_argument('--admm', action='store_true', help='PBE0/HSE06 only: enable checked AUX_FIT exchange approximation (target 2026.2)')
+    from .admm import ADMM_VARIANTS
+    gen.add_argument('--admm-variant', type=str.upper, choices=ADMM_VARIANTS,
+                     default='BASIS_PROJECTION', help='Explicit variant, requires --admm; ADMMS: isolated PBE0 RKS OT ENERGY only, no CDD')
     gen.add_argument('--admm-purification', type=str.upper, choices=('MO_DIAG', 'NONE'),
-                     help='Default auto: OT MO_DIAG, diagonalization NONE; MO_DIAG requires OT')
+                     help='Auto: BASIS_PROJECTION OT MO_DIAG / diagonalization NONE; ADMMS NONE (MO_DIAG rejected)')
     gen.add_argument('--aux-basis', type=parse_auxiliary_basis, default=DEFAULT_AUXILIARY_BASIS,
                      help='Independent AUX_FIT stable ID: admm-dz/admm-dzp/admm-tzp/admm-tz2p; default admm-dzp, active only with --admm')
     gen.add_argument('--aux-basis-file', dest='aux_basis_files', action='append', default=[],

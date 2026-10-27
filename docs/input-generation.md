@@ -491,7 +491,7 @@ Standard-library readers preserve original hashes and do not run Gaussian/VASP/M
 - Restart provides **geometry only**: original KIND labels merge by element;
   method/U/constraints/moments/charge/solvent are not inherited. This is a new template,
   not a complete restart of the original job.
-- Hybrids beyond the six bounded profiles, ADMM/RI-HFX beyond PBE0/HSE06, their combination,
+- Hybrids beyond the six bounded profiles, ADMM/RI-HFX beyond PBE0/HSE06, combinations beyond the bounded 0.3.6 intersection,
   MD, frequencies, NEB, TDDFT, solvents, external fields, richer
   constraints beyond fixed atoms, and other advanced Multiwfn branches are not implemented.
   Electron/spin cubes are supported; potential/ELF/MO cubes are not.
@@ -514,7 +514,7 @@ arbitrary XC mixtures remain unsupported.
 | k-points / SCF | Gamma only; OT or diagonalization; no smearing |
 | Dispersion | PBE0/HSE06/B3LYP: none/D3/D3(BJ); M06-2X: none/D3 (reference M062X); BHandHLYP/PBEh: none only |
 | Density | Existing GPW electron/spin cubes and explicit whole/A/B CDD inputs; reference states and actual cube-grid compatibility still need validation |
-| Excluded | GAPW/AE, +U, UZH-PBE0/custom orbital protocols, non-Gamma, correlated methods; ADMM and RI-HFX are separately opt-in for PBE0/HSE06 only, not together |
+| Excluded | GAPW/AE, +U, UZH-PBE0/custom orbital protocols, non-Gamma, correlated methods; ADMM and RI-HFX are opt-in for PBE0/HSE06 only; together only in the 0.3.6 intersection below |
 
 `FUNCTIONALS` retains the original 15 entries, then PBE0/HSE06/B3LYP,
 then BHANDHLYP/M06-2X/PBEH (canonical IDs; names are case-insensitive).
@@ -704,15 +704,15 @@ not numerically validated. These are generator limits, not CP2K-wide restriction
 
 | Profile | Direct HFX | ADMM + four-center HFX | RI-HFX | RI-HFX + ADMM |
 |---|---|---|---|---|
-| PBE0 | Supported | Supported | Supported | Blocked: separate combination audit deferred |
+| PBE0 | Supported | Supported | Supported | Supported only in the 0.3.6 intersection below |
 | HSE06 | Supported | Supported | Supported | Blocked: separate combination audit deferred |
 | B3LYP | Supported | Blocked: correction audit deferred | Blocked: profile audit deferred | Blocked |
 | BHandHLYP | Supported, Libxc assertion | Blocked: correction audit deferred | Blocked: profile audit deferred | Blocked |
 | M06-2X | Supported, Libxc assertion | Blocked: correction audit deferred | Blocked: profile audit deferred | Blocked |
 | PBEh | Supported, explicit HF fraction | Blocked: correction audit deferred | Blocked: profile audit deferred | Blocked |
 
-All supported columns retain the common hybrid task/model/spin/solver gates
-above. None enables GAPW, low-dimensional PBC, non-Gamma, CELL_OPT/stress,
+The first three columns retain the common hybrid task/model/spin/solver gates
+above; the combination column has the stricter 0.3.6 intersection below. None enables GAPW, low-dimensional PBC, non-Gamma, CELL_OPT/stress,
 smearing, +U, custom orbital bases, UZH-PBE0 protocols or correlated methods.
 Required build support is not detected. No column is certified by native CP2K runs.
 
@@ -728,8 +728,8 @@ RI auxiliary policy is **AUTO_BASIS RI_HFX**, default **MEDIUM**, with explicit
 SMALL/MEDIUM/LARGE/HUGE sizes. Actual selected ORB files, Gaussian payloads,
 aliases/q and hashes are checked using existing resolution; use `--data-dir`,
 CP2K_DATA_DIR or explicit `--basis-file`. Catalog-only RI templates are rejected.
-CP2K constructs the RI basis from ORB at runtime; cp2kkit neither constructs nor
-certifies those auxiliary functions. No new basis number, coefficients, manual
+CP2K constructs the RI basis from ORB at runtime for independent RI, or AUX_FIT
+with ADMM; cp2kkit neither constructs nor certifies those auxiliary functions. No new basis number, coefficients, manual
 RI basis selection, RI_AUX selection or AUX_FIT substitution is introduced.
 AUX_FIT remains the separate ADMM role at 223. SORT_BASIS EXP is emitted for RI.
 
@@ -785,7 +785,7 @@ Numerical controls at 121 share CLI/config/replay validation:
 Nondefault RI controls while RI is off fail instead of disappearing. They remain
 editable through 121 for explicit reset after disabling. Other unsupported
 functional/model requests fail without changing charge, spin, PBC, task or solver.
-RI + ADMM is explicitly rejected in either selection order. Direct four-center
+RI + ADMM is accepted in either selection order only in the 0.3.6 intersection below. Direct four-center
 `hf_memory` has no RI meaning: nondefault values fail with RI; its default 512 is
 retained in raw settings but **HF/MEMORY is not emitted**, and effective
 max_memory_mib_per_mpi_process/eps_storage_scaling are null. EPS_SCHWARZ remains
@@ -827,6 +827,98 @@ Stoychev2016. Follow CP2K's method references for research use. Exact local
 source identities, Multiwfn references and differences are recorded in
 [provenance](../third_party/multiwfn/PROVENANCE.md).
 
+## Ordinary ADMM + RI-HFX (0.3.6)
+
+The Stage-1 combination is opt-in (`--admm --ri-hfx`) and deliberately narrower
+than either independent approximation. It supports **CP2K target 2026.2, PBE0,
+classic MOLOPT/UCL GPW, Gamma, PERIODIC NONE, closed-shell RKS, OT, ENERGY,
+RI_METRIC HFX** only. Charge is not restricted to zero, but electron parity and
+all existing potential/q/data gates still apply. Automatic multiplicity must
+resolve to 1; explicit magnetism (including an empty/zero seed request enabling
+UKS), diagonalization, HSE06/other functionals, periodic systems, forces,
+optimization, independent TRUNCATED RI metric and **CDD bundles** are rejected
+before publication. General exclusions for GAPW, non-Gamma, +U, smearing, custom ORB and UZH-PBE0
+remain in force. No setting is silently changed to fit this scope.
+Independent direct HFX, ADMM and RI-HFX, including their CDD behavior, stay intact.
+
+```bash
+cp2kkit generate-input water.xyz -o water-pbe0-admm-ri.inp --periodic NONE \
+  --functional PBE0 --admm --ri-hfx --data-dir /path/to/cp2k/data --write-json
+```
+
+The ordinary ADMM block is unchanged: **BASIS_PROJECTION**, purification auto
+(**MO_DIAG for OT**) or explicit MO_DIAG/NONE, exchange scaling **NONE** and
+correction **DEFAULT**. This remains the default variant; explicit ADMMS is
+separately selected as described below. HF fraction=0.25, full COULOMB, XC coefficients, SCF and
+screening are inherited unchanged. RI still omits direct-only HF/MEMORY;
+nondefault hf_memory must be explicitly reset, MEMORY_CUT is batching only.
+T_C_G_DATA initialization resolution/protection remains in force.
+
+When ADMM is active CP2K builds AUTO_BASIS RI_HFX from **AUX_FIT**, not ORB.
+The generator reuses resolved auxiliary records checked for element/q, selected
+Gaussian payloads and conflicting aliases across the emitted library union.
+`hfx.ri.basis_parent_role=AUX_FIT` and `basis_parents` map elements to the same
+checked records as `kinds[*].aux_fit` (basis ID/name/q, file and selected-entry
+path/line/SHA-256). Independent RI keeps its existing ORB parent metadata.
+Missing/incomplete parent records fail; no generated coefficients are inferred.
+Menus **121/122/223**, config and generated-manifest replay share this policy;
+review displays the actual parent role. Capability `ri_hfx_admm=true` is qualified
+by `ri_hfx_admm_scope`, not blanket support. Schema remains **0.1.0**.
+
+The [audit](admm-ri-hfx-audit.md) records the local-source evidence; its initial
+read-only status is historical, not the current implementation status. The
+source supports ordinary projection plus RI, AUX_FIT parent selection and the
+DEFAULT/full-Coulomb PBE correction. Multiwfn chooses ADMMS for its combination;
+Stage 1 deliberately does not copy that different physical model. Stage 2
+exposes it only through an explicit independent variant selection.
+Source and synthetic checks alone do not establish native compatibility or
+SCF convergence. Subsequent small-system smoke checks do not establish RI basis
+completeness, ORB/AUX physical fitness, general accuracy or performance. No
+Multiwfn execution is claimed. Further authorized runs must use new paths and
+compare combination vs ADMM to isolate RI error, and vs direct HFX for total
+approximation error. Broader combination scopes remain deferred.
+
+## Explicit ADMMS (0.3.6 Stage 2)
+
+Use `--admm --admm-variant ADMMS` or menu **122** to select ADMMS explicitly.
+The default `BASIS_PROJECTION` variant preserves ordinary ADMM and old config
+meaning. Enabling RI never selects or changes the ADMM variant.
+
+Initial ADMMS support is bounded to **target 2026.2, PBE0, classic MOLOPT/UCL
+GPW, Gamma, PERIODIC NONE, closed-shell RKS, OT, ENERGY**, without explicit
+magnetism or CDD. It works with four-center HFX or the existing RI combination
+(`RI_METRIC HFX` only). HSE06, periodic/open-shell/diagonalization/force and
+optimization ADMMS paths remain excluded; ordinary ADMM retains its broader
+independent scope. The existing +U/smearing/GAPW/custom/UZH-PBE0 exclusions apply.
+
+```bash
+cp2kkit generate-input water.xyz -o water-pbe0-admms-ri.inp --periodic NONE \
+  --functional PBE0 --admm --admm-variant ADMMS --ri-hfx \
+  --data-dir /path/to/cp2k/data --write-json
+```
+
+ADMMS emits expanded settings in the single DFT-level ADMM block:
+`METHOD CHARGE_CONSTRAINED_PROJECTION`, `ADMM_PURIFICATION_METHOD NONE`,
+`EXCH_SCALING_MODEL MERLOT`, `EXCH_CORRECTION_FUNC DEFAULT`.
+No `ADMM_TYPE` shortcut is mixed with explicit controls. Auto purification resolves
+to NONE for ADMMS; explicit NONE is accepted, retained MO_DIAG fails until reset
+explicitly. Switching variant or toggling RI never clears physical requests.
+Disabling ADMM requires resetting the variant to BASIS_PROJECTION as well as any
+other nondefault retained ADMM controls.
+
+The [schema](schema.md#generated-input-json-explicit-admms-software-036-stage-2)
+records selected variant and effective settings, including purification origin.
+Review displays actual method/purification/scaling. Checked AUX_FIT records,
+RI parent identity, HF fraction/operator, correction policy and protected writers
+are reused. This is source-based input assembly with synthetic software tests;
+small-system smoke checks do not certify general accuracy, forces or performance.
+Compare ADMMS+RI against ADMMS without RI to isolate RI error and against direct
+HFX for total approximation error in separately authorized new run directories.
+For input/data staging without execution, use the
+[six-case native validation preparation protocol](admm-ri-native-validation.md)
+and its example helper. Native acceptance must be checked for the user's own
+inputs; approximation convergence and numerical accuracy require separate checks.
+
 ## ADMM and auxiliary bases (0.3.4)
 
 ADMM is an additional exchange approximation/assembly scheme, not another XC
@@ -843,7 +935,7 @@ with a smaller auxiliary basis. Default **off** preserves previous input physics
 | Auxiliary basis | Independent AUX_FIT registry 200-203; admm-dz, admm-dzp (default), admm-tzp, admm-tz2p |
 | Required data | Actual selected ORB and AUX_FIT Gaussian libraries; default auxiliary source BASIS_ADMM_UZH |
 | Reused features | Existing dispersion gates, electron/spin cubes, whole/A/B CDD with ADMM and per-element auxiliary identity checks |
-| Excluded | B3LYP/BHandHLYP/M06-2X/PBEh ADMM, GAPW/AE, UZH-PBE0/custom ORB, RI-HFX/RI_AUX, +U, smearing, non-Gamma, CELL_OPT/stress, MD/TDDFT |
+| Excluded | B3LYP/BHandHLYP/M06-2X/PBEh ADMM, GAPW/AE, UZH-PBE0/custom ORB, RI_AUX, RI combinations beyond the 0.3.6 intersection, +U, smearing, non-Gamma, CELL_OPT/stress, MD/TDDFT |
 
 ```bash
 cp2kkit generate-input water.xyz -o water-pbe0-admm.inp --periodic NONE \
@@ -891,9 +983,9 @@ or installed auxiliary coverage is bundled.
 
 Purification choices follow the inspected Multiwfn ground-state branch:
 MO_DIAG requires OT; NONE supports diagonalization. Only these two force-capable
-purification modes and BASIS_PROJECTION are exposed. No silent solver repair,
-named ADMMS shortcut, blocking, charge-constrained fitting or scaling variant is
-introduced. Explicit incompatible retained controls fail; disabling ADMM requires
+purification modes and BASIS_PROJECTION were exposed in 0.3.4. Stage 2 adds the
+separately selected, narrower ADMMS variant above. No silent solver repair or
+blocking variant is introduced. Explicit incompatible retained controls fail; disabling ADMM requires
 resetting nondefault auxiliary/purification/file overrides rather than hiding them.
 
 `EXCH_CORRECTION_FUNC DEFAULT` intentionally lets CP2K follow the actual HFX
