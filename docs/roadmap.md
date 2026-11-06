@@ -1,10 +1,66 @@
 # Development status and next steps
 
-Current software: **0.3.6**; schema: **0.1.0**.
+Current software: **0.4.1**; schema: **0.1.0**.
+
+## Potential and frontier-orbital output (0.4.1)
+
+- Add independent V_HARTREE_CUBE/MO_CUBES generation, shared stride and final-step
+  cadence for target 2026.2 GPW Gamma. CLI, menu, review, config/replay and CDD
+  use the same validation and protected input writer.
+- Preserve native potential sign and orbital-amplitude meaning explicitly.
+  Count/spin/solver gates reject unsupported requests without changing the model.
+- Default output is unchanged. New-field GAPW/xTB/non-Gamma/legacy-target support,
+  smearing frontier definitions, all-orbital dumps, physical ESP conversion,
+  potential/orbital post-processing and automatic native execution remain outside this stage.
+
+- The [three-case preparation protocol](cube-native-validation.md) and example
+  helper stage H2O RKS OT/diag and H2O+ UKS OT with checked actual data, input/source
+  hashes and null pending results. Synthetic preparation tests are not CP2K runs.
+  Main SCF, post-SCF virtual convergence, actual CUBE inventory and process/scheduler
+  exits are independent evidence levels; late failures do not block data-chain
+  development and must not be relabeled clean success.
+- [Native-format regression coverage](cube-native-validation-results.md) includes
+  privacy-filtered stdout/header selections and exact UKS total-density title
+  recognition, not a new scalar type or expanded legacy-target support. Private
+  execution records and environment-specific diagnostics are not distributed.
+  Format coverage does not establish clean execution or scientific convergence.
+- [0.4.1 closeout](closeout-0.4.1.md) adds the explicit offline audit example,
+  small provenance-tagged native excerpts and failure/status/identity regressions.
+  Shared parsers and exclusive writers remain authoritative; unknown evidence is
+  null and there is no global release/scientific-pass flag or public audit API.
+
+## Density and surface workflows (0.4.0)
+
+- Add native-grid plane means/full-slab/cumulative electron integrals, explicit
+  skew-cell geometry and units, streaming validation, and exclusive CSV/JSON.
+- Add deterministic H2O/NH3/CO2-on-h-BN fixed-geometry preparation using existing
+  whole/A/B generation; no implicit calculation or submission in software.
+- [Format/data-chain validation](surface-density-validation.md) remains separate
+  from process and scientific acceptance. Private execution details are excluded
+  from public documentation; their omission is not a passing result.
+- Continue functional regression without quantum calculations. Clean-run evidence
+  remains separate from deterministic software/data-chain tests.
+- Remaining release/scientific work: obtain clean-run evidence and separately
+  converge reference states, geometry, grids/bases/cell and k-points.
+  No Bader partitioning, ghosts, automatic charge transfer or metal-surface
+  convergence is claimed. Existing hybrid scope is unchanged.
 
 The sections below record implementation and preparation milestones. Subsequent
 small-system smoke checks do not broaden the supported combinations or establish
 general scientific accuracy, force accuracy or performance.
+
+## Hybrid stabilization baseline (0.3.6; no scope expansion)
+
+- Freeze the [six-mode support boundary](input-generation.md#stabilization-baseline-036)
+  rather than adding methods or broadening ADMM/RI combinations.
+- Cross-mode synthetic regression independently enumerates 1296 combinations:
+  363 accepted, 933 rejected without replacing an existing input or creating
+  sidecars/staging artifacts. Check effective operator/model/parent/resource
+  identity, immutable requests, resolved PBC/automatic spin, manifest replay and
+  CLI rejection alongside the existing focused CLI/TUI/data/protection tests.
+- No production generator changes, physical-default changes, version/schema
+  changes or new calculation execution are introduced. Native compatibility,
+  convergence, approximation accuracy and performance remain separate work.
 
 ## Native validation preparation (0.3.6; no calculations)
 
@@ -57,16 +113,12 @@ The following version sections describe historical implementation stages;
 - Hybrid ENERGY_FORCE explicitly prints forces to stdout in hartree/bohr.
   Periodic HSE06 range preflight warns using the documented screening equation
   and emitted-cell face spacing, without model/threshold changes.
-- User-returned native 2026.2/git:c92cc08 evidence contains 71 input-matched
-  SCF-converged outputs, all with late SIGSEGV, plus one stale failed reference;
-  all 16 GEO_OPT cases report convergence. Eighteen HSE06/XYZ cases warn about
-  range/cell compatibility. Thirty RI/direct energy pairs are provisional;
-  force accuracy, finite differences, RI size/radius convergence and speedup
-  remain unverified. No clean-exit acceptance or stable RI release claim.
-- Next: resolve runtime shutdown failures, recover the missing fresh reference,
-  review periodic HSE06 models and collect actual force/convergence evidence in
-  separately authorized new run directories. Existing inputs/results are not
-  repaired or resubmitted. Menu IDs, physical defaults and schema are unchanged.
+- Main/geometry convergence, process exit, force accuracy, RI size/radius
+  convergence and performance remain separate evidence levels. Private runtime
+  diagnostics are not distributed and no stable RI/scientific acceptance is claimed.
+- Next: independently review periodic HSE06 models and collect force/convergence
+  evidence only in separately authorized fresh directories. Existing results are
+  not repaired or resubmitted. Menu IDs, physical defaults and schema are unchanged.
 
 ## RI-HFX and hybrid acceleration matrix implemented (0.3.5)
 
@@ -182,12 +234,11 @@ Validation: 455 regression tests passed, none skipped, including expanded synthe
 unit/token-boundary cases and a CLI subprocess check. Read-only re-parsing of the
 10 existing local xTB outputs recovered all reported energies in the seven normally
 terminated runs, matching recorded values/evidence and unchanged source hashes;
-the three crashed GFN2 runs still have no energy records. These logs remain local
-under `test-workspace/xtb-native-20261021-123240-bJMHj1/`, not bundled fixtures.
+missing energy records remain missing. Private diagnostic logs are not distributed.
 No new calculation or submission is part of this parser fix. GFN0 non-SCC quality
-classification and the observed GFN2 OT runtime crash remain outside this fix.
+classification and installed-build compatibility remain outside this fix.
 
-## Implemented GFN2 OT crash protection (0.3.1 retained)
+## Implemented GFN2 OT compatibility policy (0.3.1 retained)
 
 Reject GFN2 OT for legacy targets 2025.2/2026.1 in the shared generator before
 writing; require explicit `--scf diag` / menu 320, without changing saved requests
@@ -195,17 +246,10 @@ or automatically falling back. Target 2026.2 retains OT; version_compatibility
 adds gfn2_ot_enabled as generation policy, not proof of installed build support.
 The 2025.2 restriction is conservative and has no native-run evidence.
 
-Earlier user-authorized diagnostics used isolated H2O, charge 0/multiplicity 1,
-Gamma/no smearing, one/four MPI ranks, one thread and bounded optimization:
-local 2026.1/git:5e54ba2 default OT at one rank and IRAC OT at four ranks crashed
-with exit 139, matching the earlier default four-rank crash. Its diagonalization
-ENERGY (one/four ranks), ENERGY_FORCE and GEO_OPT converged; local
-2026.2/git:c92cc08 OT passed the same four-case task/rank matrix, including
-geometry completion. Local sources show the legacy OT p_mix_new density-update
-path versus the newer use_rho branch. Compiler/backend builds also differ;
-revision strings alone do not prove official-release equivalence or a unique fix.
-Evidence and hashes remain local under
-`test-workspace/gfn2-ot-diagnosis-20261021-124634-mJ9t2F/` (not bundled fixtures).
+Inspected sources distinguish the legacy OT p_mix_new density-update path from
+the newer use_rho branch. These are source observations, not installed-build
+certification or proof of a unique runtime fix. Private installation diagnostics
+and execution details are not distributed.
 No new calculation or submission is part of this generator protection change.
 GFN0/GFN1, default DFT physics and schema 0.1.0 remain unchanged.
 Validation: 458 regression tests passed, none skipped, including 23 xTB tests.
@@ -371,7 +415,7 @@ physics is unchanged.
   **79/79 rejection checks** passed without input publication. XC/nonlocal semantics
   and selected H/O basis/potential payloads matched. Original inputs/logs, corrected
   scratch-comparator history and final summaries remain locally under
-  `test-workspace/pure-functional-0.3.0-20261020-155629-SwFpIH/` (ignored, not bundled).
+  `PRIVATE_VALIDATION_ROOT/` (ignored, not bundled).
   The executed binary is not the 2026.10.1 development source. No CP2K execution,
   scientific/convergence validation or broader element-coverage claim follows.
 - At the 0.3.0 checkpoint, hybrids/HFX/ADMM/RI-HFX, UZH-PBE0, GFN-xTB,
@@ -618,7 +662,7 @@ mandatory UI dependency, relaxed quality rule or parallel CLI/TUI generator is p
 The original 0.2.6 planning below is retained for provenance. The registry-v1
 follow-up now implements paired UZH-PBE selections, audited over all 71 current
 preset elements; UZH-PBE0/hybrid templates remain unimplemented. See
-[basis selection](basis-selection.md) for current scope and permanent numbers. User-provided `test-workspace/modc.py` was inspected read-only (SHA-256
+[basis selection](basis-selection.md) for current scope and permanent numbers. User-provided `PRIVATE_REFERENCE_SCRIPT` was inspected read-only (SHA-256
 `b37f4c2cb1b7051f6fd4d3a19cd00dbb511f9aca355e0fb936f3d033362e7dbd`),
 not executed, copied, modified or committed. No redistribution authorization for
 that user script is inferred. It demonstrates preserving q while selecting UZH

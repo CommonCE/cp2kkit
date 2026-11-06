@@ -188,7 +188,7 @@ claims about CP2K capabilities. Collinear explicit magnetic seeds/split KINDs
 retain atom order and inherit the same per-element AE basis/atomic grids.
 
 Header-only audit and exact source hashes are in `all_electron_catalog.py`.
-Reference root was `/home/xwp/soft/cp2k-2026.2`, REVISION `git:c92cc08`; a directory
+Reference root was `CP2K_SOURCE_ROOT`, REVISION `git:c92cc08`; a directory
 name is not verified upstream-tag or binary identity. Pinned local source/doc
 hashes are distinct from existing official tagged PP references. No coefficients
 or nuclear parameters are bundled. Actual files give selected-entry checks only;

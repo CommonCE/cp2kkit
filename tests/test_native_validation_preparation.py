@@ -9,6 +9,7 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
+from cp2kkit import __version__
 from cp2kkit.inputgen import InputSettings, generate_input
 from cp2kkit.structure import read_structure
 from tests.synthetic_cp2k_data import basis_entry, potential_entry
@@ -44,7 +45,7 @@ class NativeValidationPreparationTests(unittest.TestCase):
         self.prepare()
         matrix = json.loads((self.output/'case-matrix.json').read_text())
         self.assertEqual(len(matrix['cases']), 6)
-        self.assertEqual(matrix['generator_version'], '0.3.6')
+        self.assertEqual(matrix['generator_version'], __version__)
         self.assertIsNone(matrix['actual_binary_identity'])
         self.assertIsNone(matrix['energy_acceptance_tolerance_hartree'])
         self.assertEqual(len(matrix['comparison_pairs']), 7)

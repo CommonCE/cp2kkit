@@ -40,6 +40,7 @@ from .hybrid import validate_hfx_controls, resolve_hfx, hf_lines, hybrid_runtime
 from .admm import validate_admm, resolve_admm, admm_lines
 from .ri_hfx import validate_ri_hfx, resolve_ri_hfx, ri_dft_lines, acceleration_capabilities, qs_eps_default
 from .auxiliary_basis import DEFAULT_AUXILIARY_BASIS, auxiliary_option, parse_auxiliary_basis
+from .cube_output import PRINT_EACH, validate_cube_requests, resolve_extra_cubes, extra_cube_lines
 
 MULTIWFN_CITATIONS = (
     "Tian Lu, Feiwu Chen, J. Comput. Chem. 33, 580-592 (2012). DOI: 10.1002/jcc.22885",
@@ -145,6 +146,10 @@ class InputSettings:
     ri_cutoff_radius: float | None = None  # Required only for TRUNCATED RI metric [angstrom].
 
     admm_variant: str = 'BASIS_PROJECTION'  # Explicit ADMMS never follows automatically from RI.
+    hartree_potential: bool = False  # Native CP2K sign, opposite physical ESP.
+    mo_cubes: bool = False
+    mo_nhomo: int = 1  # Per-spin frontier counts; zero omits this class.
+    mo_nlumo: int = 1
 
     @classmethod
     def from_config(cls, values, source_version=None):
@@ -290,6 +295,7 @@ def motion_lines(s, fixed_atoms):
 def generate_input(structure: Structure, settings: InputSettings, *, _common_ngrids=None):
     """Return complete input/manifest; optional workflow includes fragment manifests."""
     from .xtb import METHODS, generate_xtb
+    validate_cube_requests(settings)
     if settings.method not in METHODS:
         raise KitError(f'Unsupported method: {settings.method}')
     if settings.method != 'DFT':
@@ -365,10 +371,10 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
     if s.cube_stride is not None:
         if len(s.cube_stride) != 3 or any(type(v) is not int or v < 1 for v in s.cube_stride):
             raise KitError("cube_stride requires three positive integers")
-        if not density_enabled:
-            raise KitError("cube_stride requires --electron-density or --spin-density")
+        if not (density_enabled or s.hartree_potential or s.mo_cubes):
+            raise KitError("cube_stride requires --electron-density, --spin-density, --hartree-potential or --mo-cubes")
     stride = s.cube_stride if s.cube_stride is not None else (1, 1, 1)
-    density_each = {"QS_SCF": 0, "JUST_ENERGY": 1, "GEO_OPT": 0, "CELL_OPT": 0}
+    density_each = dict(PRINT_EACH)
     if len(s.kpoints) != 3 or any(type(v) is not int or v < 1 for v in s.kpoints):
         raise KitError("kpoints requires three positive integers")
     if not structure.symbols or len(structure.symbols) != len(structure.positions):
@@ -396,6 +402,8 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
     if electrons <= 0 or unpaired > electrons or (electrons - unpaired) % 2:
         model = 'all-electron electrons' if all_electron else 'explicit valence electrons'
         raise KitError(f"Charge/multiplicity inconsistent with {electrons} {model}")
+    extra_cubes, cube_warnings = resolve_extra_cubes(s, all_electron=all_electron,
+                                                    electrons=electrons, uks=uks, stride=stride)
     periodic, positions, cell, translated = resolve_geometry(structure, s)
     if s.kpoints != (1, 1, 1) and (periodic != "XYZ" or s.scf != "diag"):
         raise KitError("Non-Gamma kpoints require XYZ periodicity and diagonalization (--scf diag)")
@@ -409,6 +417,7 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
     warnings = ["Generated template is not CP2K-runtime validated; converge basis, cutoff and kpoints for the target property.",
                 "Only geometry/cell/PBC are read from the source; charge, spin, method and per-kind settings are NOT inherited."]
     warnings.extend(method_warnings)
+    warnings.extend(cube_warnings)
     warnings.append('SCF/PRINT/RESTART BACKUP_COPIES 0 disables wavefunction restart backups, not restart writing; archive existing wavefunctions before running in a reused directory.')
     if s.fixed_atoms != 'off' and not optimizing:
         warnings.append('Fixed-atom selection is retained but inactive outside GEO_OPT/CELL_OPT.')
@@ -587,12 +596,16 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
     lines += ["    &END XC"]
     if s.kpoints != (1, 1, 1):
         lines += ["    &KPOINTS", "      SCHEME MONKHORST-PACK " + " ".join(map(str, s.kpoints)), "    &END KPOINTS"]
-    if density_enabled:
-        lines += ["    &PRINT", "      &E_DENSITY_CUBE ON",
-                  "        STRIDE " + " ".join(map(str, stride)),
-                  "        APPEND F", "        ADD_LAST NUMERIC", "        &EACH"]
-        lines += [f"          {key} {value}" for key, value in density_each.items()]
-        lines += ["        &END EACH", "      &END E_DENSITY_CUBE", "    &END PRINT"]
+    if density_enabled or s.hartree_potential or s.mo_cubes:
+        lines += ["    &PRINT"]
+        if density_enabled:
+            lines += ["      &E_DENSITY_CUBE ON",
+                      "        STRIDE " + " ".join(map(str, stride)),
+                      "        APPEND F", "        ADD_LAST NUMERIC", "        &EACH"]
+            lines += [f"          {key} {value}" for key, value in density_each.items()]
+            lines += ["        &END EACH", "      &END E_DENSITY_CUBE"]
+        lines += extra_cube_lines(extra_cubes)
+        lines += ["    &END PRINT"]
     lines += ["  &END DFT", "  &SUBSYS", "    &CELL"]
     lines += [f"      {axis}" + "".join(f" {v:14.8f}" for v in row) for axis, row in zip("ABC", cell)]
     lines += [f"      PERIODIC {periodic}",
@@ -662,6 +675,7 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
                                 "coordinate_space": "fractional" if fixed_atoms else None,
                                 "keyword_reference": dict(CONSTRAINT_REFERENCE) if fixed_atoms else None,
                                 "runtime_validated": False},
+                "extra_cube_output": extra_cubes,
                 "density_output": {"enabled": bool(density_enabled),
                                    "electron_density": bool(density_enabled),
                                    "spin_density": bool(density_enabled and uks),

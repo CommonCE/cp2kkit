@@ -63,6 +63,57 @@ class CubeTests(unittest.TestCase):
         self.assertEqual(r["statistics"]["integral"]["unit"], "electron")
         self.assertFalse(r["validation"]["calculation_settings_verified"])
 
+    def test_cp2k_uks_total_density_title_requires_producer(self):
+        # Native title observed in both authorized 2025.2/2026.2 UKS runs;
+        # v2026.2 qs_scf_post_gpw.F also uses this exact write_pw title.
+        title = 'SUM OF ALPHA AND BETA DENSITY'
+        path = self.cube('uks-total.cube', comments=('-Quickstep-', title))
+        report = check_cube(path)
+        self.assertEqual(report['scalar_type'], 'electron-density')
+        self.assertEqual(report['scalar_unit'], 'e/bohr^3')
+        self.assertEqual(report['statistics']['integral']['value'], 10)
+        self.assertEqual(report['statistics']['integral']['quantity'], 'electron_number')
+        generic = self.cube('generic-total.cube', comments=('generic', title))
+        self.assertEqual(check_cube(generic)['scalar_type'], 'unknown')
+        self.assertEqual(check_cube(generic)['scalar_unit'], 'unknown')
+        self.assertEqual(check_cube(generic, CubeOptions(dialect='cp2k'))['scalar_type'],
+                         'electron-density')
+        with self.assertRaises(KitError):
+            check_cube(path, CubeOptions(scalar_type='spin-density'))
+        for index, unknown_title in enumerate(('WAVEFUNCTION 4 spin 1', 'HARTREE POTENTIAL',
+                                               title+' extra', title.lower())):
+            unknown = self.cube(f'unknown-title-{index}.cube',
+                                comments=('-Quickstep-', unknown_title))
+            self.assertEqual(check_cube(unknown)['scalar_type'], 'unknown')
+            self.assertEqual(check_cube(unknown)['scalar_unit'], 'unknown')
+
+    def test_cp2k_fixed_width_adjacent_signed_fields(self):
+        # CP2K's documented (6E13.5E3), manually constructed, not a run fixture.
+        fields = ' 0.10000E+001-0.20000E+001-0.30000E+001 0.40000E+001'
+        path = self.cube('fixed.cube')
+        header = path.read_text().splitlines()[:-1]
+        path.write_text('\n'.join(header+[fields])+'\n')
+        report = check_cube(path)
+        self.assertEqual(report['statistics']['sum'], 0)
+        self.assertEqual(report['statistics']['positive_integral']['value'], 5)
+        self.assertEqual(report['statistics']['negative_integral']['value'], -5)
+        self.assertEqual(report['source']['sha256'], hashlib.sha256(path.read_bytes()).hexdigest())
+        generic = self.dir/'generic-fixed.cube'
+        generic.write_text(path.read_text().replace('-Quickstep-', 'generic'))
+        with self.assertRaises(ParseError):
+            check_cube(generic)
+        self.assertEqual(check_cube(generic, CubeOptions(dialect='cp2k'))['statistics']['sum'], 0)
+
+    def test_fixed_width_rejects_malformed_fields_and_nonfinite(self):
+        for line in (' 0.10000E+001-0.20000E+001junk', '1.0-2.0',
+                     ' 0.10000E+001-0.20000E+00x', '************* 0.10000E+001',
+                     ' 0.10000E+001-0.20000E+001 '*4):
+            with self.subTest(line=line):
+                path = self.cube('invalid-fixed.cube')
+                path.write_text('\n'.join(path.read_text().splitlines()[:-1]+[line])+'\n')
+                with self.assertRaises(ParseError):
+                    check_cube(path)
+
     def test_nonorthogonal_constant_field(self):
         # det([1,0,0], [1,2,0], [0,1,3])=6, 8 samples of value 2 -> 96.
         p = self.cube("shear.cube", [2]*8, shape=(2, 2, 2), vectors=((1, 0, 0), (1, 2, 0), (0, 1, 3)))

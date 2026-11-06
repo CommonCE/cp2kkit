@@ -104,6 +104,15 @@ do not replace paper citations. Register additional method/upstream references p
 
 ## CP2K input specification and data
 
+Software 0.4.1 cube_output.py references Multiwfn 2026.10.1 outCP2Kinp's
+potential/orbital CUBE templates and uses target-2026.2 definitions and post-SCF
+writers to check native potential sign, orbital amplitude/spin meaning and virtual
+output handling. Tagged-source URLs/hashes and differences are recorded in
+[feature provenance](third_party/multiwfn/PROVENANCE.md). No upstream Fortran,
+new numerical payload or additional permission is claimed. Privacy-filtered
+[native-format excerpts](docs/cube-native-validation-results.md) are regression
+evidence, not general runtime/scientific certification.
+
 The generator checks keywords/nesting and basis/potential names using official
 input references and database headers; sources are in [input generation](docs/input-generation.md).
 src/cp2kkit/data_catalog.py derives header-only name/element/q/file metadata from

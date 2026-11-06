@@ -1,0 +1,475 @@
+{
+  "notice": "Verbatim privacy-filtered selections, not complete logs/CUBEs. Original full-source hashes/sizes and line numbers retained; native-format paths are non-filesystem aliases. Timestamp rows and private diagnostics/accounting are omitted.",
+  "sources": [
+    {
+      "kind": "stdout",
+      "source": {
+        "path": "native-format/2025.2/01-rks-ot/water.out",
+        "sha256": "d9c3c64cbca6454c47ed76687191e07897c0290477f0b7c49e69d3a8c5c5dddc",
+        "size_bytes": 32181
+      },
+      "lines": [
+        {
+          "line": 30,
+          "text": " CP2K| version string:                 CP2K version 2025.2 (Development Version)"
+        },
+        {
+          "line": 181,
+          "text": "  *** SCF run converged in    16 steps ***"
+        },
+        {
+          "line": 198,
+          "text": "  outer SCF loop converged in   1 iterations or   16 steps"
+        },
+        {
+          "line": 210,
+          "text": "  Lowest Eigenvalues of the unoccupied subspace spin            1"
+        },
+        {
+          "line": 212,
+          "text": " OT| Eigensolver reached convergence in 111 iterations"
+        },
+        {
+          "line": 217,
+          "text": " ENERGY| Total FORCE_EVAL ( QS ) energy [hartree]            -17.219543844833613"
+        },
+        {
+          "line": 508,
+          "text": " The number of warnings for this run is : 0"
+        }
+      ]
+    },
+    {
+      "kind": "stdout",
+      "source": {
+        "path": "native-format/2025.2/02-rks-diag/water.out",
+        "sha256": "5b2a529fe1d2b47ce51ab4f65cde00f052cb945664fe19e23da9659ae4fdc3b6",
+        "size_bytes": 29547
+      },
+      "lines": [
+        {
+          "line": 30,
+          "text": " CP2K| version string:                 CP2K version 2025.2 (Development Version)"
+        },
+        {
+          "line": 175,
+          "text": "  *** SCF run converged in    22 steps ***"
+        },
+        {
+          "line": 200,
+          "text": "  Lowest eigenvalues of the unoccupied subspace spin            1"
+        },
+        {
+          "line": 204,
+          "text": " ENERGY| Total FORCE_EVAL ( QS ) energy [hartree]            -17.219543893657264"
+        },
+        {
+          "line": 465,
+          "text": " The number of warnings for this run is : 0"
+        }
+      ]
+    },
+    {
+      "kind": "stdout",
+      "source": {
+        "path": "native-format/2025.2/03-uks-ot/water.out",
+        "sha256": "729c29aa9d1976196cd5e35ed4fab642907a2464df9034d5c1cc073d01029a25",
+        "size_bytes": 35086
+      },
+      "lines": [
+        {
+          "line": 30,
+          "text": " CP2K| version string:                 CP2K version 2025.2 (Development Version)"
+        },
+        {
+          "line": 194,
+          "text": "  *** SCF run converged in    21 steps ***"
+        },
+        {
+          "line": 211,
+          "text": "  outer SCF loop converged in   1 iterations or   21 steps"
+        },
+        {
+          "line": 236,
+          "text": "  Lowest Eigenvalues of the unoccupied subspace spin            1"
+        },
+        {
+          "line": 238,
+          "text": " OT| Eigensolver reached convergence in 87 iterations"
+        },
+        {
+          "line": 241,
+          "text": "  Lowest Eigenvalues of the unoccupied subspace spin            2"
+        },
+        {
+          "line": 243,
+          "text": " OT| Eigensolver reached convergence in 53 iterations"
+        },
+        {
+          "line": 249,
+          "text": " ENERGY| Total FORCE_EVAL ( QS ) energy [hartree]            -16.752451259121113"
+        },
+        {
+          "line": 557,
+          "text": " The number of warnings for this run is : 0"
+        }
+      ]
+    },
+    {
+      "kind": "stdout",
+      "source": {
+        "path": "native-format/2026.2/01-rks-ot/water.out",
+        "sha256": "164d3b1bd035420f304b2122dc489ad85c2fd1a510de81d7da391301c8020c25",
+        "size_bytes": 32746
+      },
+      "lines": [
+        {
+          "line": 29,
+          "text": " CP2K| version string:                                       CP2K version 2026.2"
+        },
+        {
+          "line": 183,
+          "text": "  *** SCF run converged in    16 steps ***"
+        },
+        {
+          "line": 200,
+          "text": "  outer SCF loop converged in   1 iterations or   16 steps"
+        },
+        {
+          "line": 212,
+          "text": "  Using OT eigensolver for additional unoccupied orbitals spin            1"
+        },
+        {
+          "line": 213,
+          "text": "  Lowest Eigenvalues of the unoccupied subspace spin            1"
+        },
+        {
+          "line": 215,
+          "text": " OT| Eigensolver reached convergence in 111 iterations"
+        },
+        {
+          "line": 220,
+          "text": " ENERGY| Total FORCE_EVAL ( QS ) energy [hartree]            -17.219543844833659"
+        },
+        {
+          "line": 516,
+          "text": " The number of warnings for this run is : 0"
+        }
+      ]
+    },
+    {
+      "kind": "stdout",
+      "source": {
+        "path": "native-format/2026.2/02-rks-diag/water.out",
+        "sha256": "6c54caed65c5f9ffe22d960c0482ca71c130515b5f2b53531c2ca73de3c22d7e",
+        "size_bytes": 30151
+      },
+      "lines": [
+        {
+          "line": 29,
+          "text": " CP2K| version string:                                       CP2K version 2026.2"
+        },
+        {
+          "line": 177,
+          "text": "  *** SCF run converged in    22 steps ***"
+        },
+        {
+          "line": 202,
+          "text": "  Lowest eigenvalues of the unoccupied subspace spin            1"
+        },
+        {
+          "line": 206,
+          "text": " ENERGY| Total FORCE_EVAL ( QS ) energy [hartree]            -17.219543893657274"
+        },
+        {
+          "line": 477,
+          "text": " The number of warnings for this run is : 0"
+        }
+      ]
+    },
+    {
+      "kind": "stdout",
+      "source": {
+        "path": "native-format/2026.2/03-uks-ot/water.out",
+        "sha256": "d4cf9a9d0d6f50ae06121625970840dc07a40fd7e7aa6eaf6ed8d99a3fb95306",
+        "size_bytes": 35892
+      },
+      "lines": [
+        {
+          "line": 29,
+          "text": " CP2K| version string:                                       CP2K version 2026.2"
+        },
+        {
+          "line": 196,
+          "text": "  *** SCF run converged in    21 steps ***"
+        },
+        {
+          "line": 213,
+          "text": "  outer SCF loop converged in   1 iterations or   21 steps"
+        },
+        {
+          "line": 238,
+          "text": "  Using OT eigensolver for additional unoccupied orbitals spin            1"
+        },
+        {
+          "line": 239,
+          "text": "  Lowest Eigenvalues of the unoccupied subspace spin            1"
+        },
+        {
+          "line": 241,
+          "text": " OT| Eigensolver reached convergence in 87 iterations"
+        },
+        {
+          "line": 244,
+          "text": "  Using OT eigensolver for additional unoccupied orbitals spin            2"
+        },
+        {
+          "line": 245,
+          "text": "  Lowest Eigenvalues of the unoccupied subspace spin            2"
+        },
+        {
+          "line": 247,
+          "text": " OT| Eigensolver reached convergence in 53 iterations"
+        },
+        {
+          "line": 253,
+          "text": " ENERGY| Total FORCE_EVAL ( QS ) energy [hartree]            -16.752451259120818"
+        },
+        {
+          "line": 568,
+          "text": " The number of warnings for this run is : 0"
+        }
+      ]
+    },
+    {
+      "kind": "cube_header",
+      "source": {
+        "path": "native-format/2026.2/01-rks-ot/water-ELECTRON_DENSITY-1_0.cube",
+        "sha256": "ca9171c26e6a996cbc43131a752c9d738df95ea08e62812634f241cd33a71c59",
+        "size_bytes": 105360359
+      },
+      "lines": [
+        {
+          "line": 1,
+          "text": "-Quickstep-"
+        },
+        {
+          "line": 2,
+          "text": "ELECTRON DENSITY"
+        },
+        {
+          "line": 3,
+          "text": "    3    0.000000    0.000000    0.000000"
+        },
+        {
+          "line": 4,
+          "text": "  200    0.151178    0.000000    0.000000"
+        },
+        {
+          "line": 5,
+          "text": "  200    0.000000    0.151178    0.000000"
+        },
+        {
+          "line": 6,
+          "text": "  200    0.000000    0.000000    0.151178"
+        },
+        {
+          "line": 7,
+          "text": "    8    6.000000   15.117809   15.117809   15.117809"
+        },
+        {
+          "line": 8,
+          "text": "    1    1.000000   16.548332   15.117809   16.225189"
+        },
+        {
+          "line": 9,
+          "text": "    1    1.000000   13.687286   15.117809   16.225189"
+        }
+      ]
+    },
+    {
+      "kind": "cube_header",
+      "source": {
+        "path": "native-format/2026.2/01-rks-ot/water-WFN_00004_1-1_0.cube",
+        "sha256": "ce0cad9c0190bda5499fe99f4149d84e740e2d1889b3b03895e9c0a68306dd44",
+        "size_bytes": 105360414
+      },
+      "lines": [
+        {
+          "line": 1,
+          "text": "-Quickstep-"
+        },
+        {
+          "line": 2,
+          "text": " WAVEFUNCTION            4  spin            1  i.e. HOMO -            0"
+        },
+        {
+          "line": 3,
+          "text": "    3    0.000000    0.000000    0.000000"
+        },
+        {
+          "line": 4,
+          "text": "  200    0.151178    0.000000    0.000000"
+        },
+        {
+          "line": 5,
+          "text": "  200    0.000000    0.151178    0.000000"
+        },
+        {
+          "line": 6,
+          "text": "  200    0.000000    0.000000    0.151178"
+        },
+        {
+          "line": 7,
+          "text": "    8    0.000000   15.117809   15.117809   15.117809"
+        },
+        {
+          "line": 8,
+          "text": "    1    0.000000   16.548332   15.117809   16.225189"
+        },
+        {
+          "line": 9,
+          "text": "    1    0.000000   13.687286   15.117809   16.225189"
+        }
+      ]
+    },
+    {
+      "kind": "cube_header",
+      "source": {
+        "path": "native-format/2025.2/01-rks-ot/water-ELECTRON_DENSITY-1_0.cube",
+        "sha256": "6ec30fe57e23230799d06e54dec7b4390483925ff3a6b0d25d5627587ddebb11",
+        "size_bytes": 105360359
+      },
+      "lines": [
+        {
+          "line": 1,
+          "text": "-Quickstep-"
+        },
+        {
+          "line": 2,
+          "text": "ELECTRON DENSITY"
+        },
+        {
+          "line": 3,
+          "text": "    3    0.000000    0.000000    0.000000"
+        },
+        {
+          "line": 4,
+          "text": "  200    0.151178    0.000000    0.000000"
+        },
+        {
+          "line": 5,
+          "text": "  200    0.000000    0.151178    0.000000"
+        },
+        {
+          "line": 6,
+          "text": "  200    0.000000    0.000000    0.151178"
+        },
+        {
+          "line": 7,
+          "text": "    8    0.000000   15.117809   15.117809   15.117809"
+        },
+        {
+          "line": 8,
+          "text": "    1    0.000000   16.548332   15.117809   16.225189"
+        },
+        {
+          "line": 9,
+          "text": "    1    0.000000   13.687286   15.117809   16.225189"
+        }
+      ]
+    },
+    {
+      "kind": "cube_header",
+      "source": {
+        "path": "native-format/2026.2/03-uks-ot/water-ELECTRON_DENSITY-1_0.cube",
+        "sha256": "7ed485ede10d10aae22c93e9e834278def64e2a88095dfbab921bd622f6826d5",
+        "size_bytes": 105360372
+      },
+      "lines": [
+        {
+          "line": 1,
+          "text": "-Quickstep-"
+        },
+        {
+          "line": 2,
+          "text": "SUM OF ALPHA AND BETA DENSITY"
+        },
+        {
+          "line": 3,
+          "text": "    3    0.000000    0.000000    0.000000"
+        },
+        {
+          "line": 4,
+          "text": "  200    0.151178    0.000000    0.000000"
+        },
+        {
+          "line": 5,
+          "text": "  200    0.000000    0.151178    0.000000"
+        },
+        {
+          "line": 6,
+          "text": "  200    0.000000    0.000000    0.151178"
+        },
+        {
+          "line": 7,
+          "text": "    8    6.000000   15.117809   15.117809   15.117809"
+        },
+        {
+          "line": 8,
+          "text": "    1    1.000000   16.548332   15.117809   16.225189"
+        },
+        {
+          "line": 9,
+          "text": "    1    1.000000   13.687286   15.117809   16.225189"
+        }
+      ]
+    },
+    {
+      "kind": "cube_header",
+      "source": {
+        "path": "native-format/2026.2/03-uks-ot/water-SPIN_DENSITY-1_0.cube",
+        "sha256": "2b529afe1af251d716d2f91cfb479bd326d92234c59a4016b8cbc9609f18a494",
+        "size_bytes": 105360355
+      },
+      "lines": [
+        {
+          "line": 1,
+          "text": "-Quickstep-"
+        },
+        {
+          "line": 2,
+          "text": "SPIN DENSITY"
+        },
+        {
+          "line": 3,
+          "text": "    3    0.000000    0.000000    0.000000"
+        },
+        {
+          "line": 4,
+          "text": "  200    0.151178    0.000000    0.000000"
+        },
+        {
+          "line": 5,
+          "text": "  200    0.000000    0.151178    0.000000"
+        },
+        {
+          "line": 6,
+          "text": "  200    0.000000    0.000000    0.151178"
+        },
+        {
+          "line": 7,
+          "text": "    8    6.000000   15.117809   15.117809   15.117809"
+        },
+        {
+          "line": 8,
+          "text": "    1    1.000000   16.548332   15.117809   16.225189"
+        },
+        {
+          "line": 9,
+          "text": "    1    1.000000   13.687286   15.117809   16.225189"
+        }
+      ]
+    }
+  ]
+}

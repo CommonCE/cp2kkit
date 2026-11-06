@@ -13,7 +13,7 @@ the audit. Documentation added afterwards does not change that validation status
 
 ## Reference identity
 
-- CP2K local reference root: `/home/xwp/soft/cp2k-2026.2`.
+- CP2K local reference root: `CP2K_SOURCE_ROOT`.
 - Its `REVISION` file reads `git:c92cc08`; this is a local reference identity,
   not verification of an upstream release tag or installed binary.
 - Multiwfn local reference:

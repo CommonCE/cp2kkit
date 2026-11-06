@@ -2,7 +2,22 @@
 
 This stage implements input generation, scalar-cube validation, and subtraction on
 aligned grids, without running CP2K. No Bader, interpolation, registration, grid
-reordering, plane averaging, DOS/bands, or job submission is provided.
+reordering, DOS/bands, or job submission is provided. Software 0.4.0 adds
+native-grid plane averaging and cumulative integrals (section 5).
+Software 0.4.1 additionally generates opt-in potential and HOMO/LUMO print
+settings: see [controls and meaning](input-generation.md#potential-and-frontier-orbital-cubes-041).
+These new fields are not densities: V_HARTREE_CUBE has the opposite physical
+ESP sign; MO_CUBES contains signed orbital amplitudes. Existing analysis leaves
+their scalar meaning/units unknown; do not force electron-density assertions
+to use density subtraction or planar integration. No potential sign conversion
+or orbital post-processing is implemented.
+
+The checker recognizes CP2K's exact UKS total-density title
+`SUM OF ALPHA AND BETA DENSITY` as electron density only under recognized/asserted
+CP2K producer semantics. Atom auxiliary fields remain raw (including actual zeros),
+not inferred pseudopotential valences. See the [six-job native trial](cube-native-validation-results.md)
+for complete CUBE checks, observed writer differences and independent failed-exit
+versus converged-data status.
 
 ## 1. Define comparable physical references first
 
@@ -147,6 +162,10 @@ successful-check JSON. Missing paths/usage exit 2; existing JSON targets exit 5.
 - Reject negative NATOMS/orbital cubes, multiple datasets/vectors, appended frames,
   truncation/extra data, NaN/Inf, malformed atom/grid fields, numeric overflow,
   lines exceeding 1 MiB, binary/other formats.
+- Whitespace-delimited scalar values; recognized/asserted CP2K also accepts exact
+  native `(6E13.5E3)` fields when signed values abut. Fallback requires complete
+  13-character scientific fields, at most six per line; arbitrary numeric
+  concatenations, overflow asterisks and damaged fields are rejected.
 - Bounded line iteration and compensated summation; no full text/token/grid arrays.
   Mainly retain headers and one line per input. Reject detectable changes during reading.
 
@@ -239,7 +258,51 @@ files and publish through exclusive hard links. Collisions exit 5; failures clea
 this operation's temporary files and output inodes still owned by it, not existing
 user files. Hard-link support is required; power-loss two-file atomicity is not promised.
 
-## 5. AB/A/B workflow (no automatic construction or execution)
+## 5. Native-grid plane profiles (0.4.0)
+
+```bash
+python -m cp2kkit cube-planar delta-density.cube --axis z -o delta-planar.csv
+python -m cp2kkit cube-planar AB.cube --axis z -o AB-planar.csv
+```
+
+`--axis x|y|z` (default z) selects a **native grid index**. The other two step
+vectors span the plane; this is not a Cartesian cut for arbitrary skew grids.
+The unit normal points toward increasing selected index, including left-handed
+grids. Positions are the CUBE origin projected onto that normal plus index times
+perpendicular step spacing, in angstrom. No periodic shift, interpolation, atom
+alignment or selection of an interface dividing plane is performed.
+
+For plane sum S, number of plane samples M, and full-voxel volume V:
+
+- Mean density = S/M, converted explicitly to e/angstrom^3.
+- Slab integral = S*V, with spatial/scalar units reconciled, in electrons.
+- Cumulative integral = sum of full slab integrals **through the current plane**,
+  starting at the input origin. The first row includes one slab (not a forced zero).
+- Plane area uses N1*N2*abs(cross(step1,step2)); perpendicular spacing, not the
+  selected vector length, reconciles mean*area*spacing with slab integral.
+
+CSV columns: `index` (zero-based), `distance_angstrom`,
+`mean_density_e_per_angstrom3`, `slab_electrons`, `cumulative_electrons`.
+`<output>.json` includes source hash/header/integrals, plane geometry, all rows,
+CSV hash, units, conventions and limitations. Known electron/spin density or
+corresponding difference semantics and units are required. Generic cubes accept
+exactly the same explicit producer/unit assertions as cube-check. Spin integrals
+are alpha-minus-beta excess electrons. No scalar sign conversion to electric
+charge is made. Positive electron differences mean accumulation.
+
+Cumulative values depend on the input origin and chosen reference states; they
+are **not automatically atomic charges, Bader charges, or interfragment electron
+transfer**. No normalization is applied. Sampling/truncation, SCF convergence and
+fragment-reference suitability remain independent checks. Parsing uses streaming
+values and O(selected-axis planes) compensated sums, with a 100000-plane safety
+limit. CSV/JSON use the shared exclusive staged writer; malformed/truncated data
+or publication failure leave no successful output pair owned by this operation.
+No power-loss multi-file atomicity is promised.
+
+The [surface example](../examples/surface-density/README.md) prepares constructed
+adsorption models without running CP2K. See [actual trial boundaries](surface-density-validation.md).
+
+## 6. AB/A/B workflow (no automatic construction or execution)
 
 Assume prepared `AB.extxyz`, `A-in-AB.extxyz`, `B-in-AB.extxyz` with identical cell/PBC
 and fragments in AB geometry. The example applies only when all three physical
@@ -274,7 +337,7 @@ python -m cp2kkit cube-check delta-density.cube -o delta-cube-check.json
 Actual filenames normally include project/iteration identifiers; replace the generic
 example paths with the actual files.
 
-## 6. Sources and validation levels
+## 7. Sources and validation levels
 
 - Manuals: [2026.2 E_DENSITY_CUBE](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/PRINT/E_DENSITY_CUBE.html),
   [EACH](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/PRINT/E_DENSITY_CUBE/EACH.html),
@@ -291,7 +354,7 @@ example paths with the actual files.
   were checked separately against CP2K manuals/source.
 
 Official syntax/format checks, synthetic regression, and actual execution are distinct.
-At implementation time, no CP2K executable was found/installed/run, and no usable
+At the original cube implementation stage, no CP2K executable was found/installed/run, and no usable
 real cubes existed in tests or the authorized test-workspace. Thus no real-cube
 regression or runtime certification was available. Synthetic expected values come
 from constant-field determinant quadrature and manual subtraction, not scientific calculations.

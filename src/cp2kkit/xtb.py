@@ -81,11 +81,13 @@ def generate_xtb(structure, settings):
     validate_admm(s)
     from .ri_hfx import validate_ri_hfx
     validate_ri_hfx(s)
+    from .cube_output import EXTRA_CUBE_FIELDS
     defaults = InputSettings()
     conflicts = ('functional', 'dispersion', 'basis_overrides', 'basis_files', 'potential_files',
                  'custom_basis_file', 'custom_basis_name', 'custom_potential_file', 'custom_potential_name',
                  'gapw_profile', 'allow_pbe_potential', 'libxc_available', 'dft_plus_u', 'magnetism',
                  'electron_density', 'spin_density', 'cube_stride', 'cutoff', 'rel_cutoff',
+                 *EXTRA_CUBE_FIELDS,
                  'hf_eps_schwarz', 'hf_memory', 'hf_cutoff_radius', 'pbeh_fraction',
                  'admm', 'admm_variant', 'admm_purification', 'aux_basis', 'aux_basis_files',
                  'ri_hfx', 'ri_basis_size', 'ri_eps_filter', 'ri_memory_cut', 'ri_metric', 'ri_cutoff_radius')

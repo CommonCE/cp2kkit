@@ -24,7 +24,10 @@ SCALAR_TYPES = ("auto", "unknown", "electron-density", "spin-density",
                 "electron-density-difference", "spin-density-difference")
 SCALAR_UNITS = ("auto", "unknown", "e/bohr^3", "e/angstrom^3")
 MAX_LINE_BYTES = 1024 * 1024
+# CP2K v2026.2 realspace_grid_cube.F uses (6E13.5E3), without delimiters.
+CP2K_VALUE_FIELD = re.compile(r"[ +\-]\d\.\d{5}[EeDd][+\-]\d{3}")
 CP2K_TITLES = {"ELECTRON DENSITY": "electron-density", "SPIN DENSITY": "spin-density",
+               "SUM OF ALPHA AND BETA DENSITY": "electron-density",
                "TOTAL ELECTRON DENSITY": "electron-density", "TOTAL SPIN DENSITY": "spin-density"}
 
 
@@ -279,11 +282,22 @@ class CubeReader:
         self.started = True
         count = 0
         while (line := self._line(required=False)) is not None:
-            for token in line.split():
+            tokens = line.split()
+            try:
+                values = [number(token, f"scalar at line {self.line_no}") for token in tokens]
+            except ParseError:
+                # A negative E13.5E3 field can abut the preceding exponent. Do
+                # not split arbitrary sign-adjacent numbers or recover garbage.
+                fields = [line[i:i+13] for i in range(0, len(line), 13)]
+                if (self.dialect != 'cp2k' or not 1 <= len(fields) <= 6
+                        or any(CP2K_VALUE_FIELD.fullmatch(field) is None for field in fields)):
+                    raise
+                values = [number(field.strip(), f"CP2K scalar at line {self.line_no}") for field in fields]
+            for value in values:
                 if count >= self.expected_count:
                     raise ParseError(f"Extra CUBE data at line {self.line_no}: {self.path}")
                 count += 1
-                yield number(token, f"scalar at line {self.line_no}")
+                yield value
         if count != self.expected_count:
             raise ParseError(f"Truncated CUBE data: expected {self.expected_count}, found {count}: {self.path}")
         current = os.fstat(self.stream.fileno())
@@ -340,7 +354,7 @@ class CubeReader:
                 "interpretation": self.interpretation, "statistics": stats.report(self), "warnings": self.warnings,
                 "validation": {"format_valid": True, "calculation_settings_verified": False,
                                "real_cp2k_runtime_validated": False},
-                "supported_format": "UTF-8 formatted scalar CUBE, NATOMS>=0, NVAL absent/1, max line 1 MiB"}
+                "supported_format": "UTF-8 formatted scalar CUBE, NATOMS>=0, NVAL absent/1, max line 1 MiB; CP2K E13.5E3 fields supported"}
 
 
 def check_cube(path, options=None):

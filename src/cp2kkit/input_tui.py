@@ -22,6 +22,7 @@ from .method_profiles import parse_basis_overrides, format_basis_overrides
 from .functional_registry import FUNCTIONAL_PROFILES, HYBRID_POTENTIAL_FAMILIES, parse_functional
 from .constraints import parse_fixed_atoms
 from .hybrid import HFX_FIELDS
+from .cube_output import EXTRA_CUBE_FIELDS
 from .admm import ADMM_FIELDS, ADMM_FUNCTIONALS, ADMM_VARIANTS
 from .ri_hfx import RI_FIELDS, RI_FUNCTIONALS, RI_BASIS_SIZES, RI_METRICS
 from .auxiliary_basis import auxiliary_option, numbered_auxiliary_basis, parse_auxiliary_basis
@@ -123,10 +124,14 @@ GROUPS = (
         Field("fragment_a_multiplicity", "Fragment A multiplicity", "int", optional=True, minimum=1),
         Field("fragment_b_charge", "Fragment B charge [e] (explicit confirmation required)", "int", optional=True),
         Field("fragment_b_multiplicity", "Fragment B multiplicity", "int", optional=True, minimum=1))),
-    ("Electron/spin density cubes", (
+    ("Density, potential and orbital cubes", (
         Field("electron_density", "Electron density (GPW pseudopotential valence density)", "bool"),
         Field("spin_density", "Spin density (alpha-minus-beta; requires UKS)", "bool"),
-        Field("cube_stride", "STRIDE NX NY NZ (auto: 1 1 1; enable density first)",
+        Field("hartree_potential", "Native Hartree potential CUBE (opposite sign to physical ESP)", "bool"),
+        Field("mo_cubes", "Frontier-orbital amplitude CUBEs (2026.2 GPW Gamma; no smearing)", "bool"),
+        Field("mo_nhomo", "Occupied orbitals per spin from HOMO (>=0; default 1)", "int", minimum=0),
+        Field("mo_nlumo", "Virtual orbitals per spin from LUMO (>=0; default 1)", "int", minimum=0),
+        Field("cube_stride", "Shared CUBE STRIDE NX NY NZ (auto: 1 1 1; enable an output first)",
               "int3", optional=True, minimum=1))),
 )
 
@@ -150,6 +155,7 @@ def visible_fields(fields, values):
                 'custom_basis_name', 'custom_potential_file', 'custom_potential_name', 'gapw_profile',
                 'dispersion', 'libxc_available', 'allow_pbe_potential', 'dft_plus_u', 'magnetism',
                 'cutoff', 'rel_cutoff', 'electron_density', 'spin_density', 'cube_stride', 'density_difference',
+                *EXTRA_CUBE_FIELDS,
                 'kpoints', 'smearing', 'added_mos'}
     non_scf = values.get('method') == 'GFN0-xTB'
     return tuple(f for f in fields
@@ -199,8 +205,13 @@ def field_display(field, values):
             return f'{value} (additional pair correction; required {profile.nonlocal_type} retained)'
     if field.name == 'electron_density':
         enabled = value or values.get('spin_density') or values.get('density_difference')
-        label = '1 Electron density' if enabled else '0 None'
-        return label + (' (required by CDD 602)' if values.get('density_difference') else '')
+        channels = ['1 Electron density'] if enabled else []
+        if values.get('hartree_potential'):
+            channels.append('native Hartree potential')
+        if values.get('mo_cubes'):
+            channels.append('frontier orbitals')
+        label = '; '.join(channels) or '0 None'
+        return label + (' (density required by CDD 602)' if values.get('density_difference') else '')
     if field.kind == 'basis':
         try:
             option = basis_option(value, require_selectable=False)
@@ -535,6 +546,10 @@ class Menu:
                     self.show(f"  Initial MAGNETIZATION: {kind['initial_magnetization']}; element: {kind['element']}")
             self.show(f"Effective density output: electron={manifest['density_output']['electron_density']}, "
                       f"spin={manifest['density_output']['spin_density']}, stride={manifest['density_output']['stride']}")
+            extra = manifest['extra_cube_output']
+            self.show(f"Native potential CUBE: {extra['potential']['enabled']} (opposite physical ESP sign)")
+            self.show(f"Orbital CUBEs: {extra['orbitals']['enabled']}; NHOMO={extra['orbitals']['nhomo']}, "
+                      f"NLUMO={extra['orbitals']['nlumo']}; spin channels={extra['orbitals']['spin_channels']}")
         for warning in manifest["warnings"]:
             self.show(f"Warning: {warning}")
         self.show(f"Input path: {Path(values['output']).resolve()}")

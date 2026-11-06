@@ -84,6 +84,10 @@ ENTRIES = (
     MenuEntry(602, 'density_difference', 'Charge-density difference inputs', editor='difference'),
     MenuEntry(603, 'spin_density', 'Spin density'),
     MenuEntry(605, 'cube_stride', 'Cube stride NX NY NZ'),
+    MenuEntry(607, 'mo_cubes', 'Frontier-orbital CUBEs'),
+    MenuEntry(608, 'mo_nhomo', 'Occupied orbital CUBE count per spin'),
+    MenuEntry(609, 'mo_nlumo', 'Virtual orbital CUBE count per spin'),
+    MenuEntry(610, 'hartree_potential', 'Native Hartree potential CUBE'),
 )
 BY_NUMBER = {entry.number: entry for entry in ENTRIES}
 BY_TOKEN = {str(number): entry for entry in ENTRIES for number in (entry.number, *entry.aliases)}

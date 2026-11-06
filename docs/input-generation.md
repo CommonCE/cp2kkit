@@ -1,6 +1,6 @@
 # CP2K input generation
 
-This guide describes cp2kkit **0.3.5**. Older defaults and migration notes are in
+This guide describes cp2kkit **0.4.1**. Older defaults and migration notes are in
 [the changelog](../CHANGELOG.md). AE automatic setup is described in
 [the basis guide](basis-selection.md#all-electron-automatic-setup-027).
 The [registry-v1 basis guide](basis-selection.md) defines permanent numbering toward
@@ -70,6 +70,102 @@ never overwritten. With JSON off, existing sidecars are left untouched and warne
 as potentially stale. This changes input-generation defaults only, not analysis,
 structure-export or cube/plot output protections. No multi-file power-loss atomicity
 is promised.
+
+## Potential and frontier-orbital CUBEs (0.4.1)
+
+These are **input-generation options**, not a command that computes a CUBE.
+The user must separately run CP2K in a new calculation directory. No existing
+CUBE, restart or wavefunction is opened or modified by these settings.
+
+### Controls and scope
+
+- `--hartree-potential` / menu **610** enables `DFT/PRINT/V_HARTREE_CUBE ON`.
+- `--mo-cubes` / menu **607** enables `DFT/PRINT/MO_CUBES ON`, `WRITE_CUBE T`.
+- `--mo-nhomo N` / **608**, `--mo-nlumo N` / **609** select occupied/virtual
+  counts per spin, starting at HOMO/LUMO. Both default to 1. Zero suppresses
+  that class; both zero is rejected. Negative values, including upstream -1
+  (all), Booleans and non-integers are rejected. Nondefault inactive counts
+  require explicit reset to 1; no hidden request is silently dropped.
+- `--cube-stride NX NY NZ` / **605** applies to every enabled CUBE section,
+  effective default **1 1 1**. It no longer requires density specifically.
+- **-3/601** keeps 1 (enable electron density), adds 2 (toggle native potential)
+  and 3 (toggle orbitals), without clearing other channels. 0 clears all CUBE
+  outputs, explicit stride and count overrides. CDD still blocks 0 until disabled.
+  Enter/back preserves values. Direct enable toggles retain count overrides.
+  Subchoices 2/3 are local additive toggles, not Multiwfn's ELF/XC choices 2/3.
+  The inspected Multiwfn 2026.10.1 reference instead uses 4 for potential,
+  6 for orbitals, -1 for HOMO/LUMO counts 1/1, and 7 for density + potential;
+  cp2kkit supports those output combinations via independent flags, not numeric aliases.
+
+New-field scope is target **CP2K 2026.2**, **GPW pseudopotentials**, **Gamma**,
+RKS/UKS, ENERGY/ENERGY_FORCE/GEO_OPT/CELL_OPT subject to existing task/method gates.
+No existing hybrid scope or physical default is expanded. GAPW, xTB, non-Gamma
+and older targets fail for the new fields. Potential-only output can coexist
+with the existing diagonalization/smearing policy; frontier orbitals reject
+smearing because fractional occupations make the requested frontier ambiguous.
+
+OT leaves the SCF solver and ADDED_MOS unchanged. Requesting virtuals invokes
+CP2K's **post-SCF OT eigensolver**, using native `SCF/EPS_LUMO` and
+`MAX_ITER_LUMO`; no new convergence override is emitted. Check that solver's
+convergence separately from the main SCF. For diagonalization, explicitly supply
+`--added-mos` at least as large as `--mo-nlumo`; the generator does not increase
+it automatically. Counts exceeding occupied orbitals in any spin channel, or
+an empty occupied spin channel, fail. Virtual basis capacity is not certified:
+CP2K can cap virtual counts to available basis states. Inspect actual output.
+
+All enabled sections share `APPEND F`, `ADD_LAST NUMERIC`, and EACH:
+QS_SCF 0 / JUST_ENERGY 1 / GEO_OPT 0 / CELL_OPT 0. ON overrides global LOW
+verbosity. Final identified optimization step is not proof of convergence.
+No FILENAME override is emitted; CP2K supplies project/iteration names
+(`v_hartree` or `WFN_<orbital>_<spin>` middle names). Use new run directories
+to protect previous CP2K outputs; generation does not protect files later
+written by CP2K in a reused directory.
+
+CDD bundles inherit explicitly requested potential/orbital settings and apply
+the same checks to every component. A component count/scope failure rejects
+the bundle before publication; no centering, spin or fragment model is changed.
+Potential and orbital fields are not density-difference operands.
+
+### Meaning and units
+
+Native `V_HARTREE_CUBE` is the electrostatic potential from electrons + ions
+in atomic units, **opposite in sign to the usual physical ESP**, according to
+the target-version manual. The generator records sign factor **-1** but does
+**not** negate any data. It is not just an electron-only Hartree field despite
+the name. GTH pseudopotential ionic density is not an all-electron point-nuclear
+ESP. Periodic electrostatic zero is reference-dependent; no vacuum alignment,
+work function, eV conversion or dipole correction is inferred.
+
+`MO_CUBES` contains **signed wavefunction amplitudes**, with spatial coordinates
+in bohr and amplitude units bohr^(-3/2), not e/bohr^3. UKS writes both alpha
+(spin 1) and beta (spin 2) channels, with channel-specific frontier indices.
+An orbital's overall phase is arbitrary. These are not NTOs, excited states,
+charge differences or a measured band gap.
+
+The current CUBE checker intentionally leaves these scalar meanings/units
+**unknown**, with raw numerical integrals only. Do not assert electron-density
+units to force `cube-diff` or `cube-planar` to accept them. This stage adds
+generation only, not new potential/orbital analysis or sign-conversion commands.
+
+### References and validation
+
+For preparation-only real-data cases, see the [CUBE validation protocol](cube-native-validation.md)
+and `examples/cube-validation/prepare.py`. The three fixed-geometry ENERGY cases
+cover RKS OT, explicit-added-state diagonalization and H2O+ UKS OT, with unchanged
+shared generation/data checks and separate pending convergence/exit evidence.
+No calculation or submission is authorized by preparing the bundle.
+
+Checked target-version manuals:
+[V_HARTREE_CUBE](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/PRINT/V_HARTREE_CUBE.html),
+[MO_CUBES](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/PRINT/MO_CUBES.html),
+[EACH](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/PRINT/MO_CUBES/EACH.html)
+and [SCF](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/SCF.html).
+Tagged v2026.2 input_cp2k_print_dft.F and qs_scf_post_gpw.F confirm definitions,
+spin-channel iteration, Gamma limitations, virtual-orbital handling and native
+potential writer. Exact URL/hash records are in `extra_cube_output` and
+[provenance](../third_party/multiwfn/PROVENANCE.md). No upstream code is bundled.
+Synthetic generation/CLI/menu/config/protection tests do not establish native
+execution, virtual-state convergence, accuracy or plotting compatibility.
 
 ## Fixed atoms (0.2.8)
 
@@ -358,10 +454,12 @@ that output; disable CDD first. Disabling CDD retains the enabled density reques
 CLI/API bundle generation also forces effective density output for all components,
 regardless of the raw global density toggle.
 
-Main-menu **-3** and **601** share a Multiwfn-style numbered cube selector,
-limited to implemented types: **0 None**, **1 Electron density** (UKS also prints
-spin density). Selecting 0 clears both electron/spin requests; Enter keeps and
-back returns unchanged. Other Multiwfn cube types are not offered.
+Main-menu **-3** and **601** share the implemented CUBE selector:
+**0 None**, **1 Electron density** (UKS also prints spin density),
+**2 toggle native potential**, **3 toggle frontier orbitals**.
+Selecting 0 clears all outputs/stride/count overrides, unless CDD is enabled.
+Other choices preserve unrelated channels; Enter/back keeps settings.
+See [new-field scope and semantics](#potential-and-frontier-orbital-cubes-041).
 
 The shared generator resolves the whole-system box/translation **once**, then
 extracts subsets of its generated geometry. Cell, PBC, origin convention, geometry,
@@ -661,35 +759,19 @@ submission records are not modified or resubmitted.
 
 ### Returned native evidence and limits
 
-User-returned water tests identify CP2K **2026.2, git:c92cc08**, with GPW
-DZVP-MOLOPT-SR-GTH/GTH-PBE, 400/55 Ry grids, EPS_SCF=1e-6 and 16 Angstrom cells.
-Neutral singlets and charge +1 doublets were tested; charged XYZ is a software
-smoke model, not an ionization benchmark. All 71 refreshed, input-hash-matched
-outputs have SCF-converged energy records and PROGRAM ENDED, but **all 71 stderr
-files report SIGSEGV with _dl_fini frames**. This includes direct HFX as well as
-RI, so no RI-only cause or responsible library is established. One direct-HFX
-reference is still an old absolute-path failure, not a new-input failure.
-
-All 16 GEO_OPT cases report optimization convergence. All 24 ENERGY_FORCE cases
-have force-computation timing entries, but no atom-resolved vectors were retained;
-force accuracy/finite differences remain unverified. Thirty available RI/direct
-pairs give positive total-energy differences of approximately 1.103-1.868 mHa
-(1 mHa = 0.001 hartree) with AUTO_BASIS MEDIUM and optional independent RI radius
-1.7 Angstrom. These are provisional pre-crash observations, not converged RI
-approximation errors or a chemical-accuracy guarantee. Eighteen HSE06/XYZ cases
-warn about an effective range of 14.279 Angstrom versus a half-cell spacing of
-8.000 Angstrom, including eight of those energy pairs. Such totals require a
-physical model/range review. No reliable speedup is established.
-
 **RI-HFX remains experimental.** Check stderr, actual process/scheduler exit,
-SCF/geometry convergence and numerical/model convergence separately.
-PROGRAM ENDED and sbatch acceptance alone are not clean execution. Resolve the
-shutdown failure, recover the missing fresh reference, assess periodic HSE06 and
-collect forces/RI size-radius convergence before release acceptance. Full local
-evidence is retained under
-`test-workspace/ri-hfx-035-native-analysis-JHBwYX/REPORT.md` and `native-review/`
-(ignored artifacts, not shipped fixtures). The 0.3.5 generator fixes have only
-software/static validation until separately authorized new native runs.
+SCF/geometry convergence and numerical/model convergence separately. PROGRAM
+ENDED and scheduler acceptance alone are not clean execution. Force accuracy,
+finite differences, RI size/radius convergence and reliable speedup remain
+unverified; a small-system smoke test or provisional energy pair cannot establish
+a chemical-accuracy guarantee. Periodic HSE06 requires independent exchange-range
+and cell-model review; charged periodic smoke models are not ionization benchmarks.
+
+Private execution records, scheduler identities, local paths and installation
+failure diagnostics are not distributed. Their exclusion does not establish a
+clean process result or identify a compiler/runtime/upstream defect. Generator
+source/software checks are distinct from native acceptance; additional calculation
+validation requires separate authorization and entirely new run directories.
 
 References: target-2026.2 [FORCES](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/PRINT/FORCES.html)
 and [INTERACTION_POTENTIAL](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/XC/HF/INTERACTION_POTENTIAL.html).
@@ -715,6 +797,47 @@ The first three columns retain the common hybrid task/model/spin/solver gates
 above; the combination column has the stricter 0.3.6 intersection below. None enables GAPW, low-dimensional PBC, non-Gamma, CELL_OPT/stress,
 smearing, +U, custom orbital bases, UZH-PBE0 protocols or correlated methods.
 Required build support is not detected. No column is certified by native CP2K runs.
+
+### Stabilization baseline (0.3.6)
+
+The supported modes are frozen for stabilization; ordinary ADMM and ADMMS are
+not interchangeable. All rows target 2026.2, classic MOLOPT/UCL GPW and Gamma,
+subject to the common exclusions above. This table describes generator policy,
+not the full capabilities of CP2K or scientific validation.
+
+| Mode | Functionals | PBC | SCF / electronic state | Tasks | RI metric |
+|---|---|---|---|---|---|
+| Direct HFX | All six hybrids above | NONE / XYZ | OT / diag; RKS / UKS | ENERGY / ENERGY_FORCE / GEO_OPT | Not applicable |
+| Ordinary ADMM + four-center HFX | PBE0 / HSE06 | NONE / XYZ | OT / diag; RKS / UKS | ENERGY / ENERGY_FORCE / GEO_OPT | Not applicable |
+| Independent RI-HFX | PBE0 / HSE06 | NONE / XYZ | OT / diag; RKS / UKS | ENERGY / ENERGY_FORCE / GEO_OPT | HFX / explicit TRUNCATED |
+| Ordinary ADMM + RI-HFX | PBE0 | NONE | OT; closed-shell RKS, no explicit magnetism | ENERGY | HFX only |
+| ADMMS + four-center HFX | PBE0 | NONE | OT; closed-shell RKS, no explicit magnetism | ENERGY | Not applicable |
+| ADMMS + RI-HFX | PBE0 | NONE | OT; closed-shell RKS, no explicit magnetism | ENERGY | HFX only |
+
+CDD remains available in the first three modes under its own fragment checks;
+it is excluded in the last three. Closed-shell does not imply neutral: charges
+remain explicit and subject to electron-count/parity checks. Automatic spin and
+source-inherited PBC must satisfy the same resolved-state gates. Selecting RI
+never selects ADMMS or changes the requested solver, state or task.
+
+`tests/test_hybrid_scope.py` freezes the six-mode cross-product over all six
+functionals, two periodicities, two solvers, three tasks and three electronic
+states (neutral RKS, charged doublet, explicit UKS singlet). Its 1296 synthetic
+cases cover 363 accepted and 933 rejected combinations. Rejected cases preserve
+an existing input and create no sidecar or staging artifacts; accepted cases
+check effective operator, ADMM model and RI parent/resource metadata. Separate
+checks cover resolved PBC/automatic spin, all-mode manifest replay and CLI
+rejection. Existing dedicated tests cover metrics/radii, auxiliary variants,
+malformed/inactive controls, CLI/TUI consistency and publication protection.
+These tests use invented data and do not execute CP2K.
+
+Any future widening needs an explicit scope decision, version-specific reference
+evidence, matching validation/metadata/UI documentation and positive/negative
+regression cases. Native syntax, clean process exit, SCF/geometry convergence,
+approximation accuracy and performance remain separate acceptance levels; none
+is implied by this stabilization baseline.
+
+### RI construction and controls
 
 ```bash
 cp2kkit generate-input water.xyz -o water-pbe0-ri.inp --periodic NONE \
@@ -1404,6 +1527,19 @@ Reviewed keyword sources:
 [DFT_PLUS_U](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/SUBSYS/KIND/DFT_PLUS_U.html),
 [KIND/MAGNETIZATION](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/SUBSYS/KIND.html),
 [DFT/UKS and PLUS_U_METHOD](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT.html).
+
+## Density surface workflow (0.4.0)
+
+The generator's physical defaults and whole/A/B bundle contract are unchanged.
+[Surface preparation](../examples/surface-density/README.md) constructs three
+small h-BN adsorption models, stages checked data and preserves source manifests.
+Only example deployment copies rebase the two checked library references to
+case-local data links; both original and deployed input hashes are retained.
+`cube-planar` adds post-processing of electron/spin density and difference cubes;
+see [plane geometry and units](cube.md#5-native-grid-plane-profiles-040).
+Neither the generator nor example submits/runs calculations. First authorized
+16-core trial findings and failed-process limitations are recorded in
+[the validation note](surface-density-validation.md).
 
 ## Electron/spin density output
 

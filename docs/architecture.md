@@ -1,11 +1,11 @@
-# cp2kkit v0.3.6 architecture
+# cp2kkit v0.4.1 architecture
 
 ## Design principles
 
 The initial analysis MVP baseline is preserved in [the roadmap](roadmap.md).
 Later requirements add an [input-generation](input-generation.md) subset.
 The [numbering/allocation guide](menu-numbering-draft.md) records implemented
-menu layout v1 (introduced in 0.2.9, retained in 0.3.6) plus separately labeled provisional future features.
+menu layout v1 (introduced in 0.2.9, retained in 0.4.1) plus separately labeled provisional future features.
 The current registry contains only implemented entries; no placeholder categories.
 No submission system or deferred Bader/PDOS/NEB post-processing is introduced.
 
@@ -51,9 +51,11 @@ cli.py
  |-- all_electron_catalog.py (audited AE subsets, local reference identity; no parameters)
  |-- gapw.py (versioned derived numerical setup; explicit OT overrides win)
  |-- constraints.py (compact fixed-atom parsing, bounded active expansion, keyword evidence)
+ |-- cube_output.py (2026.2 GPW Gamma potential/orbital print gates, metadata and child sections; no executor)
  |-- density_workflow.py -- inputgen.py / io.staged_files (whole/A/B bundle, shared generator, explicit mapping)
  |-- spin_settings.py (explicit Ueff/L parsing, collinear atom seeds, stable KIND splitting)
- `-- cube.py ------- models.py / io.py / structure.py (units; streaming checks/differences)
+ |-- cube.py ------- models.py / io.py / structure.py (units; streaming checks/differences)
+ `-- cube_profile.py -- cube.py / io.staged_files (native-grid plane means/integrals; no charge partition)
 
 models.py: data model/schema version
 io.py: strict reads, hashes, stable JSON, exclusive outputs
@@ -63,6 +65,19 @@ __main__.py / pyproject.toml: module/console-script entry points
 
 Conventional src layout. No plugins, database, workflow engine, or configuration
 framework yet; avoid complexity exceeding MVP value.
+
+## Offline CUBE validation example (0.4.1)
+
+`examples/cube-validation/audit.py` composes `parser.parse_output`, `cube.check_cube`,
+structure constants and `io.staged_files`; it is not imported by the package CLI.
+It reads explicit preparation/run paths and supplied accounting/process captures,
+never contacts a scheduler or launches programs. Example-local recognition of OT
+virtual blocks and saved sacct rows preserves line/hash provenance and unknowns.
+The core parser/schema is unchanged; independent clean-exit evidence does not
+become scientific validity or overwrite preparation identities. Full real results
+stay outside Git; selected excerpts and synthetic fields cover regressions.
+See the [example contract](../examples/cube-validation/README.md) and
+[closeout boundaries](closeout-0.4.1.md).
 
 ## Hybrid hardening (0.3.5)
 
@@ -318,7 +333,7 @@ interpretation of GTH q. xtb_versions.py pins tagged 2024.2-2026.2 capabilities
 and source hashes; unsupported model/version pairs fail before publication.
 Legacy/new parameter filenames and tblite activation/mixer/accuracy layouts stay
 separate. OT remains available for GFN1; GFN2 OT generation is gated by the shared
-version profile to target 2026.2 only after a native 2026.1 crash. Legacy targets
+version profile to target 2026.2 only as a conservative compatibility policy. Legacy targets
 2025.2/2026.1 require explicit diag; unsupported default/explicit/retained OT fails
 in the shared generator before publication, without changing SCF choices.
 The 2025.2 gate is conservative, not native validation. gfn2_ot_enabled records
@@ -333,6 +348,19 @@ DFT/density requests. xTB review uses model semantics, never claims a GPW basis,
 Poisson solver or installed backend version. Initial scope and manifest branch
 are described in [generation](input-generation.md#gfn-xtb-methods-031) and
 [schema](schema.md#generated-input-json-gfn-xtb-branch-software-031).
+
+## Potential and orbital output (0.4.1)
+
+InputSettings, CLI, config/replay and menu 601/607-610 share cube_output.py.
+Raw request checks run before method/workflow dispatch, so hidden xTB requests
+cannot disappear. Effective checks use the resolved electron/spin model and SCF
+settings. The single DFT/PRINT wrapper combines enabled density, potential and
+orbital sections with shared stride and final-step cadence. No default solver,
+occupation, physical model, filename or hybrid scope is changed. Potential
+metadata records the native opposite-to-ESP sign; orbital metadata records
+amplitude units and per-spin counts, never verified virtual-state convergence.
+CDD components inherit explicit output requests through the existing generator;
+a component failing the same scope/count checks prevents bundle publication.
 
 ## Cube pipeline
 

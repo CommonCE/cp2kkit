@@ -201,20 +201,28 @@ def edit_cube_output(menu, values):
     """Multiwfn-style cube selector limited to implemented output types."""
     while True:
         menu.heading('\n--- Cube output ---')
-        menu.show('0. None\n1. Electron density (also spin density for unrestricted calculations)')
-        menu.show('Only implemented output types are listed. CDD (602) requires electron density.')
-        raw = menu.ask('Cube output [0/1]; Enter keeps; back returns: ').lower()
+        menu.show('0. None\n1. Electron density (also spin density for unrestricted calculations)\n'
+                  f"2. Toggle native Hartree potential: {values['hartree_potential']}\n"
+                  f"3. Toggle frontier-orbital CUBEs: {values['mo_cubes']}")
+        menu.show('Only implemented output types are listed. CDD (602) requires electron density. '
+                  'Options 1/2/3 preserve other channels; 0 clears all. Counts: 608/609; stride: 605.')
+        raw = menu.ask('Cube output [0/1/2/3]; Enter keeps; back returns: ').lower()
         if not raw or raw == 'back':
             return
-        if raw not in {'0', '1'}:
-            menu.show('Invalid input: select 0 or 1. Settings unchanged.')
+        if raw not in {'0', '1', '2', '3'}:
+            menu.show('Invalid input: select 0 or 1, 2 or 3. Settings unchanged.')
             continue
         if raw == '0' and values['density_difference']:
             menu.show('Cannot disable electron density while CDD (602) is enabled; disable CDD first.')
             continue
-        values['electron_density'] = raw == '1'
-        if raw == '0':
-            values['spin_density'] = False
+        if raw in {'2', '3'}:
+            key = 'hartree_potential' if raw == '2' else 'mo_cubes'
+            values[key] = not values[key]
+        else:
+            values['electron_density'] = raw == '1'
+            if raw == '0':
+                values.update(spin_density=False, hartree_potential=False, mo_cubes=False,
+                              mo_nhomo=1, mo_nlumo=1, cube_stride=None)
         return
 
 

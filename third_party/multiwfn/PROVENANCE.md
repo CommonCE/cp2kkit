@@ -4,6 +4,56 @@ This records facts, not permission inferred from labels such as "reference-based
 or "rewritten in another language". Prefer version/file/subroutine/SHA-256;
 line numbers are auxiliary. Do not invent upstream commits, inspection dates, or grants.
 
+Publication privacy: CP2K_SOURCE_ROOT, PYTHON, MULTIWFN_EXECUTABLE,
+PRIVATE_VALIDATION_ROOT and PRIVATE_REFERENCE_SCRIPT are explicit aliases for
+non-distributed private locators, not public paths or downloadable datasets.
+Version/revision/file/hash evidence remains intact; original private mappings and
+execution diagnostics are not published. Their omission does not establish success.
+
+## Potential and frontier-orbital CUBE settings (0.4.1)
+
+- Local: cube_output.py, InputSettings/CLI, existing selector extension at 601,
+  direct 607-610 fields, review/config/replay, and tests/test_cube_output.py.
+  Reuse existing reference-based generator/UI and citations. Reinspected supplied
+  Multiwfn 2026.10.1 cp2kmate.f90/outCP2Kinp at development locator
+  ../Multiwfn_2026.10.1_src_Linux/cp2kmate.f90, SHA-256
+  `f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402`:
+  - Lines 814-835: -3 chooser, option 4 labels Hartree potential as negative ESP,
+    option 6 takes NHOMO/NLUMO, shortcut -1 resolves counts 1/1, and option 7
+    combines density with potential.
+  - Lines 2601-2635: V_HARTREE_CUBE/MO_CUBES and combined density/potential
+    templates, stride 1 and explicit NHOMO/NLUMO.
+  Use these as workflow/template references, not a direct Fortran port. Local
+  601 subchoices 2/3 are explicitly local additive toggles, not upstream ELF/XC
+  choices 2/3; direct 607-610 IDs remain local category identifiers. Unlike the
+  exclusive upstream ioutcube selector, outputs can be enabled independently.
+  Omit upstream ELF/V_XC/EFIELD, all-orbital -1 and arbitrary orbital-list scope.
+  No upstream source or numerical payload is bundled.
+- New keyword/semantic evidence comes directly from official CP2K target-2026.2
+  [potential](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/PRINT/V_HARTREE_CUBE.html),
+  [orbitals](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/PRINT/MO_CUBES.html),
+  EACH and SCF manuals and inspected tagged source bytes:
+  - [input_cp2k_print_dft.F](https://github.com/cp2k/cp2k/blob/v2026.2/src/input_cp2k_print_dft.F),
+    SHA-256 `2cef0bc8e85f0ec6c291a5c5101da55fea0658440c15647d42220f530c0aa2bc`.
+  - [qs_scf_post_gpw.F](https://github.com/cp2k/cp2k/blob/v2026.2/src/qs_scf_post_gpw.F),
+    SHA-256 `51c6456557b3cc5f95b2cfa2cee2b514739b80ccee7d32caa905f510d89e4fdc`.
+    qs_scf_post_gpw / make_lumo_gpw / occupied/unoccupied cube writers establish
+    per-spin output, Gamma limitation, native virtual eigensolver, wavefunction
+    titles and the v_hartree writer. No Fortran implementation is bundled.
+- Deliberate bounded policy: GPW/Gamma/2026.2, nonnegative finite counts rather
+  than upstream -1/all or explicit arbitrary MO lists; no smearing frontier,
+  GAPW/xTB support, automatic ADDED_MOS/solver changes or output sign conversion.
+  Native potential is opposite physical ESP sign; orbital values are amplitudes,
+  not densities. These new fields do not extend existing density analysis.
+- Initial implementation validation was source/manual review plus synthetic
+  input/CLI/menu/config and publication-protection tests, without calculations.
+  The [public native-format record](../../docs/cube-native-validation-results.md)
+  describes privacy-filtered excerpts rather than private execution environments.
+  The offline audit example and synthetic status tests preserve independent
+  convergence/CUBE/exit boundaries; no new Multiwfn
+  execution/source port, plotting accuracy or scientific certification is claimed.
+  Existing terms/citations/authorization limits are unchanged.
+
 ## Explicit ADMMS Stage 2 (0.3.6)
 
 - Local: admm.py explicit variant resolution/emission, InputSettings, CLI/menu
@@ -39,7 +89,7 @@ line numbers are auxiliary. Do not invent upstream commits, inspection dates, or
   ADMM_TYPE ADMMS with ADMM, otherwise ordinary BASIS_PROJECTION with
   solver-derived purification. Retain prior AUTO_BASIS/SORT_BASIS/RI organization,
   but deliberately do not adopt its ADMMS combination/model policy.
-- Rechecked local CP2K /home/xwp/soft/cp2k-2026.2, REVISION git:c92cc08:
+- Rechecked local CP2K CP2K_SOURCE_ROOT, REVISION git:c92cc08:
   - src/cp_control_utils.F 306-345 expands ordinary vs named ADMMS semantics,
     SHA-256 `da04a34bb800c6ccc9314a9e434abca7b0f1482a250f1672bb0cd27adff6aa39`.
   - src/qs_environment.F 1371-1388 selects AUX_FIT as auto-RI parent under ADMM,
@@ -84,18 +134,11 @@ line numbers are auxiliary. Do not invent upstream commits, inspection dates, or
   specifies the omitted short-range cutoff equation erfc(omega*r)/r=EPS_SCHWARZ.
   The Python bisection is a source-qualified estimate, not copied Fortran or a
   runtime observation. RI can extend the range; no physical defaults change.
-- User-returned native evidence: local ignored artifacts
-  test-workspace/ri-hfx-035-native-analysis-JHBwYX/REPORT.md and
-  native-review/results.json, verification.json and source-checksums.sha256.
-  CP2K banners identify 2026.2/git:c92cc08, not verified official-tag purity.
-  Seventy-one refreshed input-matched outputs converge SCF but all report late
-  SIGSEGV with _dl_fini frames; one direct reference is stale. Thirty energy
-  comparisons are provisional, all 16 geometry optimizations report convergence,
-  and 18 periodic HSE06 cases warn about range/cell compatibility. No atom-resolved
-  force accuracy, auxiliary-size/radius convergence, reliable speedup or clean
-  native acceptance is established. The full raw logs are local, not distributed
-  as synthetic fixtures. No account, host, partition or runtime-library settings
-  are copied into maintained project files.
+- Native convergence, process exit, force accuracy, auxiliary-size/radius
+  convergence and speedup are independent evidence levels. Private execution
+  captures and installation diagnostics are not distributed, and no runtime or
+  compiler defect is attributed to an upstream release. No clean native,
+  scientific-accuracy or performance certification is established by software tests.
 - New code tests are synthetic and never execute CP2K/Multiwfn or submit jobs.
   Existing results/restarts/dispatch identities are untouched. The 0.3.5 output
   fixes require fresh authorized native verification; no library-specific crash
@@ -108,7 +151,7 @@ line numbers are auxiliary. Do not invent upstream commits, inspection dates, or
   explicit positive angstrom radius and an emitted-cell face-spacing bound for
   XYZ. No automatic Multiwfn-matching radius, SCF or restart policy is adopted.
   Threshold/path and initialization-table evidence is documented below.
-- Fresh actual-data CLI checks in test-workspace/ri-hfx-035-refinement-m3RaS4/
+- Fresh actual-data CLI checks in PRIVATE_VALIDATION_ROOT/
   pass 48 generation/API/config-replay cases (PBE0/HSE06, NONE/XYZ, OT/diag,
   three tasks, HFX/TRUNCATED) and 10 expected rejections with target/JSON
   protection. Twenty default PBE/direct-HFX/ADMM texts match the preserved
@@ -121,9 +164,9 @@ line numbers are auxiliary. Do not invent upstream commits, inspection dates, or
 ## RI-HFX executable-generator comparison (0.3.5 follow-up)
 
 - User-authorized fresh checks under
-  test-workspace/ri-hfx-0.3.5-comparison-0iKiEQ/ actually invoked cp2kkit
-  **0.3.5** via /home/xwp/python/claude/bin/python -m cp2kkit and
-  /home/xwp/soft/multiwfn/Multiwfn. Every paired process banner identifies
+  PRIVATE_VALIDATION_ROOT/ actually invoked cp2kkit
+  **0.3.5** via PYTHON -m cp2kkit and
+  MULTIWFN_EXECUTABLE. Every paired process banner identifies
   Multiwfn **2026.10.18**, distinct from the 2026.10.1 source reference below.
   Binary/settings/helper/runner hashes and Python identity are in matrix/identity.json.
 - 32 paired water cases passed policy-aware input/data checks: PBE0/HSE06,
@@ -179,7 +222,7 @@ line numbers are auxiliary. Do not invent upstream commits, inspection dates, or
   The guide documents nuclear force support, non-universal performance and
   tensor batching semantics. It cites Bussy2023; auto_basis.F cites Stoychev2016.
   Research users should retain the applicable CP2K method citations.
-- Inspected local CP2K tree /home/xwp/soft/cp2k-2026.2, REVISION **git:c92cc08**.
+- Inspected local CP2K tree CP2K_SOURCE_ROOT, REVISION **git:c92cc08**.
   This is inspected local identity, not an unmodified official-tag certificate.
   ri_hfx.py records the exact source hashes for input_cp2k_hfx.F,
   input_cp2k_dft.F, input_cp2k_qs.F, cp_control_utils.F, qs_environment.F, auto_basis.F,
@@ -226,7 +269,7 @@ inputs, manifests, logs and evidence-directory names are preserved unchanged.
 - User-authorized fresh executable comparison: cp2kkit 0.3.5 against actual
   Multiwfn **2026.10.18** (banner checked per paired process), not the development
   source version 2026.10.1. Binary/source/helper hashes and local CP2K reference
-  revision are recorded in test-workspace/admm-0.3.5-fix-e7UQQm/identity.json.
+  revision are recorded in PRIVATE_VALIDATION_ROOT/identity.json.
 - 56 fresh real-data cases passed with --data-dir and no explicit --basis-file
   workaround: 32 paired water cases for PBE0/HSE06, NONE/XYZ, OT/diag,
   ENERGY/ENERGY_FORCE/GEO_OPT and charged doublets; plus 24 cp2kkit-only cases
@@ -237,7 +280,7 @@ inputs, manifests, logs and evidence-directory names are preserved unchanged.
   CP2K 2026.2 defaults are NONE/DEFAULT; existing resource/screening/restart
   differences remain. No CP2K was executed, no jobs submitted, no convergence,
   energy/force accuracy, speedup or scientific validation established.
-- Local evidence: test-workspace/admm-0.3.5-fix-e7UQQm/summary.json,
+- Local evidence: PRIVATE_VALIDATION_ROOT/summary.json,
   per-case inputs/logs/diffs/results, red.log, focused.log and regression.log.
   Earlier failing outputs under admm-0.3.4-comparison-9LH4xs are preserved.
   No additional upstream code, permission or changed licensing is implied;
@@ -264,7 +307,7 @@ inputs, manifests, logs and evidence-directory names are preserved unchanged.
   Explicit EXCH_SCALING_MODEL NONE and EXCH_CORRECTION_FUNC DEFAULT retain
   operator-consistent native correction rather than forcing PBEX universally.
   Existing HFX resources/screening and physical defaults remain unchanged.
-- Inspected local CP2K reference: /home/xwp/soft/cp2k-2026.2, REVISION
+- Inspected local CP2K reference: CP2K_SOURCE_ROOT, REVISION
   **git:c92cc08**, target keyword policy 2026.2. Directory/branch names do not
   establish an unmodified official tag or a linked binary. Exact source hashes:
   - input_cp2k_dft.F:
@@ -294,7 +337,7 @@ inputs, manifests, logs and evidence-directory names are preserved unchanged.
   by these entries. No automatic auxiliary-family substitution.
 - 32 water generator cases (PBE0/HSE06, OT/diag, NONE/XYZ, four auxiliary sizes)
   passed using actual local data. Local ignored evidence:
-  test-workspace/admm-0.3.4-data-audit-TSjzozqx/ (audit.py, preserved first-pass
+  PRIVATE_VALIDATION_ROOT/ (audit.py, preserved first-pass
   script/log, completed.log and completed/summary.json plus inputs/sidecars).
   This is not a fresh executable Multiwfn comparison or any CP2K execution.
   Synthetic tests separately cover malformed/conflicting sources, state gates,
@@ -374,7 +417,7 @@ inputs, manifests, logs and evidence-directory names are preserved unchanged.
   of the referenced 2026.10.1 development source; binary/source/settings hashes
   are recorded independently.
 - Local ignored evidence directory:
-  `test-workspace/hybrid-remaining-0.3.3-20261022-125352-T48M5s/`.
+  `PRIVATE_VALIDATION_ROOT/`.
   identity.json records binary/settings/source/data/fixture/Python identities;
   case-matrix.json, summary.json/csv, matrix-results.json and per-case comparison.json
   preserve the complete matrix. Four earlier pilot pairs and their initial
@@ -508,8 +551,8 @@ density/CDD and protected publication. Source/byte checks establish neither nati
 syntax acceptance nor convergence, derivative accuracy or property correctness.
 Fresh local B3LYP generator comparison against Multiwfn 2026.10.18 passed 21/21
 cases, including selected basis/potential payload checks; documented screening,
-memory and SCF policy differences remain. Local evidence: test-workspace/
-b3lyp-0.3.2-retest-20261022-114046-bWjbx5/summary.json (not a distributed fixture).
+memory and SCF policy differences remain. Private comparison evidence is not
+distributed as a fixture.
 No CP2K execution or submission was performed for this feature.
 
 ## GFN-xTB implementation (0.3.1)
@@ -536,7 +579,7 @@ its historical source identity or validation evidence.
   CELL_OPT/density/CDD/+U/refits, no extra dispersion, no direct writes or restart
   reads. Retain local EPS_SCF 1e-6 policy for self-consistent profiles. Shared
   geometry/motion/writer and explicit conflicting-request errors remain authoritative.
-- CP2K evidence: supplied `/home/xwp/soft/cp2k-2026.2`, REVISION git:c92cc08.
+- CP2K evidence: supplied `CP2K_SOURCE_ROOT`, REVISION git:c92cc08.
   This is the actual local tree identity, not inferred official-release/binary
   equivalence. Inspected source SHA-256:
   - src/input_cp2k_tb.F (create_xtb_section, create_xtb_parameter_section,
@@ -668,24 +711,20 @@ its historical source identity or validation evidence.
   validation is claimed. Existing custom terms/citations/unknown grants remain;
   no bundled Fortran/parameter payload or additional licensing grant.
 
-### GFN2 OT native crash-protection follow-up (retained 0.3.1)
+### GFN2 OT compatibility policy follow-up (retained 0.3.1)
 
 - Local changes: xtb_versions.py gfn2_ot_enabled generation-policy flag and shared
   xtb.py validation. GFN2 OT is enabled only for target 2026.2; legacy
   2025.2/2026.1 requires explicitly selected diagonalization. Do not silently
   replace OT, change the target or infer installed-build capabilities. The
   2025.2 gate is conservative; no native 2025.2 failure is claimed.
-- Earlier authorized local diagnostics: CP2K 2026.1/git:5e54ba2, water charge 0,
-  multiplicity 1, Gamma/no smearing. Default OT at one rank and IRAC at four ranks
-  crashed with SIGSEGV/139, consistent with the previous default four-rank run.
-  Diagonalization ENERGY at one/four ranks, ENERGY_FORCE and GEO_OPT converged.
-  Local 2026.2/git:c92cc08 OT passed that four-case task/rank matrix. Different
-  compilers/backends and absent source Git metadata prevent claims of official
-  unmodified-release equivalence or isolation of a single upstream fix.
+- Private native installation diagnostics are not distributed. Source-version
+  observations and the conservative generator guard do not establish official
+  installed-release equivalence, runtime pointer state or a unique upstream fix.
 - Inspected local 2026.1 source: qs_scf_initialization.F 420-425 and 721-727
   nullifies mixing storage under OT; qs_scf.F 526-529 calls tb_update_charges
   with use_rho=false; tblite_interface.F 939-949 reads p_mix_new before the
-  ao_charges call at 981, matching mulliken.F:776 in the crash backtrace.
+  ao_charges call at 981. These observations are static source evidence.
   Local qs_scf.F SHA-256:
   `a1076210b6e8497ac51e4e759cd8c2ed14283cb609fb7b7cb1c6c69e3130ab23`;
   local tblite_interface.F SHA-256:
@@ -695,7 +734,7 @@ its historical source identity or validation evidence.
   These are local-source identities, not the tagged hashes above; no debugger
   pointer-state measurement or patched-binary experiment was performed.
 - Complete diagnostic inputs/logs, build/library identities and source excerpts
-  are local under `test-workspace/gfn2-ot-diagnosis-20261021-124634-mJ9t2F/`,
+  are local under `PRIVATE_VALIDATION_ROOT/`,
   not bundled test fixtures. The current guard adds synthetic regression only;
   no new native calculation, source patch, parameter payload or Fortran port.
   Existing citations/custom terms/unknown grants remain unchanged.
@@ -712,7 +751,7 @@ its historical source identity or validation evidence.
   Actual use: PADE/BP shortcut meanings; exact TPSS/revTPSS/SCAN/r2SCAN/MN15-L/
   HLE17/B97M component names; B97M-rV RVV10 b/C=6.0/0.01 and kernel;
   BEEFVDW + LMKLL/kernel; retain original parametrized-PBE/RPBE definitions.
-- Independently checked supplied CP2K tree `/home/xwp/soft/cp2k-2026.2`,
+- Independently checked supplied CP2K tree `CP2K_SOURCE_ROOT`,
   REVISION git:c92cc08. Directory identity is not binary-version certification.
   input_cp2k_xc.F verifies keywords/nesting/units; input_cp2k_check.F 207-233
   expands BEEFVDW into BEEF exchange, 0.3998335231 PBEc + 0.6001664769
@@ -759,7 +798,7 @@ its historical source identity or validation evidence.
 
 ### User-authorized generator comparison follow-up
 
-- Actual executable `/home/xwp/soft/multiwfn/Multiwfn` reported **2026.8.31**
+- Actual executable `MULTIWFN_EXECUTABLE` reported **2026.8.31**
   in all 95 paired runs; this is not execution of the 2026.10.1 reference source.
   cp2kkit 0.3.0 was invoked through the configured Python module entry point;
   both generators exited 0 for every paired case, at one Multiwfn thread each.
@@ -773,7 +812,7 @@ its historical source identity or validation evidence.
   required nonlocal kernels matched. Ordinary ENERGY EPS_SCF differs by retained
   policy (cp2kkit 1e-6 vs this binary's 5e-6), not an input-assembly defect.
 - Local ignored evidence directory:
-  `test-workspace/pure-functional-0.3.0-20261020-155629-SwFpIH/`.
+  `PRIVATE_VALIDATION_ROOT/`.
   identity.json records actual binary/source/settings/data hashes;
   summary-v4.json/csv and negative-summary.json/csv are final results.
   Original generated inputs, stdin, full logs, exit/timing records, earlier
@@ -1111,7 +1150,7 @@ its historical source identity or validation evidence.
   1860-1861, FULL_ALL for GAPW 2468-2471 and pob IRAC/other STRICT 2478-2483.
   User-requested basis numbers 50-59 and OT menu 110 are local allocations.
 - Independent local CP2K evidence: user-supplied tree
-  `/home/xwp/soft/cp2k-2026.2`, REVISION git:c92cc08. Exact data, keyword and
+  `CP2K_SOURCE_ROOT`, REVISION git:c92cc08. Exact data, keyword and
   GAPW example hashes are in all_electron_catalog.py. The local revision is not
   asserted equivalent to the named upstream release or an installed binary.
   input_cp2k_scf.F 583-592 verifies OT ALGORITHM STRICT/IRAC and native STRICT.

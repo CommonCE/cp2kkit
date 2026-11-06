@@ -111,6 +111,10 @@ port or evidence of validation with the actual software.
 - Diagnose partial/truncated files, non-finite values, damaged formats, and unsupported
   syntax explicitly; do not silently skip important evidence.
 - Do not commit scientific binaries, large outputs, or sensitive data.
+- Before commit/push, inspect the staged contents and commit identity for private
+  account/host paths, job identities, execution timestamps, credentials and local
+  installation diagnostics. Keep raw evidence local; use explicit public aliases
+  or synthetic status fixtures without relabeling private failures as success.
 
 ## 4. Scientific settings and validation boundaries
 
@@ -140,7 +144,9 @@ port or evidence of validation with the actual software.
 - Whole-system multiplicity auto resolves from selected PP/AE electron counts
   minus charge: even -> 1, odd -> 2. Preserve explicit values; parity is not a
   ground-state spin prediction. Fragment states remain explicit. TUI -3/601 is
-  the shared 0 None / 1 Electron density selector (UKS also prints spin density);
+  the shared selector (0.4.1: 0 clears all CUBE requests/stride/count overrides,
+  1 enables density, 2/3 toggle potential/orbitals without clearing other channels;
+  UKS density also prints spin density);
   CDD enables density output and prevents disabling it until CDD is off.
 - Default UZH runtime references use BASIS_MOLOPT_UZH / POTENTIAL_UZH; keep
   resolved source paths/hashes separate in provenance and record emitted_data_files.
@@ -181,9 +187,9 @@ port or evidence of validation with the actual software.
   closed-shell ENERGY/ENERGY_FORCE/GEO_OPT. Use model reference
   occupations, intrinsic dispersion and pinned native parameter bytes; no GTH q,
   XC/grid/Poisson or density/CDD reuse. GFN0 is non-SCC; GFN1 and target-2026.2
-  GFN2 OT use FULL_SINGLE_INVERSE and EPS_SCF. GFN2 OT is blocked on legacy
-  2025.2/2026.1 after a local 2026.1 crash; 2025.2 is conservatively restricted,
-  not runtime validated. Require explicit diag (320/--scf diag), never silently
+  GFN2 OT use FULL_SINGLE_INVERSE and EPS_SCF. GFN2 OT is conservatively blocked
+  on legacy 2025.2/2026.1 by generator policy, not installed-build certification.
+  Require explicit diag (320/--scf diag), never silently
   change the solver or treat a target version as a binary upgrade. Legacy
   GFN2 uses TBLITE T without new backend/mixer/accuracy keywords; 2026.2 native
   SCC with diag uses ACCURACY, while OT uses it for numerical setup only.
@@ -254,8 +260,13 @@ port or evidence of validation with the actual software.
   exit or release acceptance. Keep RI experimental; preserve physical defaults,
   existing results and submission identities. These documented output fixes
   supersede the earlier default-text preservation for affected hybrid inputs.
-- Keep software version 0.3.6 by explicit user request during ADMM/RI-HFX
-  feature development; do not bump again within that work without a new decision.
+- The user-assigned 0.4.0 density stage supersedes the former 0.3.6 version
+  freeze; retain all bounded hybrid combinations/defaults below unchanged.
+  cube-planar uses native grid-index planes, perpendicular spacings, explicit
+  angstrom/electron units, full-voxel quadrature and exclusive CSV/JSON. It is
+  not a charge-partition method. Surface examples prepare only; execution still
+  requires explicit authorization, and late SIGSEGV/failed scheduler exits
+  cannot be accepted based on SCF convergence or PROGRAM ENDED alone.
   0.3.6 supersedes the earlier RI+ADMM rejection only for target 2026.2,
   PBE0 classic GPW Gamma NONE closed-shell RKS OT ENERGY / RI_METRIC HFX,
   without explicit magnetism or CDD. Reuse checked AUX_FIT records as the RI
@@ -266,6 +277,15 @@ port or evidence of validation with the actual software.
   NONE purification and MERLOT scaling with DEFAULT correction; reject retained
   MO_DIAG, never override it or infer ADMMS from RI. No other scope expansion. Independent
   modes, source protections and schema 0.1.0 remain unchanged.
+- 0.4.1 new potential/orbital CUBEs are opt-in target-2026.2 GPW Gamma only.
+  Native V_HARTREE_CUBE has opposite sign to physical ESP; never silently flip it.
+  MO_CUBES emits signed amplitudes, per-spin NHOMO/NLUMO >=0 (not both zero),
+  default 1/1; no all-orbital -1 or smearing frontier definition. Reject empty
+  occupied spin channels/too many occupied requests. OT keeps ADDED_MOS=0 and
+  uses native post-SCF virtual eigensolver work; diag requires explicit sufficient
+  added_mos. Never infer virtual convergence from SCF convergence. Nondefault
+  inactive counts fail until reset. New menu IDs 607/608/609/610 and shared 605
+  keep CLI/config/replay/CDD identity and existing hybrid scope/protections.
 - Do not start expensive calculations. Actual CP2K validation requires explicit
   authorization and a new run directory.
 - For failed-job diagnosis, load `qchem-error-diagnosis`, collect software/version

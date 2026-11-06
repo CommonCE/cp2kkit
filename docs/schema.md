@@ -4,6 +4,16 @@ All JSON top levels include `schema_version: "0.1.0"`.
 NaN/Infinity are prohibited. Unknown JSON values use null, CSV uses empty fields;
 actual zero values remain zero.
 
+## Offline audit example boundary (0.4.1)
+
+The [CUBE audit example](../examples/cube-validation/README.md) uses an explicitly
+example-local `cube-audit-plan-v1` plan and `cube-audit-v1` report, not a public
+CLI/API/data contract. Its report retains schema_version 0.1.0 and separate
+scheduler/process records without changing core parse JSON: `exit_status` below
+remains null. A report-written exit code is not an overall clean/scientific pass.
+Missing evidence is null; true clean exit does not imply identity/accuracy checks.
+External status captures and fixture excerpt metadata are not core parser output.
+
 ## Parse JSON
 
 - `software`, `software_version`, `project`: output-derived; absent version/project is null.
@@ -176,6 +186,33 @@ Fields/units/schema 0.1.0 are unchanged.
   address yields null; checked tagged source is used.
 - syntax_reference_checked/runtime_validated describe density-print validation,
   not certification of the entire generator.
+
+## Generated input JSON: potential/orbital CUBEs (software 0.4.1)
+
+Schema remains **0.1.0**; additions do not reinterpret density or result fields.
+
+- settings.hartree_potential / mo_cubes: Boolean, default false.
+- settings.mo_nhomo / mo_nlumo: nonnegative integer per-spin counts, default 1/1.
+  Both zero when enabled, nondefault inactive counts and unsupported states fail.
+- settings.cube_stride: still nullable, now shared by all enabled CUBE sections.
+- extra_cube_output.potential / orbitals: effective enabled, full section path,
+  nullable stride/each/add_last, append=false, filename_override=null,
+  spatial_unit=bohr, reference_version=CP2K 2026.2, manual_source, source URLs/
+  SHA-256, syntax_reference_checked=true and runtime_validated=false.
+  Disabled records still describe the checked reference, not emitted sections.
+- potential: native electron+ion meaning, scalar_unit=atomic unit of electrostatic
+  potential, physical_esp_sign_factor=-1, sign_conversion_applied=false.
+- orbitals: nhomo/nlumo (null if disabled), write_cube, signed-amplitude meaning,
+  scalar_unit=bohr^(-3/2), spin_channels (restricted or alpha/beta; [] disabled).
+  virtual_state_source is post-SCF OT eigensolver or SCF added orbitals, null
+  without requested virtuals; virtual_convergence_verified=false.
+- Source definitions/implementation identity is not proof of runtime output,
+  available virtual basis capacity, sign conversion, convergence or accuracy.
+  CDD component manifests inherit this additive object through the same generator.
+
+Existing CUBE analysis scalar types/units are unchanged; potential/orbital fields
+remain unknown to those analyzers, not electron-density assertions.
+See [controls and scientific limits](input-generation.md#potential-and-frontier-orbital-cubes-041).
 
 ## Generated input JSON: hybrid hardening (software 0.3.5)
 
@@ -725,3 +762,27 @@ Damaged/unsupported files exit through existing CLI errors, not format_valid=tru
 
 Cube comments encode type/spatial/scalar units/traversal for independent rereading,
 not certification of the original calculation. See [the cube guide](cube.md).
+
+## Cube planar profile JSON sidecar (software 0.4.0)
+
+Additive report type; schema stays 0.1.0. Existing report contracts are unchanged.
+
+- operation=planar_density_profile; generator records the software version.
+- input: full cube-check report, source byte hash, header, units and statistics.
+- axis=x/y/z selects a native grid index, not necessarily a Cartesian direction.
+- normal_cartesian: dimensionless unit vector oriented toward increasing index.
+- plane_spacing_angstrom: absolute perpendicular step projection;
+  quadrature_plane_area_angstrom2: cross-product area times both plane counts;
+  origin_projection_angstrom: input origin dotted with the oriented normal.
+- planes: zero-based index, distance_angstrom, mean_density_e_per_angstrom3,
+  slab_electrons and cumulative_electrons (full-slab sum through current plane).
+- total_integral_electrons: final cumulative integral, not a charge-transfer claim.
+  Spin fields use alpha-minus-beta excess electrons; meanings come from input.
+- density_unit=e/angstrom^3, integral_unit=electron; no electric-charge sign flip,
+  periodic recentering, endpoint weighting, interpolation or normalization.
+- output: CSV absolute path, exact-byte sha256 and ordered column names.
+- warnings/validation: no calculation-settings or charge-transfer certification.
+
+CSV and `<output>.json` are published exclusively using shared staged output;
+source parsing must finish successfully, and ordinary failures remove only this
+operation's owned output inodes. See [profile conventions](cube.md#5-native-grid-plane-profiles-040).

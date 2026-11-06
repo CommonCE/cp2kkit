@@ -8,7 +8,102 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.4.1
+
+- User-specified version 0.4.1 for this feature round; schema remains 0.1.0.
+- Add opt-in native V_HARTREE_CUBE and frontier-orbital MO_CUBES generation for
+  target CP2K 2026.2 GPW pseudopotentials at Gamma. Both default off; existing
+  hybrid gates, physical defaults and data schema 0.1.0 remain unchanged.
+- Add CLI --hartree-potential, --mo-cubes, --mo-nhomo/--mo-nlumo (per-spin,
+  default 1/1), menu 607/608/609/610, review and additive extra_cube_output
+  provenance. CLI/config/replay/CDD use the same validation/protected writer.
+- Extend shared --cube-stride to any enabled CUBE section. Selector -3/601
+  retains density choice 1, adds potential/orbital toggles 2/3; 0 clears all
+  CUBE outputs plus stride/count overrides, still blocked while CDD is enabled.
+- Record native opposite-to-physical-ESP potential sign without converting data;
+  distinguish signed wavefunction amplitudes from density. UKS emits alpha/beta.
+  OT keeps its solver and invokes post-SCF virtual eigensolver work; diag requires
+  explicit sufficient ADDED_MOS. Reject smearing frontier states, excessive
+  occupied counts/empty spin channels, all-orbital -1, nondefault inactive counts
+  and unsupported new-field method/version/k-point combinations.
+- New-field generation is checked against target manuals and tagged-source
+  hashes, not CP2K execution, virtual-state convergence or scientific accuracy.
+  No potential/orbital analysis, sign conversion, new dependencies or submission.
+- Add preparation-only three-case CUBE example/protocol using shared generation,
+  actual data checks and exclusive staged publication. Record deployed versus
+  generator input identities, explicit spin/frontier requests and null pending
+  results; no public CLI/API changes, calculations or scheduler scripts.
+- Add privacy-filtered native-format excerpts for version/SCF/virtual-spin/CUBE
+  header regression. Preserve full-source hashes and selected line numbers; omit
+  private execution identities, timestamps and installation diagnostics.
+- Fix exact CP2K UKS SUM OF ALPHA AND BETA DENSITY title recognition within the
+  existing electron-density type; retain producer gates and unknown potential/MO
+  scalar semantics. Add synthetic native-title regression coverage.
+- Close out 0.4.1 with an offline example-local CUBE audit using shared parsers,
+  explicit plans, independent SCF/virtual/CUBE/exit checks and exclusive reports.
+  Missing evidence remains null; supplied scheduler/process evidence is not execution.
+  Add small real excerpts with full-source hashes/original line numbers and synthetic
+  failure/identity/status regressions. No public CLI/API, new fields or calculations.
+- Development closeout checks: 83 focused and 633 full regression tests passed,
+  none skipped; compileall, version and whitespace checks passed. Public fixtures
+  contain 11 privacy-filtered format selections; scheduler/signal regressions use
+  synthetic evidence. No quantum calculation or submission is part of these tests.
+- Historical output-feature checks: 104 focused tests and 599 full regression tests passed, none skipped;
+  compileall, CLI version 0.4.1 and whitespace checks passed. Full regression
+  includes maintained-text/local-link checks. No new CP2K/Multiwfn execution.
+
+## 0.4.0
+
+### Density regression follow-up (no interface/version change)
+
+- Add unequal-dimension skew-grid tests for every profile axis, compensated
+  cancellation/negative spin integrals and overflow publication cleanup.
+- Read-only water difference-CUBE checks cover x/y/z planes, with cumulative
+  integrals agreeing with 3D quadrature within 7e-19 electrons. Arithmetic checks
+  do not establish process/scientific acceptance; no CP2K execution/submission.
+- Current regression: 583 tests passed, none skipped; 49 focused cube/profile
+  tests passed. Functional testing, clean-exit evidence and scientific acceptance
+  remain independent gates; private runtime diagnostics are not distributed.
+
+### Initial implementation
+
+- User-assigned density/surface workflow stage; schema remains 0.1.0 and bounded
+  hybrid physical defaults/combination gates are unchanged.
+- Fix native CP2K scalar CUBE compatibility: validate adjacent signed E13.5E3
+  fields from the documented 6E13.5E3 format, only for recognized/asserted CP2K.
+  Retain strict malformed/non-finite/data-count checks and original-byte hashes.
+- Add `cube-planar --axis x|y|z -o profile.csv`: native-grid means, full-slab and
+  cumulative electron integrals, explicit skew-cell normals/perpendicular spacing,
+  angstrom units, compensated streaming sums and exclusive CSV/JSON publication.
+  This is not atomic/Bader partitioning, automatic net charge transfer, Cartesian
+  interpolation or normalized charge. Existing cube-check/cube-diff flags remain.
+- Add deterministic H2O/NH3/CO2-on-h-BN preparation with checked portable data,
+  source/deployed hashes, original whole/A/B manifests and entirely new paths.
+  Example/library/CLI code never executes CP2K or submits jobs.
+- Document [format and density-chain validation limits](docs/surface-density-validation.md).
+  Complete format/hash/grid/integral checks and agreement of difference/profile
+  chains are distinct from process acceptance or scientific accuracy. Private
+  execution records and environment-specific diagnostics are not distributed.
+- Development validation: 580 tests passed, none skipped; compileall, CLI version
+  0.4.0, 115 local Markdown file links, the new profile anchor and diff checks
+  passed. Includes preserved pre-existing hybrid-scope tests; no new dependencies.
+
 ## 0.3.6
+
+### Hybrid stabilization (no scope expansion)
+
+- Freeze a six-mode support table distinguishing direct HFX, ordinary ADMM,
+  independent RI, ordinary ADMM+RI, ADMMS and ADMMS+RI.
+- Add an independent synthetic cross-mode matrix: 1296 combinations, with 363
+  accepted and 933 rejected before publication. Check effective HF/ADMM/RI
+  identity, unchanged requests and source bytes, resolved PBC/automatic spin,
+  manifest replay and CLI rejection preserving an existing input.
+- Production generator logic, defaults, public interfaces, software 0.3.6 and
+  schema 0.1.0 remain unchanged. No CP2K/Multiwfn run or scheduler submission;
+  synthetic checks do not establish native compatibility or scientific accuracy.
+- Checks: 106 focused regression tests and 561 full regression tests passed,
+  none skipped; compileall, CLI version, local documentation-link and diff
+  checks passed. The 1296 matrix cases are subtests, not 1296 unittest methods.
 
 ### Release checks
 
@@ -103,13 +198,10 @@ increments B once. Explicit user version requests take priority.
   erfc(omega*r)/r=EPS_SCHWARZ equation and rounded-cell face spacing. Warn when
   it exceeds half the cell; never change omega, cell, screening or physical
   cutoff. Label the estimate non-runtime; RI can extend the range independently.
-- Record returned 2026.2/git:c92cc08 evidence honestly: 71 refreshed outputs
-  have SCF-converged totals and PROGRAM ENDED but all report late SIGSEGV;
-  one reference is stale. Sixteen geometry optimizations report convergence,
-  while force accuracy, clean process exits, RI convergence and speedup remain
-  unverified. Eighteen HSE06/XYZ outputs have range/cell warnings. RI-HFX stays
-  experimental, not stable native/scientific acceptance. No speculative runtime
-  library fix, numerical-default adjustment or automatic rerun.
+- Keep convergence, process exit, force accuracy, RI convergence and speedup as
+  separate evidence levels. RI-HFX stays experimental; periodic HSE06 requires
+  range/cell review. Private installation diagnostics are not distributed and no
+  compiler/runtime defect, numerical-default repair or automatic rerun is claimed.
 - Compatibility: affected hybrid input text changes intentionally; explicit
   file paths, method/solver/spin defaults, menu/basis IDs and schema 0.1.0 stay
   unchanged. Existing calculation artifacts and submission identities are not
@@ -163,7 +255,7 @@ increments B once. Explicit user version requests take priority.
   actual-data CLI generation/replay cases and 10 expected CLI rejections passed,
   preserving targets/data. Twenty default PBE/direct-HFX/ADMM input texts still
   match the preserved pre-RI HEAD tree. Artifacts:
-  test-workspace/ri-hfx-035-refinement-m3RaS4/. No CP2K or new Multiwfn execution.
+  PRIVATE_VALIDATION_ROOT/. No CP2K or new Multiwfn execution.
 
 ## 0.3.4
 
@@ -182,7 +274,7 @@ increments B once. Explicit user version requests take priority.
   cases passed, including 32 paired comparisons with Multiwfn 2026.10.18 and
   24 additional auxiliary-size cases. 92 focused and 510 regression tests,
   compileall and CLI version checks passed. Evidence is retained locally in
-  test-workspace/admm-0.3.5-fix-e7UQQm/; historical failing artifacts are intact.
+  PRIVATE_VALIDATION_ROOT/; historical failing artifacts are intact.
 - Validation is input generation and software regression only; no CP2K
   execution, job submission, convergence or scientific-validity certification.
 
@@ -248,7 +340,7 @@ increments B once. Explicit user version requests take priority.
   PBEh high-precision comparison explicitly allows upstream five-decimal rounding,
   not exact fraction identity. All 48 invalid-combination/overwrite checks passed.
   Raw inputs, commands, stdin, logs, hashes and JSON/CSV summaries are retained in
-  test-workspace/hybrid-remaining-0.3.3-20261022-125352-T48M5s/.
+  PRIVATE_VALIDATION_ROOT/.
   No CP2K execution, native acceptance, convergence or scientific-validation claim.
 
 ## 0.3.2
@@ -313,14 +405,13 @@ increments B once. Explicit user version requests take priority.
 
 ## 0.3.1
 
-- GFN2 OT crash-protection follow-up (version retained): reject OT generation
+- GFN2 OT compatibility follow-up (version retained): reject OT generation
   for legacy CP2K targets 2025.2/2026.1 before publication; require explicit
   --scf diag/menu 320 instead of silently changing the solver. Shared version
   policy adds gfn2_ot_enabled; target 2026.2 retains OT generation without any
-  runtime-certification claim. Native crash evidence is from local 2026.1;
-  2025.2 is conservatively restricted without native execution. Prior authorized
-  water tests found diagonalization converged on local 2026.1 and OT converged
-  on local 2026.2/git:c92cc08, not necessarily an unmodified official release.
+  runtime-certification claim. Legacy targets are conservatively restricted;
+  private installation diagnostics are not distributed. Source observations do
+  not certify a particular installed build or an unmodified official release.
   Add API/config/replay/CLI/TUI and no-publication regressions; schema stays 0.1.0.
   No new native calculation, CP2K patch or automatic resubmission in this fix.
 - Parser compatibility follow-up, retaining 0.3.1 by explicit user request:

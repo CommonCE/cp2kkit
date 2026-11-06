@@ -2,12 +2,14 @@
 
 ## Status and scope
 
-**Software 0.3.6 retains the 0.2.9 menu layout v1, GFN-xTB and bounded hybrids, with opt-in PBE0/HSE06 ADMM and RI-HFX (together only for isolated PBE0 RKS OT ENERGY / metric HFX, no explicit magnetism/CDD); distant feature
+**Software 0.4.1 retains menu layout v1, GFN-xTB and bounded hybrids/ADMM/RI-HFX,
+adding target-2026.2 GPW Gamma potential and frontier-orbital CUBE controls at
+607-610. Hybrid combinations retain their existing scope; distant feature
 allocations remain a draft, not a frozen future registry or a release claim.**
 
 Schema stays **0.1.0**. The authoritative implemented function registry is
 `src/cp2kkit/menu_registry.py`. Categories 100-600 contain applicable existing
-controls and new 602; categories 700-1000 and other Planned entries below are
+controls, density workflow 602 and CUBE controls 607-610; categories 700-1000 and other Planned entries below are
 not implemented or shown. This document does not authorize execution/submission.
 The design baseline was 0.2.8; its function-number migration is now explicit.
 
@@ -318,14 +320,16 @@ not post-processing of existing results.
 
 | ID | Function | Status / boundary |
 |---:|---|---|
-| 601 | CUBE output selector | Existing GPW subset: 0 None / 1 Electron density; UKS also prints spin density |
+| 601 | CUBE output selector | 0 None clears all/stride/count overrides; 1 enables density; 2/3 toggle native potential/orbitals without clearing other channels (0.4.1); CDD blocks 0 |
 | 602 | Whole-system plus two-fragment density-difference inputs | Existing in 0.2.9; ENERGY/GPW/charge-conserving two-fragment subset |
 | 603 | Spin-density output | Existing; current UKS output channels are coupled |
 | 604 | Spin-density difference inputs | Planned |
 | 605 | CUBE sampling STRIDE | Existing |
 | 606 | ELF and other scalar fields | Planned |
-| 607 | Selected-orbital CUBE output | Planned |
-| 610 | Electrostatic/related potential fields | Planned; sign/meaning must be explicit |
+| 607 | Frontier-orbital CUBE output | Implemented 0.4.1; target 2026.2 GPW Gamma; NHOMO/NLUMO subset only |
+| 608 | Occupied orbital CUBE count per spin | Implemented; nonnegative integer, default 1 |
+| 609 | Virtual orbital CUBE count per spin | Implemented; nonnegative integer, default 1 |
+| 610 | Native Hartree potential CUBE | Implemented 0.4.1; target 2026.2 GPW Gamma; opposite physical ESP sign, no conversion |
 | 611 | Electric-field output | Planned |
 | 612 | Work-function calculation preparation | Planned |
 | 620 | DOS | Planned |

@@ -6,6 +6,7 @@ import sys
 
 from . import __version__
 from .cube import DIALECTS, SCALAR_TYPES, SCALAR_UNITS, CubeOptions, check_cube, diff_cubes
+from .cube_profile import write_planar_profile
 from .discovery import discover, resolve_output
 from .errors import KitError
 from .export import export_structure_files, write_csv
@@ -158,11 +159,23 @@ def build_parser():
     gen.add_argument("--cp2k-version", choices=CP2K_VERSIONS, default="2026.2", help="Target syntax profile; not runtime certification")
     gen.add_argument("--electron-density", action="store_true", help="Print GPW valence density cube (UKS also prints spin density)")
     gen.add_argument("--spin-density", action="store_true", help="Require UKS and enable density cubes, including alpha-minus-beta spin density")
-    gen.add_argument("--cube-stride", type=int, nargs=3, metavar=("NX", "NY", "NZ"), help="Positive grid increments, effective default 1 1 1 when density enabled; not a convergence guarantee")
-    for name in ("cube-check", "cube-diff"):
-        cmd = sub.add_parser(name, help="Validate scalar CUBE and report grid/integrals" if name == "cube-check" else "Subtract aligned fragment densities from the first CUBE; no registration/interpolation")
+    gen.add_argument("--hartree-potential", action="store_true", help="2026.2 GPW Gamma: native electron+ion potential CUBE (opposite sign to physical ESP)")
+    gen.add_argument("--mo-cubes", action="store_true", help="2026.2 GPW Gamma: frontier-orbital amplitude CUBEs; no smearing")
+    gen.add_argument("--mo-nhomo", type=int, default=1, help="Occupied orbitals per spin, counted back from HOMO (default 1; >=0)")
+    gen.add_argument("--mo-nlumo", type=int, default=1, help="Virtual orbitals per spin from LUMO (default 1; >=0); diag requires enough --added-mos")
+    gen.add_argument("--cube-stride", type=int, nargs=3, metavar=("NX", "NY", "NZ"), help="Shared positive CUBE grid increments; effective default 1 1 1 with any CUBE output; not a convergence guarantee")
+    cube_help = {
+        'cube-check': 'Validate scalar CUBE and report grid/integrals',
+        'cube-diff': 'Subtract aligned fragment densities from the first CUBE; no registration/interpolation',
+        'cube-planar': 'Native-grid plane averages and cumulative electron integrals; CSV plus provenance JSON',
+    }
+    for name, help_text in cube_help.items():
+        cmd = sub.add_parser(name, help=help_text)
         cmd.add_argument("paths" if name == "cube-diff" else "path", nargs="+" if name == "cube-diff" else None)
-        cmd.add_argument("-o", "--output", required=name == "cube-diff")
+        cmd.add_argument("-o", "--output", required=name != "cube-check")
+        if name == 'cube-planar':
+            cmd.add_argument('--axis', choices=('x', 'y', 'z'), default='z',
+                             help='Native CUBE grid index normal to averaging planes (default z); not necessarily Cartesian')
         cmd.add_argument("--dialect", choices=DIALECTS, default="auto", help="auto recognizes Quickstep; signed explicitly uses negative counts as angstrom")
         cmd.add_argument("--length-unit", choices=["bohr", "angstrom"], help="Explicit spatial unit assertion, not a conversion request")
         cmd.add_argument("--scalar-type", choices=SCALAR_TYPES, default="auto", help="Meaning assertion for otherwise unknown fields")
@@ -208,11 +221,14 @@ def emit(data, output):
 
 
 def execute(args):
-    if args.command in {"cube-check", "cube-diff"}:
+    if args.command in {"cube-check", "cube-diff", "cube-planar"}:
         options = CubeOptions(args.dialect, args.length_unit, args.scalar_type, args.scalar_unit)
         if args.command == "cube-check":
             report = check_cube(args.path, options)
             emit(report, args.output)
+        elif args.command == 'cube-planar':
+            report = write_planar_profile(args.path, args.output, args.axis, options)
+            print(f"Wrote {args.output} and {args.output}.json", file=sys.stderr)
         else:
             count = len(args.paths)
             lengths = args.input_length_units or [args.length_unit]*count

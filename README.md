@@ -2,13 +2,13 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.3.6 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.4.1 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 - Analysis remains read-only: no submission/execution or modification of existing
   inputs, restart files, or raw output.
 - The six MVP features have entry points, with additional `generate-input`,
-  `cube-check`, and `cube-diff` commands; calculations are never run automatically.
+  `cube-check`, `cube-diff`, and `cube-planar` commands; calculations are never run automatically.
 - The core uses Python's standard library; Rich styling and Matplotlib are optional.
 - Outputs include schema, units, SHA-256, line numbers, and original text.
   Missing values are not zero.
@@ -30,9 +30,65 @@ input generation; version 0.3.3 adds BHandHLYP, M06-2X and configurable PBEh.
 All 21 referenced DFT selections now have bounded generation support; this is
 not full Multiwfn feature/combination coverage.
 
-## Current version: 0.3.6
+## Current version: 0.4.1
 
-Software stays at **0.3.6** by explicit user request during ADMM/RI-HFX development.
+Version **0.4.1** adds opt-in native electrostatic-potential and frontier-orbital
+CUBE print settings for CP2K target **2026.2**, GPW pseudopotentials and Gamma.
+Both are off by default; existing density output and hybrid scope are retained.
+
+```bash
+cp2kkit generate-input water.xyz -o water-fields.inp --periodic NONE \
+  --electron-density --hartree-potential --mo-cubes --write-json
+
+# Diagonalization: explicitly provide sufficient virtual orbitals.
+cp2kkit generate-input water.xyz -o water-orbitals.inp --periodic NONE \
+  --scf diag --added-mos 2 --mo-cubes --mo-nhomo 2 --mo-nlumo 2
+```
+
+Menu **-3/601** retains density choice 1, adds potential/orbital toggles 2/3,
+and choice 0 clears all CUBE requests including stride/count overrides.
+Direct IDs: **607** orbitals, **608/609** occupied/virtual counts per spin,
+**610** potential, **605** shared stride.
+CP2K's native potential has **opposite sign to physical ESP**; no conversion is
+performed. Orbitals are signed amplitudes, not densities. UKS emits separate
+alpha/beta orbitals. OT virtuals need additional post-SCF eigensolver work;
+diagonalization requires explicit sufficient ADDED_MOS. Frontier orbitals with
+smearing, and new-field GAPW/xTB/non-Gamma/legacy-target support, are excluded.
+See [settings and limitations](docs/input-generation.md#potential-and-frontier-orbital-cubes-041).
+Input generation alone is keyword/source checked, not proof of native execution.
+The [three-case CUBE preparation protocol](docs/cube-native-validation.md) and
+`examples/cube-validation/prepare.py` stage matched H2O RKS OT/diagonalization and
+H2O+ UKS OT inputs using checked actual data in a new directory only. They do not
+execute CP2K, generate submission scripts or infer convergence/exit success.
+Small [native-format excerpts](docs/cube-native-validation-results.md) cover
+version, SCF/virtual-spin and CUBE-header formatting without distributing private
+execution details. They do not establish clean exit, scientific certification or
+expanded legacy generator support.
+The [offline audit example](examples/cube-validation/README.md) reuses shared
+parsers to record independent identities/convergence/CUBE/exit checks in a new
+report directory. Small provenance-tagged native excerpts supplement synthetic
+regressions; no public audit CLI/API, execution or submission system is added.
+See [0.4.1 closeout and remaining gates](docs/closeout-0.4.1.md).
+
+### Density stage (0.4.0)
+
+Version **0.4.0** starts the density/surface workflow stage. New `cube-planar`
+exports native-grid plane averages, full-slab electron integrals and cumulative
+profiles to overwrite-protected CSV plus provenance JSON, including skew cells
+and electron/spin differences. It does not infer Bader charges or fragment charge
+transfer. The [surface example](examples/surface-density/README.md) prepares three
+small fixed-geometry h-BN adsorption bundles (H2O, NH3, CO2; nine ENERGY inputs),
+without execution/submission. See [density profiles](docs/cube.md#5-native-grid-plane-profiles-040).
+
+Format/arithmetic checks and synthetic regressions do not certify clean native
+execution or scientifically validated adsorption/electron-transfer results.
+Private execution diagnostics are not distributed. See
+[validation boundaries](docs/surface-density-validation.md).
+
+### Retained 0.3.6 hybrid scope
+
+The prior explicit 0.3.6 version freeze ended with the user-assigned 0.4.0 stage;
+hybrid defaults and supported combinations remain unchanged.
 Version **0.3.6** adds the minimal ordinary **ADMM + RI-HFX** combination:
 CP2K target 2026.2, PBE0, classic MOLOPT/UCL GPW, Gamma, PERIODIC NONE,
 closed-shell RKS without explicit magnetism, OT, ENERGY and RI_METRIC HFX only.
@@ -49,6 +105,9 @@ ADMM and RI remain unchanged, as do menu IDs 121/122/223 and schema 0.1.0.
 Small-system smoke checks do not establish general scientific accuracy, force
 accuracy or speedup, or broaden the supported combinations. No Multiwfn execution
 is claimed. See [combination scope and limits](docs/input-generation.md#ordinary-admm--ri-hfx-036).
+The [stabilization baseline](docs/input-generation.md#stabilization-baseline-036)
+separates all six acceleration modes and freezes their current scope with a
+cross-mode synthetic regression matrix; it does not widen support or certify CP2K execution.
 A [six-case native validation preparation protocol](docs/admm-ri-native-validation.md)
 and `examples/admm-ri-validation/prepare.py` stage matched water inputs/data in a
 new directory only; they do not run CP2K or submit jobs.
@@ -65,13 +124,11 @@ hartree/bohr despite global LOW verbosity. A source-derived periodic HSE06 range
 preflight warns without changing the cell, operator or screening thresholds.
 CLI/config/menu IDs, physical defaults and schema **0.1.0** are unchanged.
 
-**RI-HFX remains experimental.** The returned suite supplied 71 input-matched,
-SCF-converged outputs, but all 71 reported late SIGSEGV with `_dl_fini` frames;
-one reference remained a stale path-error result. All 16 geometry optimizations
-reported convergence, but force accuracy and reliable speedup remain unverified.
-Periodic HSE06 also raised range/cell warnings. These observations are not clean
-execution or scientific certification, and the new generator fixes have not been
-rerun natively. See [findings and compatibility](docs/input-generation.md#hybrid-returned-run-hardening-035).
+**RI-HFX remains experimental.** Force accuracy, numerical convergence and reliable
+speedup remain unverified. Periodic HSE06 needs an independent range/cell review.
+Source checks and software regressions are not clean execution or scientific
+certification. Private runtime diagnostics are not distributed. See
+[findings and compatibility](docs/input-generation.md#hybrid-returned-run-hardening-035).
 
 Version **0.3.5** adds opt-in **PBE0/HSE06 Gamma RI-HFX** at menu **121** /
 `--ri-hfx`, plus a [hybrid acceleration capability matrix](docs/input-generation.md#ri-hfx-and-hybrid-acceleration-matrix-035).
@@ -214,8 +271,8 @@ Target-version coverage: **GFN1 on 2024.2-2026.2**, **GFN0 from 2025.1**,
 explicitly; no model substitution. GFN1 defaults to OT. GFN2 OT generation is
 enabled only for target **2026.2**; legacy targets **2025.2/2026.1 require explicit
 `--scf diag`** (menu 320). Omitted/default OT is rejected before writing, never
-silently replaced. This guard follows a local 2026.1 tblite/OT crash; 2025.2 is
-conservatively restricted without native validation. GFN0 is non-SCC and needs D4 build support. Legacy tblite
+silently replaced. This is a conservative generator compatibility policy, not
+certification of installed builds. GFN0 is non-SCC and needs D4 build support. Legacy tblite
 syntax differs from 2026.2; ACCURACY/native SCC controls are emitted only
 where available. GFN2 OT convergence uses EPS_SCF; 2026.2 native SCC with diag
 uses ACCURACY. Linked-build availability is user-asserted, not detected.
@@ -225,9 +282,8 @@ no additional DFT-D correction is added. xTB does not use MOLOPT/GTH or the
 DFT valence table. Incompatible nondefault DFT/density requests fail explicitly.
 Periodic/open-shell/CELL_OPT/CDD/+U and custom refits remain outside this subset.
 See [model/data/solver details](docs/input-generation.md#gfn-xtb-methods-031).
-Earlier user-authorized water diagnostics found GFN2 diagonalization converged on
-local 2026.1/git:5e54ba2, while OT crashed; local 2026.2/git:c92cc08 OT converged.
-These narrow build-specific checks are not general CP2K/tblite certification.
+Private installation diagnostics are not distributed. Source checks and narrow
+compatibility observations are not general CP2K/tblite certification.
 Changing `--cp2k-version` does not upgrade the actual executable.
 
 ### Retained non-hybrid DFT profiles
@@ -560,6 +616,7 @@ python -m cp2kkit generate-input AB.extxyz -o AB-density.inp --project AB \
 python -m cp2kkit cube-check AB.cube -o AB-cube-check.json
 python -m cp2kkit cube-diff AB.cube A.cube B.cube -o delta-density.cube
 python -m cp2kkit cube-check delta-density.cube
+python -m cp2kkit cube-planar delta-density.cube --axis z -o delta-planar.csv
 ```
 
 Generation supports `--electron-density`, `--spin-density`, and `--cube-stride`.

@@ -1,6 +1,6 @@
 """Header-only all-electron audit of the user-supplied CP2K tree.
 
-Reference root: /home/xwp/soft/cp2k-2026.2; REVISION git:c92cc08.
+Reference root: CP2K_SOURCE_ROOT; REVISION git:c92cc08.
 This is a local source/data identity, NOT verified equivalence to upstream v2026.2
 or an executed binary. No coefficients or nuclear potential parameters bundled.
 First release conservatively limits every enabled family to audited H--Kr entries;
