@@ -559,6 +559,23 @@ class CLIInteractiveTests(unittest.TestCase):
 
 
 class PresentationTests(unittest.TestCase):
+    def test_nonpositive_terminal_width_falls_back_without_changing_positive_widths(self):
+        for width, columns, expected in ((None, 0, 80), (None, -1, 80),
+                                         (-1, 40, 80), (40, 0, 40),
+                                         (1, 0, 1), (None, 40, 40)):
+            with self.subTest(width=width, columns=columns), patch(
+                    'cp2kkit.presentation.shutil.get_terminal_size',
+                    return_value=os.terminal_size((columns, 24))):
+                stream = TTY()
+                presenter = Presenter(stream, plain=True, width=width)
+                self.assertEqual(presenter.width, expected)
+                presenter.show('Input preview')
+                rendered = stream.getvalue()
+                self.assertEqual(rendered.replace('\n', ''), 'Input preview')
+                if expected >= len('Input preview'):
+                    self.assertEqual(rendered, 'Input preview\n')
+                self.assertTrue(all(len(line) <= expected for line in rendered.splitlines()))
+
     def test_plain_no_color_and_missing_rich_have_no_escape_sequences(self):
         for plain, env in ((True, {}), (False, {'NO_COLOR': ''})):
             with patch.dict(os.environ, env, clear=True):

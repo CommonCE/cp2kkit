@@ -1,7 +1,7 @@
 # Recorded Multiwfn official terms
 
 - Official source: http://sobereva.com/multiwfn/download.html
-- Last website-terms check (UTC): 2026-10-13
+- Initial website-terms check (UTC): 2026-10-13
 - Development source version listed at that check: 2026.10.1
 - Scope: LICENSE INFORMATION excerpts, not a full website archive.
 
@@ -25,6 +25,17 @@ change: recheck before release and record applicable terms for new upstream vers
 Official note following that section:
 
 > Whenever possible, please mention and cite Multiwfn in main text rather than in supplemental information, otherwise not only Multiwfn will be difficult for readers to notice, but also the paper will not be included in citation statistics.
+
+## 0.4.3 final-validation terms recheck
+
+On 2026-11-12 (UTC), the official source URL above was opened again. LICENSE
+INFORMATION clauses (a)-(d) and the following citation note retain the substantive
+wording recorded above, including the prior-consent requirement for selling a
+modified version. This is a terms-page observation, not a new author grant or
+whole-project licensing conclusion. The page now advertises Multiwfn 2026.11.12;
+that does not change the inspected development reference 2026.10.1 or its source
+identities recorded in provenance. No new upstream source or executable was
+incorporated during this verification. Historical excerpts remain unchanged.
 
 ## Project status and recording rules
 

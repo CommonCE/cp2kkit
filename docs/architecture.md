@@ -1,4 +1,4 @@
-# cp2kkit v0.4.2 architecture
+# cp2kkit v0.4.3 architecture
 
 ## Design principles
 
@@ -18,6 +18,22 @@ No submission system or deferred Bader/PDOS/NEB post-processing is introduced.
    ordinary single-input generation alone may atomically replace regular .inp,
    never sources/data/symlinks. Density bundles require all requested targets to be new.
 7. **Minimal dependencies:** standard-library core, isolated optional plotting/Rich presentation, no ASE requirement.
+
+## Vibrational input task (0.4.3)
+
+`vibration.py` owns the bounded task policy, numerical presets, source identities
+and top-level finite-difference section. `inputgen.generate_input` validates new
+requests before method/workflow dispatch, then checks resolved spin, basis and
+boundary conditions. The molecular MT preset checks the emitted orthorhombic
+cell and displaced atomic envelope without changing source/user cell or SCF
+choices; unavailable electronic-density containment is explicitly unverified.
+Existing geometry/data resolution, provenance and staged
+publication remain shared. CLI/TUI expose semantic settings, not copied science
+rules; config/replay retain optional requests and distinguish effective presets.
+The task explicitly enables native PROGRAM_RUN_INFO diagnostics at global LOW
+verbosity without adding output interpretation or changing force calculations.
+This is generation only, with no task execution, frequency parser or automatic
+optimization-to-frequency chain. See [task scope](input-generation.md#molecular-vibrational-inputs-043).
 
 ## Producer and consumer responsibilities
 
@@ -41,6 +57,10 @@ CLI and exchange schema must be useful to independent consumers.
 Project independence does not change third-party provenance, citations or terms;
 see [third-party notices](../THIRD_PARTY_NOTICES.md). It does not establish
 redistribution permission or assign a project license.
+
+Public integration semantics are indexed in [consumer contracts](contracts.md).
+Feature contracts describe existing interfaces, not a second validation layer
+or private consumer model; executable baselines remain consumer-independent.
 
 ## Modules and dependency direction
 

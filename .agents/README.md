@@ -11,6 +11,7 @@ Start a session with the [development rules](DEVELOPMENT.md), then choose a temp
 |---|---|
 | [Implement a feature](prompts/implement-feature.md) | Add features/fix defects while preserving unrelated interfaces and behavior |
 | [Reference Multiwfn](prompts/multiwfn-reference.md) | Inspect upstream source, extend CP2K generation in stages, and record provenance |
+| [Maintain a public contract](prompts/maintain-contract.md) | Assess consumer-visible changes, update existing contracts and test public behavior without consumer dependencies |
 | [Review](prompts/review.md) | Read-only review of implementation, scientific settings, tests, and authorization |
 | [Update version and documentation](prompts/update-version-docs.md) | Bump once per feature round, update documentation/changelog, and verify consistency |
 
@@ -43,5 +44,8 @@ these templates are not a universal automatic-loading entry point.
   and function IDs, basis registry numbers and atom indices are separate namespaces.
 - Keep third-party authorization/provenance in [notices](../THIRD_PARTY_NOTICES.md)
   and `third_party/`, not here or in ignored directories.
+- Public interface work includes contract impact assessment, documentation and
+  applicable executable tests; see the [contract index](../docs/contracts.md).
+  Internal-only changes do not automatically need a new contract or schema.
 - Recheck these templates as implementation changes. Do not freeze obsolete test
   counts, environment paths, or unverified compatibility claims.

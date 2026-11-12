@@ -24,7 +24,12 @@ Requirements:
 4. Verify scientific keywords/formats against the actual target-version manual/source.
    Record actual external sources affecting implementation; do not invent defaults.
 5. Check terms and record provenance/citations before referencing third-party implementations.
-6. Add normal/error/boundary/overwrite-protection tests; run focused tests, then
+6. Assess the public contract impact using `docs/contracts.md` and, where
+   applicable, `.agents/prompts/maintain-contract.md`. Update existing contracts
+   and small executable examples/tests for changed API/CLI/config/replay, defaults,
+   output meanings, errors or file effects. Do not require a new document/schema
+   for internal-only changes or invent an interface to fill a template.
+   Add normal/error/boundary/overwrite-protection tests; run focused tests, then
    regression and syntax checks.
 7. Change development goals only when requested. After a feature round, follow
    `.agents/prompts/update-version-docs.md` and update version/changelog/documentation once.

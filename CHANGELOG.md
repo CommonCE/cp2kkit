@@ -8,6 +8,67 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.4.3
+
+- Fall back to 80 columns when terminal width is nonpositive, including Python
+  3.10 unsized PTYs; preserve positive explicit/detected widths. Add deterministic
+  presentation coverage and retain the real-PTY generation test. Source regression
+  passes on Python 3.10.22 (681 tests, three optional plotting skips) and 3.12.16
+  (681 tests, no skips). New sdist/wheel-from-sdist, extracted-sdist regression
+  and isolated installed-core/API/CLI/PTY checks pass on both runtimes; previous
+  artifacts remain untouched. This release-candidate fix keeps user-assigned 0.4.3;
+  generation settings, machine-readable contracts and schema 0.1.0 are unchanged.
+
+- Initially verify sdist, wheel-from-sdist and clean core-only installed API/CLI/contracts
+  on Python 3.12.16/Linux; source and extracted-sdist suites each pass 680 tests.
+  Audit archive contents, metadata and required third-party documents; recheck
+  recorded Multiwfn website terms without inferring a new license/grant.
+  This initial check covered Python 3.10 grammar only; the controlled runtime
+  follow-up and terminal-width fix are recorded above and in the closeout.
+  Broader platform/optional-extra installation coverage remains unverified.
+  No publication implied.
+
+- Complete the consumer-facing vibrational generation contract and public
+  synthetic selected-field/API/CLI/replay/error/protection baseline, with a
+  shared contract index and reusable contract-maintenance prompt. Make contract
+  impact assessment part of feature/review/documentation completion. Existing
+  runtime interfaces and exchange schema are unchanged; this does not certify
+  integration with any specific consumer. Include the synthetic geometry in the
+  sdist manifest rules without claiming a new package build.
+
+- User-assigned software version. Add VIBRATIONAL_ANALYSIS generation for target
+  CP2K 2026.2, isolated Gamma PBE/classic MOLOPT-UCL GPW, closed-shell RKS and
+  OT/STRICT only. Unsupported combinations fail without automatic model repair.
+- Add optional vibration_displacement_bohr (CLI --vibration-displacement-bohr,
+  TUI 640) with explicit bohr units, auto 0.01. Set task EPS_SCF auto 1e-8
+  (explicit values must be <=1e-8), task QS EPS_DEFAULT 1e-14, explicit
+  NPROC_REP 1, FULLY_PERIODIC F, INTENSITIES F and THERMOCHEMISTRY F.
+- Reuse shared structures, basis/potential and spin resolution, config/replay,
+  origin metadata, source hashes and protected staged writing. Schema stays
+  0.1.0 with optional generator fields; prior task text defaults and the 0.4.2
+  output observation contract remain unchanged.
+- Add the molecular MT/PERIODIC NONE Poisson preset for isolated orthorhombic
+  cells. Preserve source/user cells and SCF choices;
+  reject skew cells, too-small displaced-atom envelopes or misplaced atoms
+  rather than resizing/recentering them. Record solver origin and the necessary
+  geometric check, explicitly not electronic-density containment. Old task text,
+  configuration interfaces, software 0.4.3 and schema 0.1.0 stay unchanged.
+- Explicitly enable native vibrational PROGRAM_RUN_INFO diagnostics to stdout
+  without raising global LOW verbosity or changing scientific settings. Record
+  print origin in optional metadata/review; warn that the native Minimum
+  Structure label is not optimization evidence and output may be large.
+  Reject single-atom vibration requests and DX values that round away at
+  generated coordinate precision, with no new public configuration fields.
+- No optimized-geometry inference, frequency parsing, IR/Raman, thermochemistry,
+  periodic phonons, automatic SCF-solver changes, calculations or submission. Tagged-source
+  checks and synthetic tests do not certify native acceptance or convergence.
+  Third-party provenance records actual reference use and upstream differences.
+- Close the bounded input-generation stage with 673 passing source regressions,
+  unchanged legacy-task comparison matrices and a separately authorized final
+  native smoke check of execution, SCF and diagnostic output. This is neither
+  a converged scientific reference nor a release/build certification. See
+  docs/closeout-0.4.3.md; machine-specific execution records remain local-only.
+
 ## 0.4.2
 
 - Complete the observation-contract development stage with 655 passing source

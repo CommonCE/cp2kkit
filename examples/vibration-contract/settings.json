@@ -1,0 +1,16 @@
+{
+  "project": "vibration-contract",
+  "run_type": "VIBRATIONAL_ANALYSIS",
+  "cp2k_version": "2026.2",
+  "method": "DFT",
+  "functional": "PBE",
+  "basis": "molopt-sr-dzvp",
+  "periodic": "NONE",
+  "charge": 0,
+  "multiplicity": null,
+  "scf": "ot",
+  "ot_algorithm": "STRICT",
+  "eps_scf": null,
+  "vibration_displacement_bohr": null,
+  "write_json": true
+}

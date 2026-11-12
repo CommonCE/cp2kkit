@@ -1,0 +1,88 @@
+{
+  "schema_version": "0.1.0",
+  "generator": {
+    "name": "cp2kkit"
+  },
+  "target_software": "CP2K",
+  "target_version": "2026.2",
+  "runtime_version": null,
+  "runtime_validated": false,
+  "settings": {
+    "project": "vibration-contract",
+    "run_type": "VIBRATIONAL_ANALYSIS",
+    "periodic": "NONE",
+    "charge": 0,
+    "multiplicity": 1,
+    "eps_scf": null,
+    "vibration_displacement_bohr": null,
+    "write_json": true
+  },
+  "effective_eps_scf": 1e-8,
+  "poisson_solver": "MT",
+  "basis_validation": {
+    "status": "unverified_template",
+    "runtime_validated": false,
+    "runnable_verified": false
+  },
+  "source_structure": {
+    "coordinate_unit": "angstrom",
+    "cell_unit": "angstrom",
+    "atom_count": 3,
+    "frame": 0,
+    "cell": null,
+    "pbc": null
+  },
+  "generated_structure": {
+    "coordinate_unit": "angstrom",
+    "cell_unit": "angstrom",
+    "atom_count": 3,
+    "frame": 0,
+    "pbc": [
+      false,
+      false,
+      false
+    ],
+    "cell": [
+      [11.52, 0.0, 0.0],
+      [0.0, 10.0, 0.0],
+      [0.0, 0.0, 10.58]
+    ]
+  },
+  "coordinates_translated": true,
+  "vibrational_analysis": {
+    "algorithm": "central_finite_difference_of_forces",
+    "displacement_bohr": 0.01,
+    "displacement_origin": "native_default_explicit",
+    "eps_scf": 1e-8,
+    "eps_scf_origin": "task_preset",
+    "qs_eps_default": 1e-14,
+    "qs_eps_default_origin": "task_preset",
+    "poisson_solver": "MT",
+    "poisson_solver_origin": "task_preset",
+    "nproc_rep": 1,
+    "nproc_rep_origin": "native_default_explicit",
+    "fully_periodic": false,
+    "intensities": false,
+    "thermochemistry": false,
+    "program_run_info": true,
+    "program_run_info_origin": "task_preset",
+    "stationary_point_verified": false,
+    "runtime_validated": false,
+    "mt_box": {
+      "density_extent_verified": false
+    }
+  },
+  "force_output": {
+    "explicit_print": false,
+    "section": null,
+    "destination": null,
+    "unit": null,
+    "runtime_validated": false
+  },
+  "motion_output": {
+    "enabled": false
+  },
+  "constraints": {
+    "enabled": false
+  }
+}

@@ -14,7 +14,7 @@ Read the materials relevant to the task:
 
 - [README](../README.md) and [project configuration](../pyproject.toml).
 - [Architecture](../docs/architecture.md) and [roadmap](../docs/roadmap.md).
-- [Schema](../docs/schema.md) for data exchange; [input generation](../docs/input-generation.md)
+- [Public contracts](../docs/contracts.md) and [schema](../docs/schema.md) for consumer interfaces/data exchange; [input generation](../docs/input-generation.md)
   for input generation; [menu numbering/allocation](../docs/menu-numbering-draft.md)
   for implemented routing/migration and separately labeled future reservations.
 - [Third-party notices](../THIRD_PARTY_NOTICES.md), [Multiwfn terms](../third_party/multiwfn/TERMS.md),
@@ -90,6 +90,28 @@ port or evidence of validation with the actual software.
 - Use the configured Python environment. Check installed/declared dependencies before
   installing only necessary missing packages; do not upgrade unrelated packages.
 
+### Public contract completion gate
+
+- For every externally visible feature/fix, assess public API/CLI/config/replay,
+  output meanings/defaults/units, errors and filesystem effects against the
+  [contract index](../docs/contracts.md). Follow the
+  [contract-maintenance prompt](prompts/maintain-contract.md) when applicable.
+- Update the smallest relevant existing contract/schema section and executable
+  examples/tests; create a new contract only for a useful distinct boundary.
+  Internal-only changes may need no contract edit. Do not invent runtime APIs,
+  add a contract framework or duplicate scientific validation to fill a template.
+- Document absence/null/zero/false, normalized-versus-requested values, origins,
+  provenance, validation limits and compatibility/migration. Output tolerance
+  does not imply unknown input keys are accepted. Evaluate software/schema
+  versions independently; do not change a schema solely for an additive feature.
+- Test public success/error behavior, applicable API/CLI/config/replay parity,
+  units/provenance and source/file protection using small independent fixtures.
+  Consumer mappings and private persistence stay downstream; no consumer repo,
+  credentials or actual scientific execution is a contract-test dependency.
+- Completion reporting must state contract impact (or why none), actual checks
+  and remaining gaps. Public interface work is not complete on implementation
+  alone, and producer tests do not certify a consumer adapter or scientific result.
+
 ## 3. Non-destructive operation and evidence
 
 - Analysis is read-only; generation creates new files only and never submits or runs CP2K.
@@ -113,8 +135,11 @@ port or evidence of validation with the actual software.
 - Do not commit scientific binaries, large outputs, or sensitive data.
 - Before commit/push, inspect the staged contents and commit identity for private
   account/host paths, job identities, execution timestamps, credentials and local
-  installation diagnostics. Keep raw evidence local; use explicit public aliases
-  or synthetic status fixtures without relabeling private failures as success.
+  installation diagnostics. Keep machine-specific problems, cluster job records
+  and installation diagnostics in the Git-ignored `/local-notes/` directory or
+  outside the repository, not in maintained documentation or changelogs. Keep
+  raw evidence local; use explicit public aliases or synthetic status fixtures
+  without relabeling private failures as success.
 
 ## 4. Scientific settings and validation boundaries
 

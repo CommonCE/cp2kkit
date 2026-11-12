@@ -37,6 +37,9 @@ workflows, parameter tables, defaults, or rewritten code. Record actual use hone
   file/subroutine/hash, use, differences, permission, and a future-entry template.
 
 Registered modules include `src/cp2kkit/inputgen.py` (generation),
+`src/cp2kkit/vibration.py` (0.4.3 bounded molecular finite-difference task,
+Multiwfn task/section/threshold references and independently checked CP2K v2026.2
+keyword/force paths; no upstream Fortran or numerical payload),
 `src/cp2kkit/spin_settings.py` (explicit Ueff/L and initial-spin KIND organization),
 `src/cp2kkit/method_profiles.py` (inspected parametrized-PBE/Libxc RPBE/q/reference branches),
 `src/cp2kkit/functional_registry.py` (0.3.0 non-hybrid XC/component/nonlocal

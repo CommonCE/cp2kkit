@@ -129,7 +129,9 @@ def build_parser():
     gen.add_argument("--scf", choices=["ot", "diag"], default="ot")
     gen.add_argument("--cutoff", type=float, default=400.0, help="Ry")
     gen.add_argument("--rel-cutoff", type=float, default=55.0, help="Ry")
-    gen.add_argument("--eps-scf", type=float)
+    gen.add_argument("--eps-scf", type=float, help="Auto: 1e-8 for vibration, 1e-6 otherwise; vibration requires <=1e-8")
+    gen.add_argument("--vibration-displacement-bohr", type=float,
+                     help="VIBRATIONAL_ANALYSIS finite-difference DX [bohr], finite and >0; auto: 0.01")
     gen.add_argument("--max-scf", type=int, help="Default: OT inner 25; diagonalization 128")
     gen.add_argument("--ot-algorithm", type=str.upper, choices=("IRAC", "STRICT"),
                      help="OT only: always emitted; default IRAC for every AE basis, STRICT for PP; explicit choice overrides")

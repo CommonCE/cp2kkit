@@ -8,6 +8,9 @@ class Presenter:
     def __init__(self, stream, plain=False, width=None):
         self.stream = stream
         self.width = width or shutil.get_terminal_size((80, 24)).columns
+        # Python 3.10 may return zero columns for an unsized PTY despite fallback.
+        if self.width <= 0:
+            self.width = 80
         self.console = None
         if not plain and 'NO_COLOR' not in os.environ and stream.isatty():
             try:

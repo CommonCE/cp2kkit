@@ -2,7 +2,7 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.4.2 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.4.3 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 cp2kkit is an independent CP2K toolkit, not an internal component of a workflow
@@ -10,7 +10,8 @@ platform. Its Python API, CLI and exchange contracts serve downstream consumers
 such as external workflow tools and result import adapters. Consumers own their
 internal models, persistence and workflow policies; installation and tests do not
 require a consumer repository, database or credentials. See the
-[producer/consumer boundary](docs/architecture.md#producer-and-consumer-responsibilities).
+[producer/consumer boundary](docs/architecture.md#producer-and-consumer-responsibilities)
+and [public contract index](docs/contracts.md).
 
 - Analysis remains read-only: no submission/execution or modification of existing
   inputs, restart files, or raw output.
@@ -37,7 +38,44 @@ input generation; version 0.3.3 adds BHandHLYP, M06-2X and configurable PBEh.
 All 21 referenced DFT selections now have bounded generation support; this is
 not full Multiwfn feature/combination coverage.
 
-## Current version: 0.4.2
+## Current version: 0.4.3
+
+Version **0.4.3** adds bounded **frequency/vibrational input generation**:
+CP2K target 2026.2, isolated Gamma PBE/classic MOLOPT-UCL GPW, closed-shell
+RKS and OT/STRICT only. The molecular task uses an explicit **MT Poisson**
+preset with PERIODIC NONE, preserving the isolated model and existing cell.
+A displaced-atom box check is necessary but cannot verify electronic-density
+containment; converge the box independently. Old tasks keep their defaults.
+No SCF solver or spin is changed to fit.
+Central finite differences of forces use explicit DX in bohr (auto 0.01),
+EPS_SCF auto 1e-8 (explicit values must be no looser), and task QS EPS_DEFAULT
+1e-14. Existing grid defaults are unchanged and must be converged independently.
+Native vibration diagnostics expose reference/displaced forces and Hessian
+information without changing global LOW verbosity. Single atoms and DX values
+that round away at generated coordinate precision are rejected. No intensities,
+thermochemistry, periodic phonons, output parsing or execution.
+
+```bash
+cp2kkit generate-input water.xyz -o water-freq.inp --periodic NONE \
+  --run-type VIBRATIONAL_ANALYSIS --write-json
+```
+
+TUI: select task at **-1**, then edit **640** (DX [bohr]) or **303** (EPS_SCF);
+review with `r`, generate with main-menu `0`. The supplied geometry is not
+assumed optimized: generation proves neither a stationary point nor vibrational
+convergence. See [support matrix, API and replay](docs/input-generation.md#molecular-vibrational-inputs-043).
+Schema remains **0.1.0**; previous task defaults and observation semantics remain.
+The bounded 0.4.3 input-generation stage is complete; see the
+[consumer contract](docs/vibration-contract.md),
+[public synthetic example](examples/vibration-contract/README.md) and
+[closeout and acceptance boundaries](docs/closeout-0.4.3.md). This is not a
+complete frequency-analysis platform, release publication or accuracy guarantee.
+Source regression was checked on Python 3.10.22 and 3.12.16/Linux, including
+unsized-PTY presentation. The core-only 3.10 run skips three optional plotting
+tests; the 3.12 development run has no skips. See the closeout for package and
+isolated installed-core acceptance scope.
+
+### Retained GEO_OPT observation stage (0.4.2)
 
 Version **0.4.2** stabilizes the GEO_OPT observation contract for downstream
 consumers: parser identity, explicit last-observed energy, step/SCF line evidence,

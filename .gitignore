@@ -7,6 +7,8 @@ dist/
 .coverage
 # Local scratch space for manual tests; regression tests/ remains tracked.
 /test-workspace/
+# Machine-specific notes and diagnostics; never publish as project documentation.
+/local-notes/
 # Expensive simulation outputs must not be committed.
 *.wfn
 *.cube

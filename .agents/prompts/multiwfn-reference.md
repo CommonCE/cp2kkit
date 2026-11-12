@@ -37,7 +37,10 @@ Workflow:
    claim clean-room development, or assume MIT compatibility.
 7. Test branches/invalid combinations, section structure, round-trip geometry,
    CLI/hashes/multi-file protection as needed. Synthetic tests do not certify CP2K execution.
-8. Update actual support/progress, not the long-term goal as completed.
+8. Assess and update the affected public contract via `docs/contracts.md` and
+   `.agents/prompts/maintain-contract.md`; reuse feature/schema rules and small
+   public-interface tests rather than copying scientific gates into new specs.
+   Update actual support/progress, not the long-term goal as completed.
 9. Follow `.agents/prompts/update-version-docs.md` after features. Update the
    software version, changelog, and documentation without conflating schema/CP2K versions.
 

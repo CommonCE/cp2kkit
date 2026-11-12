@@ -1,6 +1,9 @@
 # Exchange schema v0.1.0
 
-All JSON top levels include `schema_version: "0.1.0"`.
+Toolkit exchange exports include `schema_version: "0.1.0"` at the top level.
+Plain settings mappings are requests, not exchange exports; selected-field
+expectations are test artifacts, not complete exports. See the
+[public contract index](contracts.md).
 NaN/Infinity are prohibited. Unknown JSON values use null, CSV uses empty fields;
 actual zero values remain zero.
 
@@ -15,6 +18,46 @@ A renamed/removed/reinterpreted field would require a separate schema-version
 and migration decision, rather than silently reusing this contract. Conservative
 text-quality fixes are documented separately from schema compatibility.
 Structure and generated-input contracts are not changed by this batch.
+
+## Generated vibrational inputs (software 0.4.3)
+
+The [consumer contract](vibration-contract.md) specifies public calls, normalized
+settings, publication/errors and replay. The
+[synthetic example](../examples/vibration-contract/README.md) checks selected
+fields/types without freezing the entire manifest or requiring actual CP2K data.
+
+Schema remains 0.1.0. Optional `settings.vibration_displacement_bohr` is a finite
+positive number in bohr or null (auto); absence in old configs means auto. It is
+not an angstrom value. Non-null requests outside VIBRATIONAL_ANALYSIS fail rather
+than being ignored. `settings.eps_scf` retains its prior meaning; null now selects
+the task preset for the new task only. Existing tasks and parser observations
+retain their prior contracts.
+
+Optional top-level `vibrational_analysis` is null for ordinary non-vibrational DFT
+inputs and may be absent (including older manifests and xTB). For the new task
+it records `algorithm`, `displacement_bohr`, `displacement_origin`, `eps_scf`,
+`eps_scf_origin`, `qs_eps_default`, `qs_eps_default_origin`, `nproc_rep`,
+`nproc_rep_origin`, `fully_periodic`, `intensities`, `thermochemistry`,
+`stationary_point_verified`, `runtime_validated` and tagged `sources` (URL/SHA-256).
+Optional additions in the MT follow-up are `poisson_solver` (MT),
+`poisson_solver_origin` (task_preset) and `mt_box`: `cell_lengths_angstrom`,
+`displaced_atomic_span_angstrom`, `minimum_lengths_from_atoms_angstrom`,
+`check_scope` and `density_extent_verified` (false). They describe a necessary
+atomic-envelope check, not an observed electronic-density size. Top-level
+`poisson_solver` retains its meaning (the emitted effective solver); its value
+changes only for the new vibrational task. Existing settings/config fields and
+schema 0.1.0 remain unchanged.
+
+Optional `program_run_info` (true) and `program_run_info_origin` (task_preset)
+record explicit native vibration diagnostics to stdout at global LOW verbosity.
+They are print configuration, not parsed forces, stationarity or validation.
+No new configuration setting or public observed-result field is introduced.
+
+Origin labels distinguish user_explicit, task_preset and native_default_explicit.
+Requested nulls remain null in settings, so replay does not turn presets into
+user choices. The effective values are emitted explicitly. Validation flags stay
+false; this is not an observed Hessian or frequency result. No legacy field type
+or meaning changes. Unknown-key/optional-absence policy above still applies.
 
 ## Offline audit example boundary (0.4.1)
 

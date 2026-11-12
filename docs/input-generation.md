@@ -1,6 +1,6 @@
 # CP2K input generation
 
-This guide describes cp2kkit **0.4.1**. Older defaults and migration notes are in
+This guide describes cp2kkit **0.4.3**. Older defaults and migration notes are in
 [the changelog](../CHANGELOG.md). AE automatic setup is described in
 [the basis guide](basis-selection.md#all-electron-automatic-setup-027).
 The [registry-v1 basis guide](basis-selection.md) defines permanent numbering toward
@@ -70,6 +70,171 @@ never overwritten. With JSON off, existing sidecars are left untouched and warne
 as potentially stale. This changes input-generation defaults only, not analysis,
 structure-export or cube/plot output protections. No multi-file power-loss atomicity
 is promised.
+
+## Molecular vibrational inputs (0.4.3)
+
+This is a new **input task**, not frequency-output analysis or an execution
+workflow. It targets **CP2K 2026.2** only. The initial generator policy is
+intentionally narrower than native CP2K; excluded combinations are not claims
+that CP2K universally cannot calculate them. The bounded development stage is
+complete; the [consumer contract](vibration-contract.md) covers public calls,
+file effects and replay. See the [0.4.3 closeout](closeout-0.4.3.md) for actual checks, compatibility
+and the distinction between native input acceptance and scientific validation.
+
+| Dimension | Allowed | Rejected in this first subset |
+|---|---|---|
+| Boundary | Explicit/resolved PERIODIC NONE, Gamma; MT electrostatics; positive axis-aligned orthorhombic cell | Unknown PBC, any periodic direction, non-Gamma, skew/rotated cells |
+| Method | DFT/PBE, GPW, classic MOLOPT/UCL orbital registry and existing fixed-q GTH-PBE resolution | Other functionals, GAPW, UZH protocols, custom bases, xTB, +U, extra pair dispersion, ADMM/RI |
+| Spin | Closed-shell RKS, multiplicity 1; charge retained | UKS, multiplicity >1, any explicit magnetism (including empty UKS request) |
+| SCF | OT, STRICT (auto or explicit), no added MOs/smearing | diag, IRAC, smearing; no automatic solver switch |
+| Analysis | Molecules with at least two atoms; full central finite-difference Hessian from forces, rotation cleaning | Isolated single atoms (no internal vibrations), MODE_SELECTIVE, periodic phonons/dispersion, IR/Raman, thermochemistry |
+| Outputs/workflows | Native vibrational task defaults, existing source/manifest writer | CUBE requests and density-difference bundles |
+
+Every selected per-element orbital basis must belong to the classic protocol;
+existing element/q/data-availability gates still apply. In particular, UCL SR
+TZVP/TZV2P do not acquire missing H/C/N/O entries. Catalog-only generation is
+still labeled an unverified template; actual supplied data are hashed and
+checked using the existing resolver, not bundled or treated as converged bases.
+Even-electron charge states may be requested explicitly; electron/parity checks
+remain authoritative. Auto multiplicity retains the existing electron-parity
+rule; an odd-electron result is rejected, not forced into a singlet.
+
+### Parameters and numerical provenance
+
+- `--run-type VIBRATIONAL_ANALYSIS` / API `run_type` / TUI **-1** selects the task.
+- Optional `--vibration-displacement-bohr DX` / `vibration_displacement_bohr` /
+  **640** is the Cartesian increment for the **central difference of forces**.
+  The input emits `DX [bohr] ...`, not angstrom. Auto/null emits **0.01 bohr**,
+  matching the native default. The generator accepts finite positive numeric
+  values only (not Booleans/strings); zero/negative values are invalid because
+  the Hessian divides by `2*DX`. The inspected native keyword definition does
+  not supply a tighter numerical interval. No universal accuracy-safe interval
+  is implied: too small amplifies force noise, too large introduces truncation
+  error; converge DX for the property. A positive DX that rounds away when
+  added to or subtracted from the generated double-precision bohr coordinates
+  is rejected before writing. This is a floating-point resolvability check,
+  not a universal accuracy threshold or proof of well-conditioned differences.
+- `eps_scf=None` selects the **task preset 1e-8**, emitted for both OT inner and
+  outer SCF. Explicit `--eps-scf` must be finite, positive and **<=1e-8**;
+  looser requests fail rather than being tightened. This differs from the native
+  SCF default **1e-5** and Multiwfn's inspected vibration value **1e-7**.
+- QS `EPS_DEFAULT` is explicitly **1e-14**, a task preset following the inspected
+  Multiwfn derivative-task branch, not a measured error bound. This differs from
+  the retained ordinary derivative-task 1e-12. No general QS epsilon editor is
+  added. The existing **400/55 Ry** cutoff/relative-cutoff defaults, basis,
+  cell policy and OT iteration limits remain unchanged; converge them for forces
+  and low frequencies. Tighter thresholds alone do not guarantee convergence.
+- The molecular task emits **POISSON_SOLVER MT / PERIODIC NONE** as an explicit
+  task preset for isolated orthorhombic cells, replacing its initial WAVELET
+  choice. This does not change the boundary model or the SCF solver. No generic
+  Poisson chooser or new menu ID is added; old tasks keep their previous output.
+  MT ALPHA=7 and MT REL_CUTOFF=2 are native defaults, not emitted overrides.
+  The latter multiplies the MGRID cutoff and is distinct from MGRID REL_CUTOFF.
+  The task accepts positive axis-aligned orthorhombic cells (including non-cubic),
+  rejecting skew/rotated cells as a conservative generator policy. It does not
+  resize, rotate or recenter explicitly supplied/source cells or coordinates.
+  For each axis, the cell must exceed twice `(atomic span + 2*DX in angstrom)`
+  and contain every displaced atom. This is only a **necessary atomic-envelope
+  lower bound**, not verification that the cell is twice the charge-density
+  extent. MT can produce serious artifacts if electronic tails do not fit;
+  increase vacuum/choose a larger explicit cell and check molecular placement
+  and box convergence independently. Automatic 5-angstrom padding is retained,
+  not certified for arbitrary molecules or diffuse/charged states. Earlier
+  unreleased 0.4.3 vibration sidecars replay through this corrected preset and
+  therefore regenerate MT rather than byte-identical WAVELET input. Preserve
+  old failed runs and generate into new paths; no existing input/result is
+  automatically repaired. Old task replay behavior is unchanged.
+- `NPROC_REP 1` explicitly retains the native default: **processors per replica**,
+  not total processors and not a single-replica guarantee. CP2K derives replica
+  distribution from its MPI environment. This stage has no configurable replica
+  count, processor topology, scheduler resource or mode-selective controls.
+- Explicit `FULLY_PERIODIC F`, `INTENSITIES F`, `THERMOCHEMISTRY F` retain native
+  defaults. No dipole/polarizability, TC temperature/pressure or thermochemical
+  processing is requested. Global PRINT_LEVEL stays LOW, but the task explicitly
+  enables `VIBRATIONAL_ANALYSIS/PRINT/PROGRAM_RUN_INFO ON` to stdout. Its native
+  default MEDIUM would otherwise hide the displaced/reference energy and force
+  tables and Hessian diagnostics. These can be large (Hessian tables scale
+  quadratically with atom count). The native `Minimum Structure` heading refers
+  to the restored supplied geometry, **not** evidence that it was optimized or
+  is stationary. No automatic force assessment or frequency parser is added.
+  Native Molden/eigenvector print defaults remain; no new format control is
+  provided. Earlier unreleased vibration sidecars replay with this diagnostic
+  preset; legacy non-vibrational task output is unchanged.
+
+The manifest's optional `vibrational_analysis` records effective values,
+requested-vs-auto origins and tagged-source hashes. `settings` preserves null
+requests for replay. Review displays DX, EPS_SCF, QS EPS_DEFAULT and the MT Poisson task preset
+with origins, together with the unverified electronic-density extent and
+explicit diagnostic-print preset.
+All API/CLI/TUI/config/replay paths call the same validator and generator.
+
+A non-null displacement retained after changing to another task is an error,
+never silently emitted/ignored. In the TUI, return to the vibration task and
+reset **640** to `auto` before switching away; config/API reset to null/None.
+Previously supported fixed-atom/optimizer/trust-radius/trajectory controls retain
+the existing inactive-outside-optimization policy: no MOTION/constraints are
+emitted, fixed selections produce a warning, effective motion metadata is off.
+Other incompatible method/CUBE requests must be reset explicitly.
+
+### Explicit geometry and examples
+
+Use the existing public structure reader and select the desired frame explicitly.
+Neither a filename such as `final.xyz`, the last frame, a restart structure nor a
+frame index proves geometry convergence. Restart calculation settings are not
+inherited. The existing isolated-box construction/centering policy is unchanged;
+source and generated geometries remain distinct provenance.
+
+```python
+from cp2kkit.structure import read_structure
+from cp2kkit.inputgen import InputSettings, generate_input, write_input
+
+structure = read_structure("water.xyz", frame=0)
+settings = InputSettings(
+    periodic="NONE", run_type="VIBRATIONAL_ANALYSIS",
+    vibration_displacement_bohr=0.01, eps_scf=1e-8, write_json=True,
+)
+text, manifest = generate_input(structure, settings)  # No files or calculation.
+write_input(structure, settings, "water-freq.inp")  # Existing writer protections.
+# Reload a sidecar using InputSettings.from_config(manifest).
+```
+
+```bash
+cp2kkit generate-input water.xyz -o water-freq.inp --frame 0 --periodic NONE \
+  --run-type VIBRATIONAL_ANALYSIS --vibration-displacement-bohr 0.01 \
+  --eps-scf 1e-8 --write-json
+cp2kkit generate-input water.xyz --periodic NONE --interactive
+# -1 -> VIBRATIONAL_ANALYSIS; 640 -> DX; 303 -> EPS_SCF; r -> review;
+# p -> input/replay preview; main-menu 0 -> write, or w -> review/confirm.
+```
+
+Ordinary input replacement, exclusive JSON, source/data/hardlink protection and
+rollback behavior are unchanged. Schema **0.1.0** gains optional generator
+fields, not frequency observations; old configs omit DX and keep old defaults.
+
+### Source checks and limits
+
+The official [2026.2 vibrational manual](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/VIBRATIONAL_ANALYSIS.html)
+and tagged [input definition](https://github.com/cp2k/cp2k/blob/v2026.2/src/motion/input_cp2k_vib.F)
+establish the top-level section, DX units/default, replica semantics and the
+need for tight SCF and a stationary geometry. Tagged
+[vibrational_analysis.F](https://github.com/cp2k/cp2k/blob/v2026.2/src/motion/vibrational_analysis.F)
+`vb_anal` evaluates forces at +/-DX, builds `-(F(+DX)-F(-DX))/(2*DX)`, applies
+mass weighting and rotational/translational treatment, then diagonalizes.
+The replica force calls, Quickstep force driver and SCF input definitions are
+recorded with exact hashes in `vibration.py` and the generated manifest. This is
+finite differences of analytic forces, not an analytic electronic Hessian or
+linear-response vibration implementation. The minimal RKS/OT/PBE choice avoids
+expanding derivative/build/occupation claims to unreviewed existing methods.
+
+Multiwfn reference details, differences, citations and unchanged authorization
+limits are in [provenance](../third_party/multiwfn/PROVENANCE.md#molecular-vibrational-inputs-043).
+No Multiwfn source directory or executable is an installation/runtime dependency.
+
+**Generation does not verify a stationary point, a minimum, vibration
+convergence, native acceptance or physical validity.** Native input acceptance
+and independent SCF/force/grid/DX/box convergence checks require authorization
+and a new run directory; frequency interpretation/thermochemistry remain outside
+this task.
 
 ## Potential and frontier-orbital CUBEs (0.4.1)
 

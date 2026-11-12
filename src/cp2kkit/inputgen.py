@@ -41,6 +41,7 @@ from .admm import validate_admm, resolve_admm, admm_lines
 from .ri_hfx import validate_ri_hfx, resolve_ri_hfx, ri_dft_lines, acceleration_capabilities, qs_eps_default
 from .auxiliary_basis import DEFAULT_AUXILIARY_BASIS, auxiliary_option, parse_auxiliary_basis
 from .cube_output import PRINT_EACH, validate_cube_requests, resolve_extra_cubes, extra_cube_lines
+from . import vibration
 
 MULTIWFN_CITATIONS = (
     "Tian Lu, Feiwu Chen, J. Comput. Chem. 33, 580-592 (2012). DOI: 10.1002/jcc.22885",
@@ -57,7 +58,7 @@ DENSITY_DEFINITION_HASHES = {
     "2026.1": "e41fc1ae1c574eddf0faed59cede0e29208f460867bcc6bc89457f54d3c9fd7a",
     "2026.2": "2cef0bc8e85f0ec6c291a5c5101da55fea0658440c15647d42220f530c0aa2bc",
 }
-RUN_TYPES = ("ENERGY", "ENERGY_FORCE", "GEO_OPT", "CELL_OPT")
+RUN_TYPES = ("ENERGY", "ENERGY_FORCE", "GEO_OPT", "CELL_OPT", vibration.TASK)
 # cp2kmate.f90 Nval, restricted to matching SR basis/GTH-PBE entries
 # checked against CP2K data/BASIS_MOLOPT and data/GTH_POTENTIALS.
 _SR_ELEMENTS = ("H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn "
@@ -150,6 +151,7 @@ class InputSettings:
     mo_cubes: bool = False
     mo_nhomo: int = 1  # Per-spin frontier counts; zero omits this class.
     mo_nlumo: int = 1
+    vibration_displacement_bohr: float | None = None  # auto: explicit native DX 0.01 bohr
 
     @classmethod
     def from_config(cls, values, source_version=None):
@@ -295,6 +297,7 @@ def motion_lines(s, fixed_atoms):
 def generate_input(structure: Structure, settings: InputSettings, *, _common_ngrids=None):
     """Return complete input/manifest; optional workflow includes fragment manifests."""
     from .xtb import METHODS, generate_xtb
+    vibration.validate_request(settings)
     validate_cube_requests(settings)
     if settings.method not in METHODS:
         raise KitError(f'Unsupported method: {settings.method}')
@@ -362,7 +365,7 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
         raise KitError('EXTXYZ trajectory output is keyword-checked only for target CP2K 2026.2')
     if not math.isfinite(s.pressure):
         raise KitError("Pressure must be finite (bar)")
-    eps = s.eps_scf if s.eps_scf is not None else 1e-6
+    eps = s.eps_scf if s.eps_scf is not None else (vibration.DEFAULT_EPS_SCF if s.run_type == vibration.TASK else 1e-6)
     positive(eps, "eps_scf")
     uks = s.multiplicity > 1 or s.magnetism is not None
     density_enabled = s.electron_density or s.spin_density
@@ -405,6 +408,9 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
     extra_cubes, cube_warnings = resolve_extra_cubes(s, all_electron=all_electron,
                                                     electrons=electrons, uks=uks, stride=stride)
     periodic, positions, cell, translated = resolve_geometry(structure, s)
+    vib = vibration.resolve(s, periodic=periodic, all_electron=all_electron, uks=uks,
+                            elements=elements, cell=cell, positions=positions)
+    effective_qs_eps = vibration.EPS_DEFAULT if vib else qs_eps_default(s.run_type)
     if s.kpoints != (1, 1, 1) and (periodic != "XYZ" or s.scf != "diag"):
         raise KitError("Non-Gamma kpoints require XYZ periodicity and diagonalization (--scf diag)")
     if s.scf == "ot" and s.added_mos != 0:
@@ -413,11 +419,14 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
         positive(s.smearing, "smearing temperature")
         if s.scf != "diag" or s.added_mos < 1:
             raise KitError("Smearing requires diagonalization and positive added_mos")
-    solver = "PERIODIC" if periodic == "XYZ" else "WAVELET" if periodic == "NONE" else "ANALYTIC"
+    solver = vib['poisson_solver'] if vib else (
+        "PERIODIC" if periodic == "XYZ" else "WAVELET" if periodic == "NONE" else "ANALYTIC")
     warnings = ["Generated template is not CP2K-runtime validated; converge basis, cutoff and kpoints for the target property.",
                 "Only geometry/cell/PBC are read from the source; charge, spin, method and per-kind settings are NOT inherited."]
     warnings.extend(method_warnings)
     warnings.extend(cube_warnings)
+    if vib:
+        warnings.extend(vibration.WARNINGS)
     warnings.append('SCF/PRINT/RESTART BACKUP_COPIES 0 disables wavefunction restart backups, not restart writing; archive existing wavefunctions before running in a reused directory.')
     if s.fixed_atoms != 'off' and not optimizing:
         warnings.append('Fixed-atom selection is retained but inactive outside GEO_OPT/CELL_OPT.')
@@ -435,9 +444,9 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
                         'Charge/spin, functional, dispersion, cutoff/rel_cutoff and periodicity are preserved; numerical convergence is unverified.')
     if not all_electron and any('-SR-' not in record['basis'] for record in element_records.values()):
         warnings.append('Non-SR MOLOPT functions may increase cost/overlap ill-conditioning; converge basis and grid independently. Increasing CUTOFF does not complete the Gaussian basis.')
-    if periodic == "NONE":
+    if periodic == "NONE" and solver == 'WAVELET':
         warnings.append("WAVELET requires electronic density to vanish at cell faces; verify box size and molecular placement.")
-    elif periodic != "XYZ":
+    elif solver == 'ANALYTIC':
         warnings.append("Low-dimensional ANALYTIC Poisson solver converges slowly; check vacuum and electrostatic convergence.")
     if s.scf == "ot":
         warnings.append("OT without smearing is intended for gapped systems, not metals.")
@@ -559,7 +568,7 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
     lines += ['  &DFT', *(f'    BASIS_SET_FILE_NAME {cp2k_long_path(file)}' for file in emitted_basis_files),
               f'    POTENTIAL_FILE_NAME {cp2k_long_path(emitted_potential)}', f"    CHARGE {s.charge}",
               f"    MULTIPLICITY {s.multiplicity}", f"    UKS {'T' if uks else 'F'}", *ri_dft_lines(hfx),
-              "    &QS", f"      METHOD {qs_method}", f"      EPS_DEFAULT {scientific_number(qs_eps_default(s.run_type))}",
+              "    &QS", f"      METHOD {qs_method}", f"      EPS_DEFAULT {scientific_number(effective_qs_eps)}",
               *(f"      {key} {scientific_number(value)}" for key, value in (gapw['qs'] if gapw else {}).items()), "    &END QS",
               "    &MGRID", f"      CUTOFF [Ry] {num(s.cutoff)}", f"      REL_CUTOFF [Ry] {num(s.rel_cutoff)}",
               *([f"      NGRIDS {ngrids}"] if ngrids is not None else []), "    &END MGRID",
@@ -634,6 +643,7 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
                   '      FORCE_UNIT hartree/bohr', '    &END FORCES', '  &END PRINT']
     lines += ['&END FORCE_EVAL']
     lines += motion_lines(s, fixed_atoms)
+    lines += vibration.input_lines(vib)
     text = "\n".join(lines) + "\n"
     effective = Structure(structure.symbols.copy(), positions, [row.copy() for row in cell],
                           [axis in periodic for axis in "XYZ"], structure.source, structure.frame)
@@ -653,6 +663,7 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
                                               else 'selected-entry structure, aliases, q and source bytes only',
                                      'runtime_validated': False, 'runnable_verified': False},
                 "effective_eps_scf": eps, "poisson_solver": solver,
+                "vibrational_analysis": vib,
                 "restart_template": {"filename": restart_filename, "scf_guess": "RESTART",
                                      "enabled": False, "emitted": False, "filename_commented": False, "guess_commented": False,
                                      "naming_basis": "PROJECT and Gamma/non-Gamma default restart naming",

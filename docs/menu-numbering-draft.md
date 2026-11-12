@@ -2,15 +2,16 @@
 
 ## Status and scope
 
-**Software 0.4.1 retains menu layout v1, GFN-xTB and bounded hybrids/ADMM/RI-HFX,
-adding target-2026.2 GPW Gamma potential and frontier-orbital CUBE controls at
-607-610. Hybrid combinations retain their existing scope; distant feature
-allocations remain a draft, not a frozen future registry or a release claim.**
+**Software 0.4.3 adds bounded molecular vibrational DX at 640 and retains menu
+layout v1, GFN-xTB, bounded hybrids/ADMM/RI-HFX and target-2026.2 GPW Gamma
+potential/frontier-orbital CUBE controls at 607-610. Hybrid combinations retain
+their existing scope; distant feature allocations remain a draft, not a frozen
+future registry or a release claim.**
 
 Schema stays **0.1.0**. The authoritative implemented function registry is
 `src/cp2kkit/menu_registry.py`. Categories 100-600 contain applicable existing
-controls, density workflow 602 and CUBE controls 607-610; categories 700-1000 and other Planned entries below are
-not implemented or shown. This document does not authorize execution/submission.
+controls, density workflow 602, CUBE controls 607-610 and vibrational DX 640;
+categories 700-1000 and other Planned entries below are not implemented or shown. This document does not authorize execution/submission.
 The design baseline was 0.2.8; its function-number migration is now explicit.
 
 This records the discussed design: a compact, Multiwfn-style common-settings
@@ -337,7 +338,7 @@ not post-processing of existing results.
 | 622 | Band-path calculations | Planned |
 | 630 | Atomic population-charge analysis settings | Planned |
 | 631 | Localized orbitals / Wannier-related settings | Planned |
-| 640 | Vibrational analysis | Planned |
+| 640 | Vibrational finite-difference DX [bohr] | Implemented 0.4.3; select VIBRATIONAL_ANALYSIS at -1 first; auto = explicit 0.01 bohr; bounded isolated PBE GPW RKS OT/STRICT |
 | 641 | Finite-displacement / phonon input preparation | Planned |
 | 642 | IR/Raman-related preparation | Planned; method/workflow checks required |
 | 650 | TDDFT / excited-state settings | Planned |

@@ -10,6 +10,99 @@ non-distributed private locators, not public paths or downloadable datasets.
 Version/revision/file/hash evidence remains intact; original private mappings and
 execution diagnostics are not published. Their omission does not establish success.
 
+## Molecular vibrational inputs (0.4.3)
+
+- Local: `vibration.py`, InputSettings/inputgen, CLI/TUI/shared registry 640,
+  config/replay, and `tests/test_vibration.py`. Reference-based Python assembly,
+  not a clean-room claim or direct Fortran port. No upstream source/numerical
+  payload is bundled; no adjacent source/runtime dependency is introduced.
+- Actual supplied source rechecked: Multiwfn **2026.10.1**, development locator
+  `../Multiwfn_2026.10.1_src_Linux/cp2kmate.f90`, `outCP2Kinp`, SHA-256
+  `f533bcfe3db73265a1d768bbc68097c9a7851bdd6fbcde9c0600f151ea609402`.
+  Inspected task chooser at 853/869 (vibration choice 5, MEDIUM print level),
+  RUN_TYPE at 1363, derivative thresholds at 1786-1788 (EPS_SCF 1e-7,
+  EPS_DEFAULT 1e-14), and section assembly at 3419-3441 (DX 0.01 bohr,
+  NPROC_REP 1, thermochemistry, Gamma intensities, boundary-dependent rotation
+  cleaning and optional MOLDEN_VIB). These are workflow/template/preset
+  references, not evidence that the whole upstream matrix is supported.
+- Differences: local first subset requires isolated Gamma PBE classic GPW RKS
+  OT/STRICT, no dispersion/+U/CUBEs/workflow/acceleration. EPS_SCF auto is 1e-8
+  following the official vibrational input description rather than upstream
+  1e-7; looser explicit requests fail. Retain task QS EPS_DEFAULT 1e-14 but
+  existing grid/basis/spin/charge/solver choices are not silently modified.
+  DX is unit-explicit, configurable and finite positive, native auto 0.01.
+  INTENSITIES/THERMOCHEMISTRY are explicitly F; no dipole/TC controls copied.
+  Keep global LOW rather than upstream MEDIUM; explicitly enable the native
+  PROGRAM_RUN_INFO print key to stdout for displaced/reference forces and Hessian
+  diagnostics, retaining native Molden controls. Tagged input_cp2k_vib.F defines
+  PROGRAM_RUN_INFO at MEDIUM, while vibrational_analysis.F/vb_anal gates the
+  diagnostic tables on that print key. Its `Minimum Structure` heading labels
+  restored input coordinates, not an optimizer result. Existing hashes below
+  cover these inspected paths; no new upstream implementation is copied.
+  Reject isolated single atoms (no internal vibrational modes) and positive DX
+  values that round away at generated bohr-coordinate precision. Neither the
+  resolvability check nor diagnostics establish convergence. No automatic
+  geometry inheritance, optimization execution, mode/phonon support or output
+  interpretation.
+- User-authorized Poisson correction (version retained at 0.4.3): the new
+  molecular task now emits MT/PERIODIC NONE, leaving all older task defaults
+  unchanged. Rehashed the same actual Multiwfn source above. Additional inspected
+  outCP2Kinp branches: 756-770 (isolated selection uses WAVELET), 1434-1447
+  (automatic WAVELET cubic cell versus ordinary orthorhombic cells), 1950-1958
+  (PERIODIC forces XYZ while MT retains selected PBC), and determine_vacuumsize
+  3502-3531 (MT uses half the cluster span plus a 4-angstrom density-tail
+  heuristic per side; WAVELET uses a different padding/centering policy).
+  Local MT is an explicit requested task preset, not the upstream isolated
+  default or an asserted match to a newly executed Multiwfn result. Unlike
+  Multiwfn, do not auto-resize/recenter a supplied cell, alter selected vacuum,
+  or assert that 4 angstrom is a universally adequate tail. Check positive
+  axis-aligned orthorhombic cells, twice the displaced atomic span and displaced
+  atom containment; record electronic-density containment as unverified. No new
+  source/runtime dependency, coefficients or upstream implementation is copied.
+  The 5-angstrom automatic padding remains user-editable and unverified.
+  [Official MT manual](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/FORCE_EVAL/DFT/POISSON/MT.html)
+  warns that the cell must be twice the electronic-density size. Tagged
+  `input_cp2k_poisson.F` SHA-256
+  `cbd8e7446f05723800dd0550842ce966341fedd2cd14eb7e903ca5f73fa400a0`
+  defines the solver/PBC choices, warning and native MT ALPHA=7/REL_CUTOFF=2;
+  `pw/mt_util.F` SHA-256
+  `33b9978bd6bafda8b03a32806ac2117e0bb0597f983efcecf59e769368774b38`
+  was inspected for MT routing. Both use the tagged URL prefix below and are
+  included in generated source identities. Preserve the native Martyna1999
+  method reference. No build or numerical-accuracy guarantee is inferred.
+- Official version evidence: [2026.2 manual](https://manual.cp2k.org/cp2k-2026_2-branch/CP2K_INPUT/VIBRATIONAL_ANALYSIS.html),
+  actual tagged-source URL prefix `https://raw.githubusercontent.com/cp2k/cp2k/v2026.2/src/`:
+  - `motion/input_cp2k_vib.F`, `create_vib_section`: top-level controls/units,
+    default DX 0.01 bohr, per-replica processor meaning, stationary-state/tight-SCF
+    description; SHA-256 `a7a4fd4b7f427fa3c26f7182e2c1b2a98b4aa201ed60e46b60d5624bab285d8c`.
+  - `motion/vibrational_analysis.F`, `vb_anal`: +/-DX force calls, central
+    difference division by 2*DX (no positive range enforced by the inspected DX
+    keyword definition), mass weighting/rotation cleaning/eigensolve;
+    SHA-256 `4f8f911e5948ac5990b18a472ee0cf84fc8b103b356d62691224313e5b608965`.
+  - `replica_methods.F`, `rep_env_calc_e_f` / `rep_env_calc_e_f_int`: force
+    dispatch across replica environments; SHA-256
+    `c9ecc2b600f595ff9b21f4eaaf317ff0aa0b31fd092ba4cc27365245d999d7b7`.
+  - `qs_force.F`, `qs_calc_energy_force` / `qs_forces`: Quickstep electronic
+    energy/force path, GPW core/grid contributions; SHA-256
+    `ad1c3faee83409cf39913fd8935dac537e77c02b9799ae22ca1de0fca5a4bff0`.
+  - `input_cp2k_scf.F`: native inner/outer EPS_SCF 1e-5, outer-vs-inner
+    tolerance guidance and OT STRICT/IRAC definitions; SHA-256
+    `23f7fdd4abfdf64904f0c95ed6dd672f6ca645c0abb7f91b60347ab6693bacf1`.
+  - `start/cp2k_runs.F`: vib_anal dispatch to vb_anal; SHA-256
+    `4f476dbfe499822715ab20cfa1facd866508e9aa5cdf4a6c51e2cef713e82961`.
+  Hashes identify inspected bytes, not the user's executable/build or measured
+  force accuracy. Broader native method/spin/solver capabilities are not inferred.
+- Required Multiwfn 2012/2024 papers remain in generated headers/manifests and
+  source notices; Tian Lu's copyright/custom terms and [recorded terms](TERMS.md)
+  remain unchanged. No separate author grant, paid-distribution permission,
+  relicensing or whole-project license compatibility is inferred.
+- Synthetic small public geometry/data cover generation, interfaces and source/
+  output protection. Keyword/source checks and these regressions do not certify
+  a stationary point, numerical convergence or scientific validity. No Multiwfn
+  execution or general native/runtime certification is claimed. The
+  [0.4.3 closeout](../../docs/closeout-0.4.3.md) records bounded final-input
+  acceptance separately from scientific validation and upstream authorization.
+
 ## Potential and frontier-orbital CUBE settings (0.4.1)
 
 - Local: cube_output.py, InputSettings/CLI, existing selector extension at 601,

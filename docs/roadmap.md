@@ -1,6 +1,38 @@
 # Development status and next steps
 
-Current software: **0.4.2**; schema: **0.1.0**.
+Current software: **0.4.3**; schema: **0.1.0**.
+
+## Molecular vibrational input task (0.4.3)
+
+Complete the [bounded first task](input-generation.md#molecular-vibrational-inputs-043),
+with the [0.4.3 closeout](closeout-0.4.3.md) defining acceptance and deferred work:
+CP2K 2026.2, isolated Gamma PBE classic GPW closed-shell RKS OT/STRICT,
+central finite differences of forces. The user-authorized Poisson follow-up
+uses MT/PERIODIC NONE with orthorhombic/displaced-atom lower-bound checks,
+without automatic cell enlargement or a change to periodic electrostatics.
+Electronic-density extent and box convergence remain unverified. Shared
+API/CLI/TUI/config/replay and
+protected writer; explicit bohr DX, task SCF/QS presets and origin metadata.
+Other functionals/spins/solvers, extra dispersion, CUBEs, periodic phonons,
+intensities, thermochemistry and output analysis are outside this stage.
+Tagged-source/manual checks and synthetic tests are not native execution or
+scientific validation. Geometry is explicitly supplied, never inferred to be
+an optimized minimum. Actual acceptance/force/frequency convergence requires
+separate authorization and a new calculation directory. The final input passed
+one authorized small-molecule native execution/diagnostic-output check; this
+is not force/frequency precision convergence or universal runtime certification.
+The initial source closeout covered 673 tests, with no skips; the contract
+addendum and initial source/sdist verification reached 680. A subsequent
+terminal-width fix raises source coverage to 681 on Python 3.10.22 (three optional
+plotting skips) and 3.12.16 (no skips), including unsized PTY behavior. Broader
+platform/extra installation coverage remains unverified; see the closeout for
+installed-core/package acceptance. Version 0.4.3 is user-assigned,
+not a publication or schema-version decision. The final
+[consumer-contract baseline](vibration-contract.md) and
+[public example](../examples/vibration-contract/README.md) expose this producer
+boundary without consumer-specific models. The [contract index](contracts.md)
+and development prompts require proportionate contract impact assessment for
+future public interface changes; internal refactors need not create new specs.
 
 ## GEO_OPT consumer contract (0.4.2)
 

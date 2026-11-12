@@ -21,12 +21,16 @@ Requirements:
 3. For generation check software/version, method/basis/potential, dispersion,
    charge/multiplicity/KIND, PBC/Poisson/cell, SCF/k-points/smearing, constraints,
    and source-inheritance semantics.
-4. Review upstream versions/files/hashes, actual use, and notices. Citations,
+4. Check public API/CLI/config/replay and documented output/error/file effects
+   against `docs/contracts.md` and affected contracts. Flag incompatible meanings,
+   stale defaults, missing absence/provenance semantics or untested examples;
+   do not invent missing consumer capabilities or require duplicate specifications.
+5. Review upstream versions/files/hashes, actual use, and notices. Citations,
    public source, or a language rewrite do not automatically grant extra permission.
-5. Give each finding a severity, file/line, evidence, trigger, impact, and minimal fix.
+6. Give each finding a severity, file/line, evidence, trigger, impact, and minimal fix.
    Separate certain defects from risks requiring verification.
-6. If no definite defects are found, say so and list testing/runtime-validation gaps.
-7. Do not modify files, install packages, start calculations, or commit/push automatically.
+7. If no definite defects are found, say so and list testing/runtime-validation gaps.
+8. Do not modify files, install packages, start calculations, or commit/push automatically.
    Existing tests with temporary outputs may be run; report exactly what ran.
 
 List findings first, then validation and remaining risks.

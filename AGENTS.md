@@ -12,7 +12,7 @@ Read additional documents according to the task:
 
 - [README](README.md) and [project configuration](pyproject.toml) for scope and setup.
 - [Architecture](docs/architecture.md) for architectural changes.
-- [Schema](docs/schema.md) for data contracts.
+- [Public contracts](docs/contracts.md) and [schema](docs/schema.md) for consumer interfaces and data contracts.
 - [Input generation](docs/input-generation.md) for generator behavior and limits.
 - [Menu numbering](docs/menu-numbering-draft.md) for UI routing and identifiers.
 - [Third-party notices](THIRD_PARTY_NOTICES.md), [Multiwfn terms](third_party/multiwfn/TERMS.md),

@@ -52,6 +52,7 @@ GROUPS = (
         Field("cp2k_version", "Target CP2K version (not runtime certification)", choices=CP2K_VERSIONS))),
     ("Task and optimization", (
         Field("run_type", "Run type", choices=RUN_TYPES),
+        Field("vibration_displacement_bohr", "Vibrational DX [bohr] (auto: 0.01; finite positive)", "float", optional=True, positive=True),
         Field("optimizer", "Optimizer (optimization tasks only)", choices=("BFGS", "LBFGS", "CG")),
         Field("fixed_atoms", "Fixed atoms: 1-based indices/ranges (1,3-5); off/0 clears; fractional XYZ", "fixed_atoms"),
         Field("trust_radius", "TRUST_RADIUS [angstrom] (BFGS/LBFGS only)", "float", positive=True),
@@ -175,6 +176,7 @@ def visible_fields(fields, values):
                  and not (f.name == 'xtb_accuracy' and values.get('cp2k_version') != '2026.2')
                  and not (f.name in {'tblite_available', 'xtb_accuracy'} and values.get('method') != 'GFN2-xTB')
                  and not (f.name == 'gapw_profile' and not has_ae)
+                 and not (f.name == 'vibration_displacement_bohr' and values['run_type'] != 'VIBRATIONAL_ANALYSIS')
                  and not (f.name == 'pressure' and values['run_type'] != 'CELL_OPT')
                  and not (f.name in {'optimizer', 'max_iter', 'trust_radius', 'trajectory_format', 'fixed_atoms'} and values['run_type'] not in {'GEO_OPT', 'CELL_OPT'})
                  and not (f.name == 'density_difference' and (values['run_type'] != 'ENERGY' or has_ae))
@@ -526,6 +528,17 @@ class Menu:
             self.show("SCF wavefunction restart backups: 0; restart writing is not disabled")
             self.show(f"Restart suggestion (metadata only, inactive): {manifest['restart_template']['filename']}")
             self.show(f"SCF: {settings.scf}; Effective EPS_SCF: {manifest['effective_eps_scf']}; Poisson: {manifest['poisson_solver']}")
+            if manifest.get("vibrational_analysis"):
+                vib = manifest["vibrational_analysis"]
+                self.show(f"Vibration DX: {vib['displacement_bohr']} bohr [{vib['displacement_origin']}]; "
+                          f"EPS_SCF: {vib['eps_scf']} [{vib['eps_scf_origin']}]; "
+                          f"QS EPS_DEFAULT: {vib['qs_eps_default']} [task_preset]")
+                self.show(f"Poisson: {vib['poisson_solver']} [{vib['poisson_solver_origin']}]; "
+                          "MT atomic-envelope check only; electronic-density extent NOT verified; cell unchanged.")
+                self.show("Central finite differences of forces; NPROC_REP=1 (processors per replica); "
+                          "no intensities/thermochemistry; stationary point NOT verified.")
+                self.show("Vibrational PROGRAM_RUN_INFO: ON [task_preset]; forces/Hessian to stdout; "
+                          "native 'Minimum Structure' label is NOT optimization evidence.")
             self.show(f"Generated cell [angstrom]: {manifest['generated_structure']['cell']}")
             self.show(f"Coordinates translated: {manifest['coordinates_translated']}")
             for element, kind in manifest['kinds'].items():

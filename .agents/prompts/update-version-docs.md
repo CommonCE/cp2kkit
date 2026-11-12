@@ -41,10 +41,16 @@ Requirements:
    reconcile README, menu guide and `.agents` with the actual navigation/write policy,
    automatic defaults and naming. Keep planned allocations distinct from implemented
    registry entries; do not replace historical validation counts with current totals.
-6. Check version consistency; run focused tests, full regression, compileall,
+6. Assess public-contract compatibility via `docs/contracts.md` and follow
+   `.agents/prompts/maintain-contract.md` where applicable. Update the relevant
+   request/output/error/file/replay contract, index and executable examples/tests
+   rather than generating duplicate specs. Record when no public behavior changes;
+   distinguish optional additions from changed meanings/defaults and assess
+   software/schema versions separately. Do not infer downstream integration.
+7. Check version consistency; run focused tests, full regression, compileall,
    `git diff --check`, and `python -m cp2kkit --version`. Use counts from the
    actual run; state checks not run.
-7. Report old -> new version, changed documentation paths, actual validation,
+8. Report old -> new version, changed documentation paths, actual validation,
    and compatibility limitations in English unless another language is requested.
    A version bump is not publication or CP2K certification. Do not install, build,
    commit, or push automatically; preserve results and unrelated user files.
