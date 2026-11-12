@@ -2,8 +2,15 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.4.1 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.4.2 preliminary implementation**, not a production
 release certified with actual CP2K runs.
+
+cp2kkit is an independent CP2K toolkit, not an internal component of a workflow
+platform. Its Python API, CLI and exchange contracts serve downstream consumers
+such as external workflow tools and result import adapters. Consumers own their
+internal models, persistence and workflow policies; installation and tests do not
+require a consumer repository, database or credentials. See the
+[producer/consumer boundary](docs/architecture.md#producer-and-consumer-responsibilities).
 
 - Analysis remains read-only: no submission/execution or modification of existing
   inputs, restart files, or raw output.
@@ -30,7 +37,22 @@ input generation; version 0.3.3 adds BHandHLYP, M06-2X and configurable PBEh.
 All 21 referenced DFT selections now have bounded generation support; this is
 not full Multiwfn feature/combination coverage.
 
-## Current version: 0.4.1
+## Current version: 0.4.2
+
+Version **0.4.2** stabilizes the GEO_OPT observation contract for downstream
+consumers: parser identity, explicit last-observed energy, step/SCF line evidence,
+and damaged-record context. Add independently evidenced charge, multiplicity,
+UKS/spin-treatment and bounded QS-method normalization with conflict provenance.
+Schema remains **0.1.0**; existing `final_energy` still means last parseable
+observation, not final optimized energy. No final candidate, complete physical
+method, or output-to-structure association is claimed.
+See the [consumer contract and minimal examples](docs/geo-opt-contract.md) and
+[tested synthetic observation baseline](examples/geo-opt-contract/README.md).
+The [0.4.2 closeout](docs/closeout-0.4.2.md) records completed source regression,
+sdist/wheel and isolated core installation checks on Python 3.12.16. This is a
+completed development stage, not an immutable release or native validation.
+
+### Retained CUBE stage (0.4.1)
 
 Version **0.4.1** adds opt-in native electrostatic-potential and frontier-orbital
 CUBE print settings for CP2K target **2026.2**, GPW pseudopotentials and Gamma.

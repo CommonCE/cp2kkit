@@ -4,6 +4,18 @@ All JSON top levels include `schema_version: "0.1.0"`.
 NaN/Infinity are prohibited. Unknown JSON values use null, CSV uses empty fields;
 actual zero values remain zero.
 
+## Version policy and 0.4.2 contract review
+
+Software version and exchange version are independent. This round uses the
+user-assigned software 0.4.2, not the unpublished 0.5.0 proposal. Schema remains
+0.1.0: parser identity, observation evidence and normalized settings are optional
+additions; legacy fields/types/meanings and CSV columns are retained. Consumers
+must ignore unknown keys and tolerate new keys being absent from older producers.
+A renamed/removed/reinterpreted field would require a separate schema-version
+and migration decision, rather than silently reusing this contract. Conservative
+text-quality fixes are documented separately from schema compatibility.
+Structure and generated-input contracts are not changed by this batch.
+
 ## Offline audit example boundary (0.4.1)
 
 The [CUBE audit example](../examples/cube-validation/README.md) uses an explicitly
@@ -16,6 +28,7 @@ External status captures and fixture excerpt metadata are not core parser output
 
 ## Parse JSON
 
+- `parser`: name/version of the exporting tool (added in software 0.4.2), not CP2K.
 - `software`, `software_version`, `project`: output-derived; absent version/project is null.
 - `source`: absolute path, sha256, size_bytes.
 - `exit_status`: null; this version has no scheduler/process metadata.
@@ -46,6 +59,11 @@ Quantity:
 ```
 
 Energy fields: segment, index, nullable step, quantity, and its associated scf_converged.
+Software 0.4.2 adds nullable step_source/scf_source, scf_evidence (list), and
+scf_association (preceding_summary/ambiguous/unknown). Segment additions are
+last_observed_energy (full Energy or null) and unparsed_energy_context (list).
+See [GEO_OPT contract](geo-opt-contract.md) for exact semantics, null/absence,
+compatibility policy, limitations and consumer migration. No final candidate is exported.
 Total FORCE_EVAL records accept `[a.u.]` and `[hartree]` unit labels
 (case-insensitive); both serialize as `hartree` without numerical conversion.
 Original evidence retains the printed label. Unsupported units and malformed
@@ -53,7 +71,24 @@ records remain unparsed; energy extraction alone does not imply convergence.
 This compatibility fix does not change schema 0.1.0.
 SCF counts use iteration; wall_time uses s; coordinates/cells use angstrom.
 Settings retain original strings, source, and nullable unit; unknown semantics are
-not automatically converted to numbers.
+not automatically converted to numbers. Added in software 0.4.2:
+
+- `segments[].settings_records`: file-ordered `{key, value, unit, source}` records
+  for lines recognized by the existing settings matcher, retaining duplicates.
+  Legacy `settings` still keeps the latest value per key; software_version retains
+  its separate existing settings entry and is not a synthetic settings record.
+- `segments[].normalized_settings`: charge, multiplicity, spin_treatment, uks and
+  qs_method. Each has `{value, unit, status, sources}`; status is missing, parsed,
+  unsupported or conflicting. Non-parsed values are null, not defaults. Sources
+  include every recognized matching line. Charge is an integer in elementary_charge
+  (+1 means one electron removed), multiplicity a positive dimensionless integer.
+  spin_treatment is RKS/UKS/ROKS; uks is a Boolean from that exact printed branch
+  (false includes ROKS, not automatically RKS). qs_method supports GPW/GAPW only and
+  is not a complete calculation method. Other representations remain unsupported.
+- No magnetization/electron-difference/multiplicity substitution, XC reconstruction,
+  cross-segment inheritance or per-energy method identity is established. Conflicts
+  generate parser_warnings but do not redefine the existing text-quality rules.
+  See [source references, examples and limitations](geo-opt-contract.md#normalized-settings).
 
 ## CSV
 

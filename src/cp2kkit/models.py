@@ -26,6 +26,10 @@ class Energy:
     step: int | None
     quantity: Quantity
     scf_converged: bool | None = None
+    step_source: Evidence | None = None
+    scf_source: Evidence | None = None
+    scf_evidence: list[Evidence] = field(default_factory=list)
+    scf_association: str = "unknown"
 
 
 @dataclass
@@ -44,6 +48,11 @@ class Segment:
     diagnostics: list[Evidence] = field(default_factory=list)
     unparsed_energy_records: list[Evidence] = field(default_factory=list)
     settings: dict[str, Any] = field(default_factory=dict)
+    # Explicit observation, not a claim about the final optimized state.
+    last_observed_energy: Energy | None = None
+    unparsed_energy_context: list[dict[str, Any]] = field(default_factory=list)
+    settings_records: list[dict[str, Any]] = field(default_factory=list)
+    normalized_settings: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -60,4 +69,6 @@ class Run:
     exit_status: int | None = None
 
     def to_dict(self):
-        return asdict(self)
+        from . import __version__
+
+        return {**asdict(self), "parser": {"name": "cp2kkit", "version": __version__}}

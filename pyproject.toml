@@ -1,14 +1,20 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "cp2kkit"
-version = "0.4.1"
+version = "0.4.2"
 description = "CP2K analysis and non-destructive input generation with explicit units and provenance"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
+# Preserve notices and terms; this does not assign a whole-project license.
+license-files = [
+    "THIRD_PARTY_NOTICES.md",
+    "third_party/multiwfn/TERMS.md",
+    "third_party/multiwfn/PROVENANCE.md",
+]
 
 [project.optional-dependencies]
 plot = ["matplotlib>=3.7"]

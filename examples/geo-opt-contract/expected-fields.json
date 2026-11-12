@@ -1,0 +1,45 @@
+{
+  "schema_version": "0.1.0",
+  "parser": {"name": "cp2kkit"},
+  "software": "CP2K",
+  "software_version": "synthetic-contract-example",
+  "project": null,
+  "exit_status": null,
+  "settings": {},
+  "parser_warnings": [],
+  "segments": [{
+    "id": 0,
+    "started": true,
+    "completed": true,
+    "run_type": "GEO_OPT",
+    "scf_converged": true,
+    "geometry_converged": true,
+    "wall_time": null,
+    "diagnostics": [],
+    "unparsed_energy_records": [],
+    "unparsed_energy_context": [],
+    "final_energy": {
+      "value": 0.0,
+      "unit": "hartree",
+      "source": {"line": 10, "text": "ENERGY| Total FORCE_EVAL ( QS ) energy [hartree] 0.0"}
+    },
+    "last_observed_energy": {
+      "segment": 0,
+      "index": 1,
+      "step": 1,
+      "quantity": {"value": 0.0, "unit": "hartree", "source": {"line": 10}},
+      "scf_converged": true,
+      "step_source": {"line": 8, "text": "OPTIMIZATION STEP: 1"},
+      "scf_source": {"line": 9, "text": "SCF run converged in 4 steps"},
+      "scf_evidence": [{"line": 9}],
+      "scf_association": "preceding_summary"
+    },
+    "normalized_settings": {
+      "charge": {"value": 0, "unit": "elementary_charge", "status": "parsed", "sources": [{"line": 4}]},
+      "multiplicity": {"value": 1, "unit": "dimensionless", "status": "parsed", "sources": [{"line": 5}]},
+      "spin_treatment": {"value": "RKS", "unit": null, "status": "parsed", "sources": [{"line": 6}]},
+      "uks": {"value": false, "unit": null, "status": "parsed", "sources": [{"line": 6}]},
+      "qs_method": {"value": "GPW", "unit": null, "status": "parsed", "sources": [{"line": 7}]}
+    }
+  }]
+}

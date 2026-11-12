@@ -1,4 +1,4 @@
-# cp2kkit v0.4.1 architecture
+# cp2kkit v0.4.2 architecture
 
 ## Design principles
 
@@ -19,12 +19,35 @@ No submission system or deferred Bader/PDOS/NEB post-processing is introduced.
    never sources/data/symlinks. Density bundles require all requested targets to be new.
 7. **Minimal dependencies:** standard-library core, isolated optional plotting/Rich presentation, no ASE requirement.
 
+## Producer and consumer responsibilities
+
+cp2kkit is an independent producer of CP2K domain data and evidence, not an
+internal component of any downstream workflow platform. Its public Python API,
+CLI and exchange schema must be useful to independent consumers.
+
+- **cp2kkit owns:** CP2K output/settings and supported structure-format parsing;
+  energy, convergence, method/spin and structure-source semantics within documented
+  limits; units, source fingerprints and line evidence; generic API/CLI contracts.
+- **Consumers own:** private business models, workflows and interfaces; links to
+  their internal run/artifact objects; databases, persistence, queries and import
+  policies; mappings from generic cp2kkit fields into those internal models.
+- Consumer primary keys, database fields, ledgers and business states do not belong
+  in the public exchange contract. A core `Run` is a parsed-output domain object,
+  not a downstream database entity or an assertion of process success.
+- Public installation and tests must work without an adjacent consumer repository,
+  private fixtures, databases or credentials. Examples and adapters reuse public
+  interfaces rather than adding consumer-specific dependencies to the core.
+
+Project independence does not change third-party provenance, citations or terms;
+see [third-party notices](../THIRD_PARTY_NOTICES.md). It does not establish
+redistribution permission or assign a project license.
+
 ## Modules and dependency direction
 
 ```text
 cli.py
  |-- discovery.py -- io.py / errors.py
- |-- parser.py ----- models.py / io.py
+ |-- parser.py ----- models.py / io.py / output_settings.py
  |-- quality.py ---- models.py (facts -> rules)
  |-- export.py ----- structure.py / io.py / models.py / quality.py (shared structure export/CSV)
  |-- structure.py -- models.py / io.py (independent geometry)
@@ -127,9 +150,23 @@ output/directory -> deterministic selection -> line format matching -> Run/Segme
   Whitespace-delimited annotations are accepted; adjacent garbage/incomplete exponents
   are not prefix-parsed. Evidence retains the entire original line and byte hash.
 - Associate each energy with the preceding SCF summary, never the previous step's success.
+- Each energy adds step-line and pending SCF-summary evidence. Multiple summaries
+  are marked ambiguous rather than claiming a unique SCF association. Unsupported
+  records retain step/SCF context and consume pending summaries too.
+- Segment last_observed_energy is a full Energy observation; legacy final_energy
+  remains its Quantity. Neither establishes the final optimized state. No final
+  candidate or structure-matching engine is implemented.
 - Historical SCF failures remain evidence even after recovery.
 - Do not infer process exit codes or charge/spin from total energies.
-- Preserve original settings strings; semantic normalization/cross-input merging is future work.
+- Preserve original settings strings and ordered settings_records (including
+  duplicates); output_settings.py normalizes only exact printed charge,
+  multiplicity, spin-treatment and GPW/GAPW QS-method labels with per-field status
+  and sources. Conflicts/unsupported records remain unknown and generate warnings.
+  uks comes only from the printed spin branch, not multiplicity or electron counts.
+  Cross-input merging and complete model reconstruction remain future work.
+- Normalized settings describe observations in a segment, not a proven settings
+  identity for each energy/FORCE_EVAL. They do not alter the existing text-quality
+  rules or certify model fitness.
 
 Positive quality requires normal completion, final electronic convergence, SCF
 convergence associated with the final energy, an energy, supported run type, and

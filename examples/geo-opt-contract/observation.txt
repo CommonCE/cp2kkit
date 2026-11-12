@@ -1,0 +1,12 @@
+CP2K| version string: synthetic-contract-example
+PROGRAM STARTED AT synthetic
+GLOBAL| Run type  GEO_OPT
+DFT| Charge  0
+DFT| Multiplicity  1
+DFT| Spin restricted Kohn-Sham (RKS) calculation  RKS
+QS| Method:  GPW
+OPTIMIZATION STEP: 1
+SCF run converged in 4 steps
+ENERGY| Total FORCE_EVAL ( QS ) energy [hartree] 0.0
+GEOMETRY OPTIMIZATION COMPLETED
+PROGRAM ENDED AT synthetic

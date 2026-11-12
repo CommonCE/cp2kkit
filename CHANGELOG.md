@@ -8,6 +8,47 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.4.2
+
+- Complete the observation-contract development stage with 655 passing source
+  regressions and isolated sdist/wheel/core-installation checks on Python 3.12.16.
+  Preserve notices/terms/provenance in distributions and docs/examples/fixtures in
+  the sdist. Build-only setuptools >=77 supports project.license-files; runtime
+  dependencies and the Python >=3.10 declaration are unchanged. No license is
+  assigned and no package publication is implied. See docs/closeout-0.4.2.md.
+- Add a public hand-written GEO_OPT example and selected-field expectations with
+  scalar-type, legacy-field, missing/conflicting-setting and API/CLI regressions.
+  Document the source-tree baseline and its release/installation limits; no new
+  runtime API, schema field or downstream adapter is introduced.
+- Clarify independent-toolkit positioning and producer/consumer responsibilities.
+  Keep private models, persistence and deployment mappings downstream; public
+  installation/tests do not require a consumer repository, database or credentials.
+  Generalize the GEO_OPT contract and planned adapter scope without changing APIs,
+  schema, third-party terms or publication status.
+- User-assigned version for this round, replacing the unpublished 0.5.0 proposal.
+  Exchange-contract review retains schema 0.1.0: optional additions only, with
+  unchanged legacy fields and CSV layout; absence remains supported by consumers.
+- Add parse-JSON parser name/version, independent of CP2K software_version and
+  schema 0.1.0; retain all previous fields and CSV columns.
+- Add segment last_observed_energy (full Energy record), per-energy step_source,
+  scf_source/scf_evidence/scf_association, and unparsed_energy_context. Existing
+  final_energy remains the last successfully parsed Quantity, never a final-state claim.
+- Retain damaged/unsupported record context and consume its pending SCF evidence;
+  do not transfer convergence to a subsequent energy. Damaged records after an
+  end marker start a new incomplete segment. Multiple preceding SCF summaries
+  are explicitly ambiguous and block positive energy quality.
+- Add ordered settings_records preserving duplicates, and normalized_settings
+  for charge, multiplicity, spin_treatment, uks and GPW/GAPW qs_method. Exact
+  printed labels are checked against CP2K v2026.2 source; unsupported/conflicting
+  observations remain null with sources and warnings, never last-value guesses.
+  Raw settings retain their previous last-write behavior. Settings after an end
+  marker start an independent incomplete segment rather than altering the prior one.
+- No final candidate, complete method reconstruction, structure association,
+  process exit inference, or restart continuity is introduced. Downstream consumers
+  must tolerate new fields and keep observations separate from final optimized results.
+- Hand-written public Python/CLI regressions only; no native calculation or
+  scientific validity certification. See docs/geo-opt-contract.md for migration.
+
 ## 0.4.1
 
 - User-specified version 0.4.1 for this feature round; schema remains 0.1.0.

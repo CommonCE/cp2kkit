@@ -1,6 +1,28 @@
 # Development status and next steps
 
-Current software: **0.4.1**; schema: **0.1.0**.
+Current software: **0.4.2**; schema: **0.1.0**.
+
+## GEO_OPT consumer contract (0.4.2)
+
+- Maintain a [public synthetic baseline](../examples/geo-opt-contract/README.md)
+  with selected-field expectations, legacy-field presence, explicit scalar types
+  and Python/CLI parity/strict-exit regressions. The
+  [0.4.2 closeout](closeout-0.4.2.md) completes this development stage with 655
+  source-tree regressions and isolated sdist/wheel/core-installation checks on
+  Python 3.12.16. No immutable release checkpoint or native certification is implied.
+- Implement parser identity, explicit last-observed energy and step/SCF evidence,
+  damaged-record context and conservative ambiguity handling. Existing fields keep
+  their meanings. See [consumer semantics](geo-opt-contract.md).
+- Implement independently evidenced charge, multiplicity, UKS/spin treatment and
+  GPW/GAPW QS representation using tagged output-source labels. Preserve ordered
+  raw records, conflict/unsupported statuses and unknowns. This is not a complete
+  method or physical-model reconstruction. Broader method/spin mappings require
+  their own format references and tests.
+- Structure follow-up: reuse read_structure/read_xyz (XYZ/extXYZ), but first add
+  evidenced trajectory step/comment semantics and explicit output/frame matching.
+  Current frame selection is not proof of final optimization identity.
+- Final-candidate criteria/order validation and native output-layout validation
+  remain future work. Do not treat text quality as final-state certification.
 
 ## Potential and frontier-orbital output (0.4.1)
 
@@ -262,15 +284,18 @@ source inputs remained unchanged. Version/text/link checks, compileall and
 
 Status: **planned, not implemented**. This is a parallel development track to
 scientific feature coverage, not a claim of an available MCP server, registered
-Pi tools, or company-platform compatibility. No release version or delivery date
+host tools, or downstream-platform compatibility. No release version or delivery date
 is assigned yet.
 
 ### Scope and architecture
 
-Support the personal Pi Agent and the company-developed computational Agent
-through a shared deterministic toolkit API. Keep intent interpretation and
-workflow decisions in the host Agent; cp2kkit remains responsible for validated
-input generation, parsing, quality assessment, and evidence-preserving exports.
+Support external workflow tools and result import adapters through a shared
+deterministic toolkit API. Keep intent interpretation, private object mappings,
+persistence and workflow decisions in downstream consumers; cp2kkit remains
+responsible for validated input generation, parsing, quality assessment and
+evidence-preserving exports. Follow the
+[producer/consumer boundary](architecture.md#producer-and-consumer-responsibilities);
+consumer-specific deployment adapters are not core data models.
 
 - Reuse existing domain models, registries, validators, parsers and protected
   writers. CLI, TUI and Agent adapters must not implement separate scientific rules.
@@ -280,10 +305,11 @@ input generation, parsing, quality assessment, and evidence-preserving exports.
   tool-contract version from software and scientific-data schema versions.
 - Add MCP as an optional thin adapter, with an optional dependency or separate
   adapter package; preserve the standard-library core and independent CLI/TUI.
-  Company integration may instead use an existing internal tool protocol over
-  the same API. Do not require a plugin framework, database or workflow engine.
-- Confirm the actual Pi integration mechanism and company tool protocol, file
-  access model and execution ownership before implementing host-specific setup.
+  External workflow tools may instead use their own protocol over the same API.
+  Do not require a plugin framework, database or workflow engine.
+- Confirm the target consumer's protocol, file access model and execution ownership
+  before implementing host-specific setup outside the core. Public installation
+  and tests must remain independent of consumer repositories and private fixtures.
 
 ### Staged delivery and acceptance
 
@@ -291,12 +317,12 @@ input generation, parsing, quality assessment, and evidence-preserving exports.
 |---|---|---|
 | AGENT-1: contracts and read-only MVP | Define supported API/error contracts; expose project discovery, output parsing and quality assessment through a local stdio MCP adapter | Test tool discovery, request/result schemas, ambiguity, malformed/truncated output, non-TTY operation and protocol-only stdout; results agree with shared core logic and preserve evidence/unknown values. Host integration is claimed only after an actual client smoke test. |
 | AGENT-2: preview and protected generation | Add structure inspection, input validation/preview and explicit file publication; incrementally advance ARC-3 validation/resolution/render/manifest separation | Preview creates no files; shared defaults, scientific settings and generated text remain consistent with CLI/TUI. Agent writes reject existing targets by default; any replacement requires separately defined explicit authorization. Test collisions, source changes between preview/write, repeated calls, interruption and rollback without changing existing CLI replacement behavior. |
-| AGENT-3: capabilities and enterprise integration | Expose capabilities derived from shared registries/rules; map workspace-relative paths or artifact IDs; add a company adapter and remote MCP transport only when needed | Report target-version, task/model/build/data restrictions and validation levels without duplicating policy. Verify workspace isolation, artifact resolution, bounded responses, authentication/authorization and audit requirements in the agreed deployment. Company compatibility remains unverified until checked there. |
+| AGENT-3: capabilities and deployment adapters | Expose generic capabilities derived from shared registries/rules; evaluate remote MCP transport only when needed. External adapters own workspace resolution and internal object mappings | Report target-version, task/model/build/data restrictions and validation levels without duplicating policy. Check workspace isolation, bounded responses, authentication/authorization and audit requirements in each deployment. Downstream compatibility remains unverified until checked there; no private IDs or persistence dependencies enter the core contract. |
 
 The first MVP does not depend on completing the full ARC-3 refactor. Extend the
 adapter incrementally after read-only contracts are stable; structure export and
 Cube checks/differences are later candidates, not automatically exposed commands.
-Prefer local stdio for the initial personal integration. Evaluate Streamable HTTP
+Prefer local stdio for the initial local adapter. Evaluate Streamable HTTP
 for remote/shared deployment only after checking client compatibility, the target
 MCP specification/SDK, and service-security requirements.
 
@@ -315,7 +341,7 @@ MCP specification/SDK, and service-security requirements.
   responses; large logs/Cubes should return summaries and artifact references.
 - Keep content hashes, units, source locations and scientific evidence. Define
   path/raw-text redaction before external transfer; do not embed secrets or
-  sensitive company structures/results in prompts, fixtures or audit logs.
+  sensitive consumer structures/results in prompts, fixtures or audit logs.
   A remote file path alone does not transfer or grant access to an artifact.
 - Distinguish tool completion, input generation, syntax acceptance, actual execution,
   normal termination, electronic/geometry convergence and scientific validity.
@@ -323,9 +349,9 @@ MCP specification/SDK, and service-security requirements.
 - Exclude arbitrary shell execution, job submission/cancellation, deletion and
   autonomous repair/reruns from the initial tools. Future execution integration
   requires separate scope and authorization, stable job identities, duplicate-job
-  prevention and recovery; prefer the company's existing execution system.
+  prevention and recovery; execution remains owned by external workflow tools.
 - Review actual third-party authorization for the intended internal use, service
-  deployment or distribution before company rollout. The unresolved boundaries in
+  deployment or distribution before downstream rollout. The unresolved boundaries in
   [third-party notices](../THIRD_PARTY_NOTICES.md) remain; MCP wrapping or a Python
   rewrite does not establish additional permission.
 
@@ -631,7 +657,7 @@ A runnable preliminary implementation **does not equal complete production accep
    and checking versions/parameter combinations.
 8. Develop the parallel [Agent integration and optional MCP track](#planned-agent-integration-and-optional-mcp-support):
    start with stable contracts and a read-only local adapter, then preview/protected
-   generation and deployment-specific company integration. These are planned features,
+   generation and deployment-specific external adapters. These are planned features,
    not existing commands or authorization to execute calculations.
 
 ## Review follow-up backlog

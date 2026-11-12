@@ -17,6 +17,8 @@ def quality_report(run):
             reasons.append("Final electronic convergence is false or unknown")
         if segment.energies and segment.energies[-1].scf_converged is not True:
             reasons.append("Final energy lacks an associated converged SCF cycle")
+        if segment.energies and segment.energies[-1].scf_association == "ambiguous":
+            reasons.append("Final observed energy has multiple preceding SCF summaries")
         # An earlier SCF failure is retained even if a later SCF converges.
         earlier_scf_failure = any(re.search(r"SCF.*(?:NOT converged|did not converge)", e.text, re.I) for e in segment.evidence)
         if earlier_scf_failure:
