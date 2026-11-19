@@ -10,6 +10,7 @@ Start a session with the [development rules](DEVELOPMENT.md), then choose a temp
 | Template | Purpose |
 |---|---|
 | [Implement a feature](prompts/implement-feature.md) | Add features/fix defects while preserving unrelated interfaces and behavior |
+| [0.4.4 vibrational post-processing](prompts/implement-vibration-postprocessing-0.4.4.md) | Historical implementation scope and acceptance criteria for the main 5/6 grouping and read-only vibration reporting |
 | [Reference Multiwfn](prompts/multiwfn-reference.md) | Inspect upstream source, extend CP2K generation in stages, and record provenance |
 | [Maintain a public contract](prompts/maintain-contract.md) | Assess consumer-visible changes, update existing contracts and test public behavior without consumer dependencies |
 | [Review](prompts/review.md) | Read-only review of implementation, scientific settings, tests, and authorization |

@@ -1,0 +1,35 @@
+ **** **** ******  **  PROGRAM STARTED AT                synthetic
+ CP2K| version string:                                      CP2K version 2026.2
+ GLOBAL| Run type                                            VIBRATIONAL_ANALYSIS
+ POISSON| Periodicity                                        NONE
+ VIB| REPLICA Nr.    1- Energy and Forces for particle:    1  coordinate: X - DX
+ VIB| Minimum Structure - Energy and Forces:
+ VIB| Hessian in cartesian coordinates (mass weighted)
+ VIB| Cartesian Low frequencies ---
+ VIB| -1.2000000E+00 -3.0000000E-01 0.0000000E+00 2.0000000E+00 3.0000000E+00
+ VIB| Frequencies after removal of the rotations and translations
+
+ VIB| Internal  Low frequencies ---
+ VIB| -1.2000000E+00 -3.0000000E-01 0.0000000E+00 2.0000000E+00
+
+ VIB|                        NORMAL MODES - CARTESIAN DISPLACEMENTS
+ VIB|
+ VIB|                         1                    2                    3
+ VIB|Frequency (cm^-1) -1.2345678901E+02   -5.0000000000E-01    0.0000000000E+00
+ VIB|Red.Masses (a.u.)  1.0000000000E+00    1.0000000000E+00    1.0000000000E+00
+ VIB|Frc consts (a.u.) -1.0000000000E+00   -1.0000000000E-01    0.0000000000E+00
+  ATOM  EL               X     Y     Z       X     Y     Z       X     Y     Z
+     1  O               0.00  0.00  0.00    0.00  0.00  0.00    0.00  0.00  0.00
+     2  C               0.00  0.00  0.00    0.00  0.00  0.00    0.00  0.00  0.00
+     3  O               0.00  0.00  0.00    0.00  0.00  0.00    0.00  0.00  0.00
+
+ VIB|                         4
+ VIB|Frequency (cm^-1)  2.3456789012E+03
+ VIB|Red.Masses (a.u.)  1.0000000000E+00
+ VIB|Frc consts (a.u.)  2.0000000000E+00
+  ATOM  EL               X     Y     Z       X     Y     Z       X     Y     Z
+     1  O               0.00  0.00  0.00
+     2  C               0.00  0.00  0.00
+     3  O               0.00  0.00  0.00
+
+ **** **** ******  **  PROGRAM ENDED AT                  synthetic

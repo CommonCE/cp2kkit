@@ -1,7 +1,8 @@
 # Molecular vibrational generation contract (software 0.4.3)
 
 This is an input-generation contract for independent API/CLI consumers, not a
-frequency-result or execution contract. It reuses schema **0.1.0** and the
+frequency-result or execution contract. See the separate [result contract](vibration-results-contract.md)
+for read-only frequency observations. Generation reuses schema **0.1.0** and the
 [shared consumer rules](contracts.md). The authoritative supported/rejected
 scientific combinations, presets and numerical limits are in the
 [input-generation task policy](input-generation.md#molecular-vibrational-inputs-043);

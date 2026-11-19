@@ -1,0 +1,13 @@
+{
+  "status": "complete",
+  "segment": 1,
+  "block": 1,
+  "frequency_unit": "cm^-1",
+  "zero_threshold_cm_1": 0.5,
+  "counts": {"observed": 4, "raw_negative": 2, "negative": 1, "near_zero": 2, "positive": 1},
+  "strict_passed": true,
+  "expected_mode_count_from_diagnostic": 4,
+  "electronic_converged": null,
+  "exit_status": null,
+  "stationary_point": null
+}

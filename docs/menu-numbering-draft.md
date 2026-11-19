@@ -1,4 +1,4 @@
-# Input-generator menu numbering and future allocation draft
+# Application and input-generator menu numbering
 
 ## Status and scope
 
@@ -39,6 +39,81 @@ No planned scientific feature is automatically available for every CP2K version,
 method, spin state, boundary condition, or build. Keyword/source checks and
 scientific compatibility tests are prerequisites to implementation. Generation,
 native acceptance, convergence, and physical validity remain distinct.
+
+## Application workflow layout (0.4.4)
+
+This is implemented routing. Pre-release application numbers migrate explicitly;
+existing batch CLI commands and generator function IDs do not migrate with them.
+
+| Main ID | Label | Scope |
+|---:|---|---|
+| 1 | Load/change structure | Retain current structure loading |
+| 2 | Structure details | Requires a loaded structure |
+| 3 | Export structure | Requires a loaded structure |
+| 4 | Generate CP2K input | Retain the input generator |
+| 5 | Output analysis | Output observations, quality and convergence workflows |
+| 6 | CUBE analysis | Scalar-field workflows grouped under one entrance |
+| 7 | Vibrational analysis | Read-only molecular frequency observations |
+| 0 | Exit | Exit the application |
+
+Top-level entries represent workflows, not every individual operation. Entries
+5-7 do not require a previously loaded structure and preserve any loaded
+structure on return. Additional required sources are requested explicitly inside
+the workflow; the loaded geometry is not automatically associated with a result.
+
+Implemented local operations (and separately labeled future adapters):
+
+- **5 / 1 Quality report:** retain the current main-5 operation. Parsed-observation
+  export and energy/SCF plots are later adapters over existing CLI/core functions,
+  not required additions in the bounded vibration round.
+- **6 / 1 Check scalar CUBE; 6 / 2 Subtract density CUBEs:** move the current
+  main-6/main-7 operations here. **6 / 3 Planar averages and integrals** is a later
+  adapter over cube-planar, not an implemented menu entry or this round's gate.
+- **7 Vibrational analysis:** directly opens the [bounded frequency workflow](vibration-results-contract.md),
+  with semantic ID `vibration` and no structure requirement.
+- Local **0 Back** returns without writing. Merely opening a group or inspecting
+  observations does not publish files. Scrolling, cancel/q behavior,
+  positive-width fallback, narrow-terminal and non-TTY handling are retained.
+
+The pre-release migration deliberately moves old main-7 density subtraction to
+6 / 2 and assigns main-7 to vibration, without ambiguous numeric aliases. Existing
+batch CLI commands and generator **640** (finite-displacement DX) are unchanged. Main IDs,
+local menu choices, generator IDs, basis numbers and atom indices are separate
+namespaces. Show only implemented operations; future plans are not placeholders.
+
+### Future molecular thermochemistry and phonons
+
+The user intends to integrate Shermo-related thermochemical corrections. Group
+that future molecular workflow with vibrations under main 7; an expanded label
+such as Vibrations and thermochemistry can accompany its actual implementation.
+Native frequency observations and derived thermochemistry remain independent
+operations and contracts, not an automatic calculation on opening a report.
+
+Before integrating Shermo, inspect the selected version's official interfaces,
+input/output formats and terms. Choose explicitly between preparing an exchange
+file, importing an existing Shermo result and authorized external execution;
+these are separate capabilities. Do not promise direct CP2K compatibility or
+redistribution permission without evidence. Future requests/results must retain
+frequency and electronic-energy sources, units, molecular mass/composition,
+charge/spin assumptions, temperature, pressure/standard state, scaling and
+low-frequency treatment where applicable, together with tool/version and
+parameters. Missing frequencies, intensities or corrections are not zeros.
+The 0.4.4 frequency parser must not run Shermo or silently apply corrections.
+
+Periodic phonons belong to a separate future application workflow, not the
+molecular vibration/thermochemistry operation. Plan q-point/mesh and band-path
+identity, supercell/primitive-cell mapping, force-constant provenance, acoustic
+sum-rule treatment and cell/molar normalization before offering dispersion,
+phonon DOS or solid-state thermodynamics. Molecular RRHO assumptions must not be
+silently applied to periodic phonons; Gamma-point modes alone do not establish
+full-Brillouin-zone thermodynamics. No phonon parser or external execution is
+introduced by this plan.
+
+Other future workflow directions include structure/trajectory analysis,
+electronic-structure analysis, reaction-path analysis and explicit result
+comparison. Do not freeze their top-level numbers yet. Add only implemented
+workflows after checking the actual menu; do not scatter new CUBE operations
+across top-level entries.
 
 ## 1. Interaction contract
 

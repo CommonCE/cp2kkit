@@ -2,7 +2,7 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.4.3 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.4.4 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 cp2kkit is an independent CP2K toolkit, not an internal component of a workflow
@@ -16,7 +16,7 @@ and [public contract index](docs/contracts.md).
 - Analysis remains read-only: no submission/execution or modification of existing
   inputs, restart files, or raw output.
 - The six MVP features have entry points, with additional `generate-input`,
-  `cube-check`, `cube-diff`, and `cube-planar` commands; calculations are never run automatically.
+  `cube-check`, `cube-diff`, `cube-planar`, and `vibration` commands; calculations are never run automatically.
 - The core uses Python's standard library; Rich styling and Matplotlib are optional.
 - Outputs include schema, units, SHA-256, line numbers, and original text.
   Missing values are not zero.
@@ -38,7 +38,29 @@ input generation; version 0.3.3 adds BHandHLYP, M06-2X and configurable PBEh.
 All 21 referenced DFT selections now have bounded generation support; this is
 not full Multiwfn feature/combination coverage.
 
-## Current version: 0.4.3
+## Current version: 0.4.4
+
+Observe CP2K 2026.2 molecular normal-mode tables without running a calculation.
+The parser preserves signed frequencies in cm^-1, original tokens and evidence,
+and reports incomplete blocks without guessing missing values. Multiple blocks
+require explicit 1-based segment/block selection.
+
+```bash
+cp2kkit vibration water.out --zero-threshold-cm-1 0.5 --strict
+cp2kkit vibration water.out --segment 1 --block 1 --format csv -o water-freq.csv
+```
+
+Main menu **7 Vibrational analysis** needs no loaded structure. Quality is now
+**5/1**, CUBE checking **6/1**, and density subtraction **6/2** (formerly main 7).
+Strict mode checks the text, not whether the geometry is stationary or the
+process exited cleanly. The threshold changes categories, not values or the raw
+negative count. See the [result contract](docs/vibration-results-contract.md)
+and [synthetic example](examples/vibration-results/README.md). The
+[0.4.4 closeout](docs/closeout-0.4.4.md) records source checks and read-only
+validation with existing CP2K output. Schema remains **0.1.0**; packaging and
+publication are not part of this stage.
+
+### Retained molecular vibrational input generation (0.4.3)
 
 Version **0.4.3** adds bounded **frequency/vibrational input generation**:
 CP2K target 2026.2, isolated Gamma PBE/classic MOLOPT-UCL GPW, closed-shell
@@ -53,7 +75,7 @@ EPS_SCF auto 1e-8 (explicit values must be no looser), and task QS EPS_DEFAULT
 Native vibration diagnostics expose reference/displaced forces and Hessian
 information without changing global LOW verbosity. Single atoms and DX values
 that round away at generated coordinate precision are rejected. No intensities,
-thermochemistry, periodic phonons, output parsing or execution.
+thermochemistry, periodic phonons or execution in the generator.
 
 ```bash
 cp2kkit generate-input water.xyz -o water-freq.inp --periodic NONE \

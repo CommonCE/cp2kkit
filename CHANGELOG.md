@@ -8,6 +8,24 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.4.4
+
+- Add read-only CP2K 2026.2 molecular Cartesian normal-mode observations through
+  Python, `cp2kkit vibration` and main menu 7. Preserve signed printed
+  frequencies (cm^-1), line evidence, source hash and incomplete blocks; require
+  explicit selection when multiple blocks match. A reporting threshold changes
+  categories only; raw negative counts are independent.
+- Add deterministic JSON/CSV and exclusive one-file export. Strict status checks
+  textual completeness, version/task evidence and the selected segment's end
+  marker, not stationarity, process exit or electronic/numerical convergence.
+  Existing generation and GEO_OPT exchange meanings are unchanged; schema 0.1.0
+  adds a separate result operation.
+- Group main menu 5 as Output analysis (5/1 retains Quality report), and 6 as
+  CUBE analysis (6/1 checks, 6/2 subtracts; former main 7). Main entries 1-4 and
+  generator 640 keep their meanings. No native calculation, package build or
+  publication in this round. See the [result contract](docs/vibration-results-contract.md)
+  and [closeout](docs/closeout-0.4.4.md) for the tested scope and limitations.
+
 ## 0.4.3
 
 - Fall back to 80 columns when terminal width is nonpositive, including Python

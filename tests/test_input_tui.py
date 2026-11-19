@@ -341,7 +341,9 @@ class ApplicationTests(unittest.TestCase):
         return run_main_menu(path, stdin=TTY(lines), stdout=log, plain=True), log.getvalue()
 
     def test_stable_actions_grouped_continuous_numbers(self):
-        self.assertEqual(len(ACTIONS), len({a.id for a in ACTIONS}))
+        self.assertEqual(tuple(a.id for a in ACTIONS),
+                         ('load', 'details', 'export', 'generate', 'output_analysis', 'cube_analysis', 'vibration'))
+        self.assertTrue(all(not a.requires_structure for a in ACTIONS[4:]))
         _, log = self.app('0\n')
         for number, action in enumerate(ACTIONS, 1):
             self.assertIn(f'{number}. {action.label}', log)
@@ -374,7 +376,7 @@ class ApplicationTests(unittest.TestCase):
         self.assertIn('Success: Structure loaded', log)
 
     def test_analysis_without_structure_summary_then_details(self):
-        _, log = self.app(f'5\n{FIXTURES/"truncated.out"}\nd\n\n0\n')
+        _, log = self.app(f'5\n1\n{FIXTURES/"truncated.out"}\nd\n\n0\n')
         self.assertIn('Success: Output parsed', log)
         self.assertIn('Warning: Text quality status: not_passed', log)
         self.assertIn('Missing normal-termination', log)
@@ -384,7 +386,7 @@ class ApplicationTests(unittest.TestCase):
     def test_cube_check_without_structure(self):
         cube = self.dir/'unknown.cube'
         cube.write_text('unknown\nscalar\n0 0 0 0\n1 1 0 0\n1 0 1 0\n1 0 0 1\n2\n')
-        _, log = self.app(f'6\n{cube}\n\n\n0\n')
+        _, log = self.app(f'6\n1\n{cube}\n\n\n0\n')
         self.assertIn('Success: Scalar CUBE', log)
         self.assertIn('raw_numerical_integral', log)
         self.assertIn('not electron count', log)
@@ -392,7 +394,7 @@ class ApplicationTests(unittest.TestCase):
     def test_cube_meaning_and_units_can_be_asserted_explicitly(self):
         cube = self.dir/'generic.cube'
         cube.write_text('unknown\nscalar\n0 0 0 0\n1 1 0 0\n1 0 1 0\n1 0 0 1\n2\n')
-        _, log = self.app(f'6\n{cube}\na\n\nbohr\nelectron-density\ne/bohr^3\n\n0\n')
+        _, log = self.app(f'6\n1\n{cube}\na\n\nbohr\nelectron-density\ne/bohr^3\n\n0\n')
         self.assertIn('scalar_type: electron-density', log)
         self.assertIn('electron_number', log)
 
@@ -414,16 +416,16 @@ class ApplicationTests(unittest.TestCase):
         header = '-Quickstep-\nELECTRON DENSITY\n0 0 0 0\n1 1 0 0\n1 0 1 0\n1 0 0 1\n'
         first.write_text(header+'2\n')
         fragment.write_text(header+'1\n')
-        _, log = self.app(f'7\n{first}\n0\n0\n')
+        _, log = self.app(f'6\n2\n{first}\n0\n0\n')
         self.assertIn('Cancelled', log)
         self.assertFalse(out.exists())
-        _, log = self.app(f'7\n{first}\n{fragment}\n\n{out}\n\n\n0\n')
+        _, log = self.app(f'6\n2\n{first}\n{fragment}\n\n{out}\n\n\n0\n')
         self.assertTrue(out.exists(), log)
         self.assertTrue(Path(str(out)+'.json').exists())
         self.assertIn('not fragment net charge transfer', ' '.join(log.split()))
         self.assertIn(str(out.resolve()), log)
         data = out.read_bytes()
-        _, log = self.app(f'7\n{first}\n{fragment}\n\n{out}\n\n\n0\n')
+        _, log = self.app(f'6\n2\n{first}\n{fragment}\n\n{out}\n\n\n0\n')
         self.assertIn('Refusing to overwrite', log)
         self.assertEqual(out.read_bytes(), data)
 
@@ -441,7 +443,7 @@ class ApplicationTests(unittest.TestCase):
         self.assertIn('Cancelled; returning', log)
         with patch.object(TTY, 'readline', side_effect=KeyboardInterrupt):
             self.assertEqual(self.app('')[0], 0)
-        with patch.object(TTY, 'readline', side_effect=['5\n', 'missing.out\n', KeyboardInterrupt(), '0\n']):
+        with patch.object(TTY, 'readline', side_effect=['5\n', '1\n', 'missing.out\n', KeyboardInterrupt(), '0\n']):
             _, log = self.app('')
         self.assertGreaterEqual(log.count('cp2kkit Main menu'), 2)
         with patch('cp2kkit.main_tui.read_structure', side_effect=KeyboardInterrupt):

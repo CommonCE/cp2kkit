@@ -26,10 +26,16 @@ ACTIONS = (
     Action('details', 'Structure', 'Structure details', True),
     Action('export', 'Structure', 'Export structure (extXYZ)', True),
     Action('generate', 'Calculation', 'Generate CP2K input', True),
-    Action('quality', 'Analysis', 'CP2K output quality report'),
-    Action('cube_check', 'Analysis', 'Check scalar CUBE'),
-    Action('cube_diff', 'Analysis', 'Subtract aligned density CUBEs'),
+    Action('output_analysis', 'Analysis', 'Output analysis'),
+    Action('cube_analysis', 'Analysis', 'CUBE analysis'),
+    Action('vibration', 'Analysis', 'Vibrational analysis'),
 )
+
+ANALYSIS_GROUPS = {
+    'output_analysis': ('Output analysis', (('quality', 'Quality report'),)),
+    'cube_analysis': ('CUBE analysis', (('cube_check', 'Check scalar CUBE'),
+                                        ('cube_diff', 'Subtract density CUBEs'))),
+}
 
 
 def periodicity(structure):
@@ -114,6 +120,83 @@ def cube_options(menu):
     return CubeOptions(*values)
 
 
+def analysis_group(menu, action):
+    title, choices = ANALYSIS_GROUPS[action]
+    menu.heading(f'\n--- {title} ---')
+    by_number = {}
+    for i, (action_id, label) in enumerate(choices, 1):
+        menu.show(f'  {i}. {label}')
+        by_number[str(i)] = action_id
+    menu.show('  0. Back')
+    while True:
+        raw = menu.ask(f'Select [0-{len(choices)}]; cancel/q: ').lower()
+        if raw in {'', '0', 'back'}:
+            return
+        if raw in by_number:
+            analysis(menu, by_number[raw])
+            return
+        menu.show('Error: Invalid menu number')
+
+
+def vibration_analysis(menu):
+    from .io import json_text
+    from .vibration_results import AmbiguousVibration, export_vibration, parse_threshold, parse_vibration
+
+    path = required_path(menu, 'CP2K vibrational output file path')
+    raw = menu.ask('Zero threshold [cm^-1]; Enter uses 0; back/cancel/q: ')
+    if raw.lower() == 'back':
+        raise Cancelled
+    threshold = parse_threshold(raw) if raw else 0.0
+    try:
+        report = parse_vibration(path, zero_threshold_cm_1=threshold)
+    except AmbiguousVibration as exc:
+        choices = {f'{s}/{b}': (s, b) for s, b, _ in exc.choices}
+        menu.show('Multiple normal-mode blocks (segment/block):')
+        for s, b, line in exc.choices:
+            menu.show(f'  {s}/{b}  heading line {line}')
+        while True:
+            raw = menu.ask('Segment/block; Enter/0/back returns; cancel/q: ').lower()
+            if raw in {'', '0', 'back'}:
+                return
+            if raw in choices:
+                segment, block = choices[raw]
+                break
+            menu.show('Error: Choose a listed segment/block.')
+        report = parse_vibration(path, segment=segment, block=block, zero_threshold_cm_1=threshold)
+        if report.source != exc.source:
+            raise KitError('Output changed while selecting a block; reopen the report')
+
+    menu.show(f"Source: {report.source['path']}")
+    menu.show(f'Segment {report.segment}, block {report.block}: {report.status}; '
+              f'program end marker: {"observed" if report.program_end else "not observed"}')
+    counts = report.counts
+    menu.show(f"Observed frequencies: {counts['observed']}; raw negatives: {counts['raw_negative']}")
+    menu.show(f"Threshold: {threshold:g} cm^-1; negative={counts['negative']}, "
+              f"near-zero={counts['near_zero']}, positive={counts['positive']}")
+    for mode in report.modes[:10]:
+        label = f'Mode {mode.mode_id}' if mode.mode_id is not None else f'Observation {mode.ordinal}'
+        menu.show(f'  {label}: {mode.token} cm^-1 ({mode.classification})')
+    if len(report.modes) > 10:
+        menu.show('Only the first 10 frequencies are shown; use full details for all observations.')
+    for warning in report.warnings[:8]:
+        menu.show(f'Warning: {warning}')
+    if len(report.warnings) > 8:
+        menu.show('Additional warnings are available in full details.')
+    menu.show('Text observations do not establish convergence, a clean process exit or a stationary point.')
+    while True:
+        raw = menu.ask('Enter returns; d details; j export JSON; c export CSV; cancel/q: ').lower()
+        if raw in {'', '0', 'back'}:
+            return
+        if raw == 'd':
+            menu.show(json_text(report.to_dict()))
+        elif raw in {'j', 'c'}:
+            output = required_path(menu, 'New vibration report path')
+            export_vibration(output, report, 'json' if raw == 'j' else 'csv')
+            menu.show(f'Generated path: {Path(output).resolve()}')
+        else:
+            menu.show('Error: Select d, j, c or Enter.')
+
+
 def analysis(menu, action):
     if action == 'quality':
         from .parser import parse_output
@@ -136,7 +219,7 @@ def analysis(menu, action):
         for warning in report['parser_warnings']:
             menu.show(f'Warning: {warning}')
         menu.show('Passed text checks do not certify physical validity. Missing exit status/forces are not inferred.')
-    else:
+    elif action in {'cube_check', 'cube_diff'}:
         from .cube import check_cube, diff_cubes
         first = required_path(menu, 'CUBE path')
         paths = [first]
@@ -173,6 +256,8 @@ def analysis(menu, action):
             menu.show(f"{key}: {quantity['value']} {quantity['unit']} ({quantity['quantity']})")
         for warning in report['warnings']:
             menu.show(f'Warning: {warning}')
+    else:
+        raise KitError(f'Unknown analysis action: {action}')
     optional_details(menu, report)
 
 
@@ -245,8 +330,10 @@ def run_main_menu(path=None, stdin=None, stdout=None, plain=False):
                                     stdin=stdin, stdout=stdout, plain=plain, parent_session=True)
                 elif action.id == 'export':
                     export_structure(menu, loaded_path)
-                elif action.group == 'Analysis':
-                    analysis(menu, action.id)
+                elif action.id in ANALYSIS_GROUPS:
+                    analysis_group(menu, action.id)
+                elif action.id == 'vibration':
+                    vibration_analysis(menu)
             except (Cancelled, KeyboardInterrupt):
                 menu.show('Cancelled; returning to the main menu. Completed files, if any, are retained.')
             except (KitError, OSError) as exc:

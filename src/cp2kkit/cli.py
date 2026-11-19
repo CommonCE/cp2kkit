@@ -46,6 +46,14 @@ def build_parser():
             cmd.add_argument("--strict", action="store_true", help="Exit 7 if quality is not passed")
         else:
             cmd.add_argument("--kind", choices=["energy", "scf"], default="energy")
+    vibration = sub.add_parser('vibration', help='Observe a CP2K 2026.2 molecular normal-mode table')
+    vibration.add_argument('path', help='Explicit CP2K output file')
+    vibration.add_argument('--segment', type=int, help='1-based program segment')
+    vibration.add_argument('--block', type=int, help='1-based normal-mode block within a segment')
+    vibration.add_argument('--zero-threshold-cm-1', default='0', help='Nonnegative reporting threshold (default 0)')
+    vibration.add_argument('--format', choices=('json', 'csv'), default='json')
+    vibration.add_argument('-o', '--output', help='Exclusive new file; default writes to stdout')
+    vibration.add_argument('--strict', action='store_true', help='Exit 7 if textual checks do not pass')
     structure = sub.add_parser("export-structure", help="Read XYZ/restart/GJF/CIF/POSCAR; export with a provenance sidecar")
     structure.add_argument("path")
     structure.add_argument("-o", "--output", required=True)
@@ -223,6 +231,17 @@ def emit(data, output):
 
 
 def execute(args):
+    if args.command == 'vibration':
+        from .vibration_results import export_vibration, parse_threshold, parse_vibration, write_vibration
+        report = parse_vibration(args.path, segment=args.segment, block=args.block,
+                                 zero_threshold_cm_1=parse_threshold(args.zero_threshold_cm_1))
+        if args.output is not None:
+            export_vibration(args.output, report, args.format)
+        else:
+            write_vibration(sys.stdout, report, args.format)
+        for warning in report.warnings:
+            print(f'WARNING: {warning}', file=sys.stderr)
+        return 7 if args.strict and not report.strict_passed else 0
     if args.command in {"cube-check", "cube-diff", "cube-planar"}:
         options = CubeOptions(args.dialect, args.length_unit, args.scalar_type, args.scalar_unit)
         if args.command == "cube-check":

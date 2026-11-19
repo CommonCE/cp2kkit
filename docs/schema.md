@@ -19,6 +19,15 @@ and migration decision, rather than silently reusing this contract. Conservative
 text-quality fixes are documented separately from schema compatibility.
 Structure and generated-input contracts are not changed by this batch.
 
+## Vibrational result observations (software 0.4.4)
+
+The distinct `operation: "vibration_observation"` uses schema **0.1.0** and
+does not add fields to `Run` or reinterpret input manifests. It carries a selected
+segment/block, source and parser identity, frequency quantities in `cm^-1`,
+printed mode IDs/tokens when available, and independent text completeness and
+program-end evidence. See the [result contract](vibration-results-contract.md)
+for fields, nullability, classification, CSV and eligibility for strict mode.
+
 ## Generated vibrational inputs (software 0.4.3)
 
 The [consumer contract](vibration-contract.md) specifies public calls, normalized

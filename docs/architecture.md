@@ -1,4 +1,4 @@
-# cp2kkit v0.4.3 architecture
+# cp2kkit v0.4.4 architecture
 
 ## Design principles
 
@@ -32,8 +32,16 @@ publication remain shared. CLI/TUI expose semantic settings, not copied science
 rules; config/replay retain optional requests and distinguish effective presets.
 The task explicitly enables native PROGRAM_RUN_INFO diagnostics at global LOW
 verbosity without adding output interpretation or changing force calculations.
-This is generation only, with no task execution, frequency parser or automatic
+This module is generation only, with no task execution or automatic
 optimization-to-frequency chain. See [task scope](input-generation.md#molecular-vibrational-inputs-043).
+
+## Vibrational result observations (0.4.4)
+
+`vibration_results.py` owns the bounded CP2K 2026.2 table parser, textual
+completeness, threshold classification and deterministic JSON/CSV. CLI and main
+TUI use the same report and exclusive writer. It shares numerical and evidence
+helpers, not the GEO_OPT result/quality model or generation policy. See the
+[result contract](vibration-results-contract.md).
 
 ## Producer and consumer responsibilities
 
@@ -72,7 +80,8 @@ cli.py
  |-- export.py ----- structure.py / io.py / models.py / quality.py (shared structure export/CSV)
  |-- structure.py -- models.py / io.py (independent geometry)
  |-- plot.py ------- export.py / quality.py / optional matplotlib
- |-- main_tui.py --- input_tui.py / structure.py / export.py (menu/load/direct operations)
+ |-- main_tui.py --- input_tui.py / structure.py / export.py (menu/load/grouped operations)
+ |-- vibration_results.py -- parser.py (helpers) / models.py / io.py (frequency observations)
  |-- structure_formats.py (strict GJF/CIF/POSCAR; lazy dispatch from structure.py)
  |-- input_tui.py -- input_editor.py / inputgen.py / structure.py (TTY navigation/fields)
  |-- input_editor.py -- menu_registry.py (category/direct routing, aliases, drafts; same generator/writer)

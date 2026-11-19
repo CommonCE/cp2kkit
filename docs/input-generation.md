@@ -1,6 +1,6 @@
 # CP2K input generation
 
-This guide describes cp2kkit **0.4.3**. Older defaults and migration notes are in
+This guide describes the generator in cp2kkit **0.4.4**. Older defaults and migration notes are in
 [the changelog](../CHANGELOG.md). AE automatic setup is described in
 [the basis guide](basis-selection.md#all-electron-automatic-setup-027).
 The [registry-v1 basis guide](basis-selection.md) defines permanent numbering toward
@@ -156,7 +156,8 @@ rule; an odd-electron result is rejected, not forced into a singlet.
   tables and Hessian diagnostics. These can be large (Hessian tables scale
   quadratically with atom count). The native `Minimum Structure` heading refers
   to the restored supplied geometry, **not** evidence that it was optimized or
-  is stationary. No automatic force assessment or frequency parser is added.
+  is stationary. The generator does not assess forces or parse frequencies;
+  see the separate [vibrational result contract](vibration-results-contract.md).
   Native Molden/eigenvector print defaults remain; no new format control is
   provided. Earlier unreleased vibration sidecars replay with this diagnostic
   preset; legacy non-vibrational task output is unchanged.

@@ -1,6 +1,32 @@
 # Development status and next steps
 
-Current software: **0.4.3**; schema: **0.1.0**.
+Current software: **0.4.4**; schema: **0.1.0**.
+
+## Molecular vibrational result observation (0.4.4)
+
+This bounded development stage is complete; see the [closeout](closeout-0.4.4.md)
+for source regressions and validation against existing output. The
+[result contract](vibration-results-contract.md) covers read-only
+CP2K 2026.2 molecular Cartesian normal-mode tables, explicit block selection,
+signed frequencies, textual completeness and JSON/CSV. The
+[application layout](menu-numbering-draft.md#application-workflow-layout-044)
+retains main entries 1-4, groups quality at 5/1, CUBE operations at 6/1 and 6/2,
+and places vibration at 7. Existing parse/plot/cube-planar CLI functions can
+gain local menu adapters later. Formal packaging is deferred to 0.5.
+
+For the next development round, choose a bounded follow-up from the
+[handoff priorities](development-handoff.md#follow-up-candidates-not-additional-044-implementation):
+broader native-format fixture coverage or evidence-based energy/structure/frequency
+association. Neither is required to use the current read-only parser.
+
+Future Shermo-related molecular thermochemical corrections should share the
+vibration workflow, but retain separate source observations, derived results,
+parameters and tool/version provenance. Official interface/format and terms
+inspection precedes integration; no direct CP2K support or execution is assumed.
+Periodic phonons need a separate future workflow, q-point/force-constant and
+normalization contracts, rather than reuse molecular RRHO thermochemistry.
+Neither expansion is part of the 0.4.4 frequency-observation stage. Further
+trajectory, electronic-structure and reaction-path groups have no frozen numbers.
 
 ## Molecular vibrational input task (0.4.3)
 
@@ -663,7 +689,8 @@ A runnable preliminary implementation **does not equal complete production accep
 | CSV/JSON | Versions/units/hashes/evidence | Schema freeze and user feedback |
 | Plots | Segmented energies/SCF counts | Real restart paths; residual/gradient plots if needed |
 | Input generation | GPW/density cubes/CLI/TUI implemented, incomplete | Full Multiwfn generation coverage is the goal; syntax checks through 2026.2, real execution still needed |
-| Cube validation/difference | Streaming scalars, strict grids, multi-fragment subtraction/provenance | Real cubes, integration/sampling error; plane averages later |
+| Cube validation/difference/profile | Streaming scalars, strict grids, subtraction and native-grid plane averages/cumulative integrals | Broader native CUBE coverage and integration/sampling error |
+| Molecular frequency observation | Bounded CP2K 2026.2 table, Python/CLI/TUI and JSON/CSV | Broader native formats and evidence-based geometry association |
 
 ## Initial implementation validation record
 
@@ -769,10 +796,12 @@ old default, or emitting target-version-unsupported keywords without checking.
    0.3.1 adds the bounded GFN-xTB branch; 0.3.2 adds the first three direct-HFX hybrids;
    initial GAPW/all-electron bases were added in 0.2.7. Remaining: broader meta-GGA
    model/task support, native/scientific UZH validation, UZH-PBE0,
-   broader HFX/ADMM combinations, RI-HFX, additional auxiliary and all-electron bases/families/
+   broader HFX/ADMM/RI-HFX combinations beyond the implemented 0.3.2-0.3.6 subsets, additional auxiliary and all-electron bases/families/
    q policies, correlated wavefunctions, semiempirical/force fields and SCF options.
-4. **Tasks:** frequencies/vibrations/Raman, MD, dimer TS, BAND/NEB, NMR, polarizability,
-   BSSE, real-time electrons, PIMD, XAS, appropriate TDDFT.
+4. **Tasks:** Retain bounded molecular vibrational input generation and separate
+   result observation. Broader vibrational support (including Raman/phonons),
+   MD, dimer TS, BAND/NEB, NMR, polarizability, BSSE, real-time electrons, PIMD,
+   XAS and appropriate TDDFT remain separate candidates.
 5. **Environment/outputs:** SCCS, fields, surface dipole correction, trajectory/restart
    printing, cube/Molden, charges, orbitals/matrices, cutoff/k-point convergence templates.
 
