@@ -8,6 +8,23 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.4.5
+
+- Add explicit local Shermo 2.6.2 molecular thermochemistry via Python, the
+  `thermochemistry` CLI and vibration menu **7 / s**. A separate `shermo-read`
+  command imports supported existing output without executing Shermo. Accept
+  an explicit separate single-point energy for composite thermochemistry and
+  keep its provenance distinct from the vibrational reference. Reject mismatched
+  printed charge across selected sources and check printed spin multiplicity
+  against the request before invoking Shermo. Capture ZPE, U/H/G corrections,
+  corrected totals and provenance; no bundled or internal
+  engine, automatic execution or CP2K run. See the [contract](docs/shermo-thermochemistry.md).
+- Retain the unique native CP2K vibrational reference electronic energy in
+  printed kJ/mol and check displacement indices/elements consistently across
+  mode groups. Missing or ambiguous reference energy is not replaced by a late
+  FORCE_EVAL energy. Energy parsing rejects nonzero values that underflow to zero.
+  Existing CSV columns, energy field meanings and exchange schema 0.1.0 remain.
+
 ## 0.4.4
 
 - Add read-only CP2K 2026.2 molecular Cartesian normal-mode observations through

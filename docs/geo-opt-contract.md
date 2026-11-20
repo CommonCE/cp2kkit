@@ -180,8 +180,9 @@ split segments without inferred restart continuity. No segments are joined.
   nullable step_source, source, scf_evidence and reason=unsupported_or_malformed.
   Pending SCF summaries are consumed even by these records. Warnings retain line
   locators. No invalid value becomes zero or replaces the last good observation.
-- Numeric overflow such as 1e999 retains the existing hard ParseError / CLI exit 4
-  behavior (no partial JSON export), rather than serializing Infinity. Malformed
+- Numeric overflow such as `1e999` retains the existing hard ParseError / CLI
+  exit 4 behavior (no partial JSON export). Version 0.4.5 treats
+  a nonzero token that underflows to zero (e.g. `1e-999`) the same way. Malformed
   tokens including NaN/Inf remain unparsed evidence under the existing matcher.
 
 No final_candidate_energy is implemented. Completion + the last number, even with

@@ -1,4 +1,4 @@
-# cp2kkit v0.4.4 architecture
+# cp2kkit v0.4.5 architecture
 
 ## Design principles
 
@@ -9,7 +9,8 @@ menu layout v1 (introduced in 0.2.9, retained in 0.4.1) plus separately labeled 
 The current registry contains only implemented entries; no placeholder categories.
 No submission system or deferred Bader/PDOS/NEB post-processing is introduced.
 
-1. **Read-only sources:** analysis never runs external calculations or writes back to sources.
+1. **Read-only sources:** analysis never writes back to sources or runs CP2K.
+   Only the explicit external thermochemistry operation invokes Shermo.
 2. **Facts separate from judgments:** parsers, quality rules, display/export are independent.
 3. **Evidence first:** absolute paths, SHA-256, byte sizes, lines, and original text.
 4. **Conservative assessment:** null is unknown; unknown/failed/truncated cannot pass.
@@ -42,6 +43,16 @@ completeness, threshold classification and deterministic JSON/CSV. CLI and main
 TUI use the same report and exclusive writer. It shares numerical and evidence
 helpers, not the GEO_OPT result/quality model or generation policy. See the
 [result contract](vibration-results-contract.md).
+
+## External molecular thermochemistry (0.4.5)
+
+`thermochemistry.py` validates the selected CP2K result and explicit geometry,
+prepares a temporary Shermo exchange input, invokes a caller-selected local
+executable and parses its stdout. Managed execution and read-only import share
+one output parser; normal CP2K result observation invokes neither. Inputs,
+process metadata and derived values remain separate; no code is bundled from
+Shermo and no scheduler/general execution service is introduced. See the
+[thermochemistry contract](shermo-thermochemistry.md).
 
 ## Producer and consumer responsibilities
 
@@ -82,11 +93,15 @@ cli.py
  |-- plot.py ------- export.py / quality.py / optional matplotlib
  |-- main_tui.py --- input_tui.py / structure.py / export.py (menu/load/grouped operations)
  |-- vibration_results.py -- parser.py (helpers) / models.py / io.py (frequency observations)
+ |-- thermochemistry.py -- vibration_results.py / parser.py / quality.py / structure.py / models.py / io.py / errors.py
+ |   Explicit external Shermo 2.6.2 thermochemistry; read-only import of existing stdout.
  |-- structure_formats.py (strict GJF/CIF/POSCAR; lazy dispatch from structure.py)
  |-- input_tui.py -- input_editor.py / inputgen.py / structure.py (TTY navigation/fields)
  |-- input_editor.py -- menu_registry.py (category/direct routing, aliases, drafts; same generator/writer)
  |-- presentation.py (scrolling text, optional Rich; no batch rendering)
  |-- inputgen.py --- structure.py / spin_settings.py / method_profiles.py / models.py / io.py
+ |   `-- vibration.py -- functional_registry.py / basis_registry.py / structure.py / errors.py
+ |       Molecular finite-difference task validation, presets and CP2K input rendering; no execution.
  |-- xtb.py -- xtb_versions.py (GFN model/backend/count/data policy; tagged-version syntax and sources)
  |-- functional_registry.py (shared XC definitions/aliases, exact-exchange/nonlocal/build/dispersion/scope policy)
  |-- hybrid.py (shared HFX validation/operator/radius/data provenance and direct/RI rendering; no executor)

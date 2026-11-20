@@ -68,15 +68,15 @@ class EnergyBoundaryTests(unittest.TestCase):
                 self.assertEqual(run.segments[0].final_energy.value, -17.123)
                 self.assertEqual(quality_report(run)['status'], 'not_passed')
 
-    def test_strict_cli_and_overflow_exit_codes(self):
+    def test_strict_cli_and_out_of_range_exit_codes(self):
         for unit, (token, suffix, expected) in product(('a.u.', 'hartree'),
-                (('-17.123', '\t', 0), ('1.2broken', '', 7), ('1e999', '', 4))):
+                (('-17.123', '\t', 0), ('1.2broken', '', 7), ('1e999', '', 4), ('-1d-999', '', 4))):
             with self.subTest(unit=unit, token=token):
                 self.output(token, suffix, unit=unit)
                 with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
                     self.assertEqual(main(['report', str(self.path), '--strict']), expected)
-        for unit in ('a.u.', 'hartree'):
-            self.output('1e999', unit=unit)
+        for unit, token in product(('a.u.', 'hartree'), ('1e999', '-1d-999')):
+            self.output(token, unit=unit)
             with self.assertRaises(ParseError):
                 parse_output(self.path)
 

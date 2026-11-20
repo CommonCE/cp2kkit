@@ -27,6 +27,8 @@ def number(token, source):
     value = float(token.replace("D", "E").replace("d", "e"))
     if not math.isfinite(value):
         raise ParseError(f"Non-finite number at {source.path}:{source.line}")
+    if value == 0 and any(c in '123456789' for c in re.split('[eEdD]', token, maxsplit=1)[0]):
+        raise ParseError(f"Number underflows to zero at {source.path}:{source.line}")
     return value
 
 

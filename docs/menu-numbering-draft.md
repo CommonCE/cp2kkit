@@ -81,24 +81,14 @@ batch CLI commands and generator **640** (finite-displacement DX) are unchanged.
 local menu choices, generator IDs, basis numbers and atom indices are separate
 namespaces. Show only implemented operations; future plans are not placeholders.
 
-### Future molecular thermochemistry and phonons
+### Molecular thermochemistry and future phonons
 
-The user intends to integrate Shermo-related thermochemical corrections. Group
-that future molecular workflow with vibrations under main 7; an expanded label
-such as Vibrations and thermochemistry can accompany its actual implementation.
-Native frequency observations and derived thermochemistry remain independent
-operations and contracts, not an automatic calculation on opening a report.
-
-Before integrating Shermo, inspect the selected version's official interfaces,
-input/output formats and terms. Choose explicitly between preparing an exchange
-file, importing an existing Shermo result and authorized external execution;
-these are separate capabilities. Do not promise direct CP2K compatibility or
-redistribution permission without evidence. Future requests/results must retain
-frequency and electronic-energy sources, units, molecular mass/composition,
-charge/spin assumptions, temperature, pressure/standard state, scaling and
-low-frequency treatment where applicable, together with tool/version and
-parameters. Missing frequencies, intensities or corrections are not zeros.
-The 0.4.4 frequency parser must not run Shermo or silently apply corrections.
+Version 0.4.5 adds [external Shermo 2.6.2](shermo-thermochemistry.md) at
+**main 7 / s** after a vibration report is selected. It requests explicit
+reference geometry, masses and multiplicity, and confirmation before running.
+Main 7 still opens the observation directly; inspection never launches
+Shermo or applies corrections automatically. The standalone read-only
+`shermo-read` command does not launch Shermo. An internal backend is future work.
 
 Periodic phonons belong to a separate future application workflow, not the
 molecular vibration/thermochemistry operation. Plan q-point/mesh and band-path

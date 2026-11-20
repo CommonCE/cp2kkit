@@ -1,6 +1,36 @@
 # Development status and next steps
 
-Current software: **0.4.4**; schema: **0.1.0**.
+Current software: **0.4.5**; schema: **0.1.0**.
+
+## 0.4.5 stabilization: energy, vibrations and Shermo
+
+- Observe the unique native CP2K 2026.2 reference electronic energy adjacent to
+  a complete frequency block. Keep its printed unit and line evidence; a late
+  force-evaluation energy from that vibration is not a substitute. An explicit
+  separate single-point output can supply the composite electronic energy.
+  Preserve last-observed energy semantics and reject nonzero tokens that
+  underflow to zero.
+- Preserve signed frequencies and report displacement atom identities. Require
+  an explicit reference XYZ frame, matching atom order, masses and multiplicity
+  before handing data to thermochemistry. This does not infer a structure from
+  filenames or frame order, or certify a minimum.
+- Implement [external Shermo 2.6.2 thermochemistry](shermo-thermochemistry.md)
+  through API, CLI and main menu **7 / s**. Invocation requires explicit user
+  action; preparation, process exit and parsed results remain distinguishable.
+  Existing Shermo output can be read without execution. Source-format synthetic
+  and mocked-process tests are not native execution or scientific validation.
+
+The [0.4.5 handoff](development-handoff.md#current-handoff-045) records two
+bounded native water adapter comparisons, not general CP2K/Shermo validation.
+The [source-tree closeout](development-handoff.md#045-source-tree-closeout)
+records completed regression checks separately from packaging or publication.
+
+**Later:** extend native reference coverage and define a separate internal
+thermochemistry backend only after establishing reference comparisons and
+reviewing upstream terms. Do not silently switch backends. Surface
+selected-mode corrections, broader CP2K coverage, periodic phonons, NEB and
+reaction-path analyses are separate directions. Formal packaging remains a
+0.5 readiness item.
 
 ## Molecular vibrational result observation (0.4.4)
 
@@ -14,19 +44,10 @@ retains main entries 1-4, groups quality at 5/1, CUBE operations at 6/1 and 6/2,
 and places vibration at 7. Existing parse/plot/cube-planar CLI functions can
 gain local menu adapters later. Formal packaging is deferred to 0.5.
 
-For the next development round, choose a bounded follow-up from the
-[handoff priorities](development-handoff.md#follow-up-candidates-not-additional-044-implementation):
-broader native-format fixture coverage or evidence-based energy/structure/frequency
-association. Neither is required to use the current read-only parser.
-
-Future Shermo-related molecular thermochemical corrections should share the
-vibration workflow, but retain separate source observations, derived results,
-parameters and tool/version provenance. Official interface/format and terms
-inspection precedes integration; no direct CP2K support or execution is assumed.
-Periodic phonons need a separate future workflow, q-point/force-constant and
-normalization contracts, rather than reuse molecular RRHO thermochemistry.
-Neither expansion is part of the 0.4.4 frequency-observation stage. Further
-trajectory, electronic-structure and reaction-path groups have no frozen numbers.
+Shermo molecular thermochemistry is a separate 0.4.5 operation, not part of
+this 0.4.4 historical baseline. Periodic phonons need their own q-point,
+force-constant and normalization contracts rather than molecular RRHO.
+Trajectory, electronic-structure and reaction-path groups have no frozen numbers.
 
 ## Molecular vibrational input task (0.4.3)
 
@@ -736,6 +757,7 @@ Keep future rounds small and independently testable; no mass renaming/refactorin
 | MNT-3 | Revisit structured settings/models only when semantic consumers require them | Intentionally defer dataclass/settings redesign. Keep original strings/evidence and null distinct from zero; do not normalize or merge physical settings implicitly. |
 | PKG-1 | Add lightweight CI, optional lint/type checks and packaging metadata/checks | Keep unittest/compileall, standard-library core and optional Rich/plotting isolation. Add only verified links/authorship; the owner decides licensing and unresolved upstream terms remain explicit. No package release is implied. |
 | TEST-1 | Expand bounded/property-style edge-case matrices incrementally | Use unittest loops/deterministic cases without new mandatory dependencies. Extend filesystem errors, parser segmentation and generator combinations; build on existing collision/race/inode-aware rollback tests rather than claiming these are absent. |
+| DOC-1 | Streamline documentation during 0.5 preparation | Make current capabilities and Quick start easy to find. Archive closed-version details from `README.md` and `docs/roadmap.md` in dedicated records; keep existing links working and preserve version provenance, validation limits and historical evidence. |
 
 Hard-link portability is a compatibility enhancement, not evidence that current
 rollback overwrites files. Refactoring is not automatically low-risk where physical

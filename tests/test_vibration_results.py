@@ -129,6 +129,34 @@ class VibrationResultTests(unittest.TestCase):
         self.assertFalse(parse_vibration(self.source(stripped)).complete)
         self.assertEqual(parse_vibration(self.source(stripped)).counts['observed'], 3)
 
+    def test_distinct_displacement_atom_orders_mark_block_incomplete(self):
+        start = TEXT.index(' VIB|                         4\n')
+        report = parse_vibration(self.source(TEXT[:start] + TEXT[start:].replace('2  C', '2  O')))
+        self.assertEqual(report.displacement_atoms, [(1, 'O'), (2, 'C'), (3, 'O')])
+        self.assertFalse(report.strict_passed)
+        self.assertTrue(any('displacement atom indices or elements' in w for w in report.warnings))
+
+    def test_reference_energy_is_only_from_selected_native_footer(self):
+        heading = ' VIB| NORMAL MODES - THERMOCHEMICAL DATA\n'
+        row = ' VIB| Electronic energy (U) [kJ/mol]: -2625.49961710\n'
+        ordinary = ' ENERGY| Total FORCE_EVAL ( QS ) energy [hartree] -2.0\n'
+        text = TEXT.replace(' VIB| Minimum Structure', ordinary + ' VIB| Minimum Structure')
+        self.assertIsNone(parse_vibration(self.source(text)).reference_electronic_energy)
+        native = text.replace(END, heading + '\n' + row + END)
+        report = parse_vibration(self.source(native + text), segment=1, block=1)
+        energy = report.reference_electronic_energy
+        self.assertEqual((energy.value, energy.unit, energy.source.text),
+                         (-2625.49961710, 'kJ/mol', row.rstrip()))
+        self.assertEqual(native.splitlines()[energy.source.line - 1], energy.source.text)
+        self.assertIsNone(parse_vibration(self.source(native + text), segment=2).reference_electronic_energy)
+        for bad in (row + row, row.replace('kJ/mol', 'hartree'),
+                    row.replace('-2625.49961710', '1e-999'), row.replace('-2625.49961710', '***')):
+            with self.subTest(bad=bad):
+                report = parse_vibration(self.source(text.replace(END, heading + bad + END)))
+                self.assertIsNone(report.reference_electronic_energy)
+                self.assertTrue(report.strict_passed)
+                self.assertTrue(any('Unusable thermochemical reference energy' in w for w in report.warnings))
+
     def test_one_mode_and_native_footer_without_diagnostic(self):
         start = TEXT.index(' VIB|                        '+HEAD)
         final_group = TEXT[TEXT.index(' VIB|                         4\n'):].removesuffix(END)

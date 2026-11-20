@@ -10,7 +10,8 @@ from . import __version__
 from .errors import AmbiguousProject, KitError, ParseError
 from .io import json_text, new_file, read_text
 from .models import SCHEMA_VERSION, Evidence, Quantity
-from .parser import NUMBER, RUN_TYPE, SCF_FAIL, SCF_OK, VERSION, number
+from .output_settings import normalize_settings
+from .parser import NUMBER, RUN_TYPE, SCF_FAIL, SCF_OK, SETTING, VERSION, number
 
 UNIT = 'cm^-1'
 HEADING = re.compile(r'VIB\|\s+NORMAL MODES - CARTESIAN DISPLACEMENTS')
@@ -21,11 +22,12 @@ VALUES = re.compile(r'Frequency\s*\(cm\^-1\)\s+(.*)')
 MODE_IDS = re.compile(r'[0-9]{1,5}(?:\s+[0-9]{1,5})*')
 INTENSITY = re.compile(r'(?:IR int \(KM/Mole\)|Raman \(A\^4/amu\)|Depol Ratio \([PU]\))\s+\S.*')
 ATOM_HEADER = re.compile(r'ATOM\s+EL(?:\s+X\s+Y\s+Z){3}')
-ATOM = re.compile(r'[0-9]{1,5}\s+[A-Za-z]{1,2}\s+(\S.*)')
+ATOM = re.compile(r'([0-9]{1,5})\s+([A-Za-z]{1,2})\s+(\S.*)')
 NEW_ANALYSIS = re.compile(r'VIB\|\s+(?:Vibrational Analysis Info|REPLICA Nr\..*|Hessian .*|'
                           r'Cartesian Low frequencies ---|Frequencies after removal .*|Internal\s+Low frequencies ---)')
-FOOTER = re.compile(r'VIB\|\s+NORMAL MODES - THERMOCHEMICAL DATA|'
-                    r'-\s+(?:DBCSR STATISTICS|T I M I N G)\s+-')
+THERMO_HEADING = re.compile(r'VIB\|\s+NORMAL MODES - THERMOCHEMICAL DATA')
+FOOTER = re.compile(THERMO_HEADING.pattern + r'|-\s+(?:DBCSR STATISTICS|T I M I N G)\s+-')
+REFERENCE = re.compile(r'VIB\|\s+Electronic energy \(U\) \[kJ/mol\]:\s*(\S+)')
 START = re.compile(r'[ *]*PROGRAM STARTED AT\s+\S.*')
 END = re.compile(r'[ *]*PROGRAM ENDED AT\s+\S.*')
 PERIODICITY = re.compile(r'(?:POISSON|CELL)\|\s+Periodicity\s+(\S+)')
@@ -64,6 +66,9 @@ class VibrationReport:
     count_source: Evidence | None = None
     closure: Evidence | None = None
     complete: bool = False
+    displacement_atoms: list[tuple[int, str]] = field(default_factory=list)
+    reference_electronic_energy: Quantity | None = None
+    reference_state: dict = field(default_factory=dict)
 
     @property
     def counts(self) -> dict[str, int]:
@@ -83,7 +88,8 @@ class VibrationReport:
                 self.software_version is not None and self.run_type == 'VIBRATIONAL_ANALYSIS')
 
     def to_dict(self) -> dict:
-        return {**asdict(self), 'schema_version': SCHEMA_VERSION, 'operation': 'vibration_observation',
+        return {**asdict(self), 'displacement_atoms': [list(atom) for atom in self.displacement_atoms],
+                'schema_version': SCHEMA_VERSION, 'operation': 'vibration_observation',
                 'parser': {'name': 'cp2kkit', 'version': __version__}, 'software': 'CP2K',
                 'frequency_unit': UNIT, 'counts': self.counts, 'status': self.status,
                 'strict_passed': self.strict_passed, 'electronic_converged': None,
@@ -102,10 +108,7 @@ class AmbiguousVibration(AmbiguousProject):
 def _numeric(token: str, evidence: Evidence) -> float:
     if not NUMERIC.fullmatch(token):
         raise ParseError(f'Malformed number at {evidence.path}:{evidence.line}: {token!r}')
-    value = number(token, evidence)
-    if value == 0 and any(c in '123456789' for c in re.split('[eEdD]', token, maxsplit=1)[0]):
-        raise ParseError(f'Number underflows to zero at {evidence.path}:{evidence.line}: {token!r}')
-    return value
+    return number(token, evidence)
 
 
 def parse_threshold(text: str) -> float:
@@ -177,18 +180,19 @@ def _read_table(report: VibrationReport, lines: list[str], start: int, stop: int
         count_rows.append(tokens)
         i -= 1
 
-    next_id, previous_width, atom_count = 1, None, None
+    next_id, previous_width = 1, None
     ids, id_source = None, None
-    stage, atoms = 'ids', 0
+    stage, atoms = 'ids', []
     supported_rows = unsupported_rows = 0
     boundary = None
     for i in range(start + 1, stop):
         line = lines[i].strip()
         if not line:
             if stage == 'atoms' and atoms:
-                if atom_count is not None and atoms != atom_count:
-                    _issue(report, evidence(i), 'Inconsistent displacement row count between groups')
-                atom_count = atoms
+                if not report.displacement_atoms:
+                    report.displacement_atoms = atoms
+                elif atoms != report.displacement_atoms:
+                    _issue(report, evidence(i), 'Inconsistent displacement atom indices or elements between groups')
                 report.closure = evidence(i)
                 stage = 'ids'
             continue
@@ -254,10 +258,10 @@ def _read_table(report: VibrationReport, lines: list[str], start: int, stop: int
         elif record and stage == 'force' and payload.startswith('Frc consts (a.u.) '):
             stage = 'atom_header'
         elif stage == 'atom_header' and ATOM_HEADER.fullmatch(line):
-            stage, atoms = 'atoms', 0
+            stage, atoms = 'atoms', []
         elif stage == 'atoms' and (atom := ATOM.fullmatch(line)):
-            atoms += 1
-            if previous_width is not None and len(atom[1].split()) != 3 * previous_width:
+            atoms.append((int(atom[1]), atom[2]))
+            if previous_width is not None and len(atom[3].split()) != 3 * previous_width:
                 _issue(report, evidence(i), 'Incomplete displacement row')
         else:
             _issue(report, evidence(i), 'Unexpected record in the normal-mode table')
@@ -280,6 +284,33 @@ def _read_table(report: VibrationReport, lines: list[str], start: int, stop: int
     report.complete = not report.diagnostics
     if boundary and report.complete:
         report.closure = boundary
+        if THERMO_HEADING.fullmatch(boundary.text.strip()):
+            _read_reference(report, lines, boundary.line, stop, evidence)
+
+
+def _read_reference(report, lines, start, stop, evidence):
+    records = []
+    for i in range(start, stop):
+        line = lines[i].strip()
+        if not line:
+            continue
+        if (not VIB.fullmatch(line) or NEW_ANALYSIS.fullmatch(line) or
+                THERMO_HEADING.fullmatch(line)):
+            break
+        if line.split('|', 1)[1].lstrip().startswith('Electronic energy (U)'):
+            records.append(evidence(i))
+    if not records:
+        return
+    if len(records) == 1 and (match := REFERENCE.fullmatch(records[0].text.strip())):
+        try:
+            value = _numeric(match[1], records[0])
+        except ParseError:
+            pass
+        else:
+            report.reference_electronic_energy = Quantity(value, 'kJ/mol', records[0])
+            return
+    report.warnings.append('Unusable thermochemical reference energy at line(s) ' +
+                           ', '.join(str(item.line) for item in records))
 
 
 def parse_vibration(path: str | Path, *, segment: int | None = None, block: int | None = None,
@@ -316,8 +347,11 @@ def parse_vibration(path: str | Path, *, segment: int | None = None, block: int 
     s, b, begin, start, stop, end_marker, count_window = selected[0]
     version = version_source = run_type = run_source = None
     summaries = {'converged': 0, 'not_converged': 0}
+    state_records = []
     for i in range(begin, start):
         line = lines[i].strip()
+        if (setting := SETTING.match(line)) and setting[1] == 'DFT' and setting[2] in {'Charge', 'Multiplicity'}:
+            state_records.append({'key': 'DFT|' + setting[2], 'value': setting[3], 'source': asdict(evidence(i))})
         if match := VERSION.match(line):
             version, version_source = match[1].strip(), evidence(i)
             if not RELEASE.fullmatch(version):
@@ -337,6 +371,8 @@ def parse_vibration(path: str | Path, *, segment: int | None = None, block: int 
     report = VibrationReport(source, version, version_source, run_type, run_source, s, b,
                              evidence(start), evidence(end_marker) if end_marker is not None else None,
                              summaries, threshold)
+    normalized = normalize_settings(state_records)
+    report.reference_state = {key: normalized[key] for key in ('charge', 'multiplicity')}
     _read_table(report, lines, start, stop, evidence, count_window)
     if version is None or run_type is None:
         report.warnings.append('Missing version or run type; only the printed table format is recognized')

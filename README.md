@@ -2,7 +2,7 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.4.4 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.4.5 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 cp2kkit is an independent CP2K toolkit, not an internal component of a workflow
@@ -13,10 +13,11 @@ require a consumer repository, database or credentials. See the
 [producer/consumer boundary](docs/architecture.md#producer-and-consumer-responsibilities)
 and [public contract index](docs/contracts.md).
 
-- Analysis remains read-only: no submission/execution or modification of existing
-  inputs, restart files, or raw output.
+- Analysis does not modify existing inputs, restart files or raw outputs, or run
+  or submit CP2K. The optional Shermo integration executes only on explicit request.
 - The six MVP features have entry points, with additional `generate-input`,
-  `cube-check`, `cube-diff`, `cube-planar`, and `vibration` commands; calculations are never run automatically.
+  `cube-check`, `cube-diff`, `cube-planar`, `vibration`, `thermochemistry` and
+  `shermo-read` commands.
 - The core uses Python's standard library; Rich styling and Matplotlib are optional.
 - Outputs include schema, units, SHA-256, line numbers, and original text.
   Missing values are not zero.
@@ -38,7 +39,19 @@ input generation; version 0.3.3 adds BHandHLYP, M06-2X and configurable PBEh.
 All 21 referenced DFT selections now have bounded generation support; this is
 not full Multiwfn feature/combination coverage.
 
-## Current version: 0.4.4
+## Current version: 0.4.5
+
+[External Shermo 2.6.2 thermochemistry](docs/shermo-thermochemistry.md) is available
+as an explicit `thermochemistry` command and from the selected vibration report
+(main **7**, then **s**). Provide a trusted external executable and the matching
+reference XYZ frame, atomic masses and multiplicity; cp2kkit handles the temporary
+exchange and reads back ZPE, thermal corrections and corrected U/H/G. Use
+`--energy-output` to take the electronic energy from a separate single point
+on the same geometry (for example, with a larger basis). Existing
+Shermo results can be imported read-only with `shermo-read`. No built-in Shermo
+algorithm or bundled executable is included. Schema remains **0.1.0**.
+
+### Retained vibrational observations (0.4.4 baseline)
 
 Observe CP2K 2026.2 molecular normal-mode tables without running a calculation.
 The parser preserves signed frequencies in cm^-1, original tokens and evidence,

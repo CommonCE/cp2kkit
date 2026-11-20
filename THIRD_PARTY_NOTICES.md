@@ -18,6 +18,26 @@ and [feature provenance](third_party/multiwfn/PROVENANCE.md).
 Existing CP2K references and upstream method/basis citations still apply; this
 notice does not assign a whole-project license or certify compatibility.
 
+## Shermo
+
+- Tian Lu and Qinxue Chen, *Shermo: A general code for calculating molecular
+  thermodynamic properties*, Comput. Theor. Chem. 1200, 113249 (2021),
+  DOI: [10.1016/j.comptc.2021.113249](https://doi.org/10.1016/j.comptc.2021.113249).
+- Reviewed the user-supplied Shermo source identifying itself as version 2.6.2.
+  `loadfile.f90:loadshm`, `sub.f90:loadarguments`/`outshmfile`, `Shermo.f90`
+  and `calc.f90:showthermo` were used as interface references only. No source,
+  mass tables, equations or binary are copied or bundled. The result cites the
+  paper. The supplied custom `LICENSE.txt` requires citation when used, limits
+  sale of modified versions without prior permission, and disclaims warranty.
+  The supplied `SYVA.F` carries separate LGPL terms; no redistribution or
+  relicensing permission is inferred for any future internal implementation.
+- Reviewed file SHA-256: `LICENSE.txt` `1e0fc30a5f381f5944bdf4b929add94c8e5983396ee4fabef60942c0149121ac`;
+  `loadfile.f90` `af9a7d17f0414b576a4d3c7bcc77ca5a427f2b0013f9d1e8144c29e5f9aaa414`;
+  `sub.f90` `79f51da0db4916e41600bc96b5f9238a3f483189c9109823fcfa90190f3228b1`;
+  `Shermo.f90` `e28c7f25ed07d7cc4074638be0c783c952afa4c694b4b2340c6e2fab99ae7187`;
+  `calc.f90` `6a6af0f72cf80ac7d250a8e76f7cc80b31d95432199a37b1c43fd72e7437d765`.
+  These identify the reviewed files, not an installed executable.
+
 ## Multiwfn
 
 ### Upstream information

@@ -13,6 +13,7 @@ scheduler or credentials are required to use or test cp2kkit.
 | GEO_OPT observations | [Observation contract](geo-opt-contract.md) | [Synthetic observation example](../examples/geo-opt-contract/README.md) |
 | Molecular vibrational input generation, software 0.4.3 | [Generation contract](vibration-contract.md) | [Synthetic generation example](../examples/vibration-contract/README.md) |
 | Molecular vibrational result observations, software 0.4.4 | [Result contract](vibration-results-contract.md) | [Synthetic frequency example](../examples/vibration-results/README.md) |
+| External Shermo molecular thermochemistry, software 0.4.5 | [Result and invocation contract](shermo-thermochemistry.md) | [Synthetic and mocked tests](../tests/test_thermochemistry.py) |
 | Other generated-input behavior | [Input generation](input-generation.md) and its feature sections | Existing feature tests; no blanket claim of complete consumer-contract coverage |
 
 Use a documented contract plus its referenced feature rules, not an example alone.

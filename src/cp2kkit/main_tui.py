@@ -169,6 +169,10 @@ def vibration_analysis(menu):
     menu.show(f"Source: {report.source['path']}")
     menu.show(f'Segment {report.segment}, block {report.block}: {report.status}; '
               f'program end marker: {"observed" if report.program_end else "not observed"}')
+    energy = report.reference_electronic_energy
+    if energy is not None:
+        menu.show(f'CP2K reference electronic energy: {energy.value:.8f} {energy.unit} '
+                  f'(line {energy.source.line}; observation only)')
     counts = report.counts
     menu.show(f"Observed frequencies: {counts['observed']}; raw negatives: {counts['raw_negative']}")
     menu.show(f"Threshold: {threshold:g} cm^-1; negative={counts['negative']}, "
@@ -184,7 +188,7 @@ def vibration_analysis(menu):
         menu.show('Additional warnings are available in full details.')
     menu.show('Text observations do not establish convergence, a clean process exit or a stationary point.')
     while True:
-        raw = menu.ask('Enter returns; d details; j export JSON; c export CSV; cancel/q: ').lower()
+        raw = menu.ask('Enter returns; d details; j JSON; c CSV; s Shermo; cancel/q: ').lower()
         if raw in {'', '0', 'back'}:
             return
         if raw == 'd':
@@ -193,8 +197,57 @@ def vibration_analysis(menu):
             output = required_path(menu, 'New vibration report path')
             export_vibration(output, report, 'json' if raw == 'j' else 'csv')
             menu.show(f'Generated path: {Path(output).resolve()}')
+        elif raw == 's':
+            shermo_analysis(menu, report)
         else:
-            menu.show('Error: Select d, j, c or Enter.')
+            menu.show('Error: Select d, j, c, s or Enter.')
+
+
+def shermo_analysis(menu, report):
+    from .io import write_json
+    from .thermochemistry import run_shermo
+
+    if not report.strict_passed:
+        raise KitError('Shermo requires a strict vibration report')
+    raw = menu.ask('CP2K single-point output path; Enter uses the vibration reference energy: ')
+    if raw.lower() == 'back':
+        return
+    energy_output = Path(raw).expanduser() if raw else None
+    if energy_output is None and report.reference_electronic_energy is None:
+        raise KitError('No unique native vibration reference energy; supply a single-point output')
+    executable = required_path(menu, 'Trusted Shermo 2.6.2 executable path')
+    geometry = required_path(menu, 'Reference XYZ geometry file')
+    try:
+        energy_segment = (menu.ask('Single-point segment (1-based); Enter requires a unique candidate: ')
+                          if energy_output is not None else '')
+        energy_segment = int(energy_segment) if energy_segment else None
+        frame = int(menu.ask('Zero-based XYZ frame: '))
+        masses = [float(m) for m in menu.ask('Atomic masses [amu] in XYZ order, space separated: ').split()]
+        multiplicity = int(menu.ask('Spin multiplicity: '))
+        temperature = float(menu.ask('Temperature [K]; Enter uses 298.15: ') or '298.15')
+        pressure = float(menu.ask('Pressure [atm]; Enter uses 1: ') or '1')
+        scale = float(menu.ask('Shared frequency scale; Enter uses 1: ') or '1')
+    except ValueError as exc:
+        raise KitError('Invalid numeric Shermo setting') from exc
+    low = menu.ask('Low-frequency treatment: grimme (default) or harmonic: ').lower() or 'grimme'
+    menu.show(f'Shermo will run at {temperature:g} K, {pressure:g} atm, scale {scale:g}, {low}.')
+    menu.show(f'Electronic energy source: {energy_output if energy_output is not None else "vibration footer"}')
+    if menu.ask('Confirm matching reference geometry and molecular state for all sources, and run Shermo? [y/N]: ').lower() not in {'y', 'yes'}:
+        return
+    data = run_shermo(report.source['path'], geometry, executable=executable, frame=frame,
+                      masses_amu=masses, multiplicity=multiplicity, confirm_reference=True,
+                      temperature=temperature, pressure=pressure, scale=scale, low_frequency=low,
+                      segment=report.segment, block=report.block, expected_source_sha256=report.source['sha256'],
+                      energy_output=energy_output, energy_segment=energy_segment)
+    menu.show('Shermo thermochemistry [hartree]:')
+    menu.show(f"  ZPE: {data['zero_point_energy']['value']:.6f}")
+    for key, total in data['corrected_totals'].items():
+        menu.show(f"  {key}: {total['value']:.7f} (correction {data['thermal_corrections'][key]['value']:+.6f})")
+    menu.show(data['citation'])
+    if menu.ask('Export Shermo result as JSON? [y/N]: ').lower() in {'y', 'yes'}:
+        path = required_path(menu, 'New Shermo JSON path')
+        write_json(path, data)
+        menu.show(f'Generated path: {Path(path).resolve()}')
 
 
 def analysis(menu, action):

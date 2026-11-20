@@ -1,4 +1,4 @@
-# Molecular vibrational result observations (software 0.4.4)
+# Molecular vibrational result observations (since software 0.4.4)
 
 This read-only contract covers CP2K 2026.2 molecular Cartesian normal-mode
 frequency tables. It is independent of the [input-generation contract](vibration-contract.md)
@@ -86,6 +86,23 @@ null or an empty list as appropriate. `closure` identifies the observed group
 terminator or, for a complete table, a recognized following footer when present.
 `expected_mode_count_from_diagnostic` is a nullable integer, not an atom-based
 count or assurance that all physical modes exist.
+
+Version 0.4.5 adds JSON/Python `displacement_atoms` (ordered index/element pairs
+from the first closed group; inconsistent later groups make the table incomplete)
+and `reference_electronic_energy`. The additive `reference_state` object records
+pre-table `DFT| Charge` and `DFT| Multiplicity` evidence for the selected segment.
+Each field uses the [normalized settings convention](geo-opt-contract.md):
+a value is non-null only with `parsed` status; `missing`, `conflicting` and
+`unsupported` retain null rather than assuming a state. This evidence does not
+change the frequency report's strict status.
+
+For a complete mode table, it observes the unique `Electronic energy (U)` row
+in its adjacent native `NORMAL MODES - THERMOCHEMICAL DATA` footer, as a
+`{value, unit, source}` quantity in the printed `kJ/mol`. CP2K v2026.2
+[passes the restored-reference energy to that footer](https://github.com/cp2k/cp2k/blob/v2026.2/src/motion/vibrational_analysis.F#L709-L713).
+Missing, malformed or duplicate rows yield null; ordinary FORCE_EVAL energies
+are not substitutes. This is not a convergence or stationarity claim. Strict
+frequency status and CSV columns are unchanged.
 
 `modes` is a list in file and column order. Each record has a 1-based observed
 `ordinal`, nullable `mode_id` and `mode_source` (printed ID and its line only
