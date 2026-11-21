@@ -68,6 +68,8 @@ class VibrationContractTests(unittest.TestCase):
         self.assertEqual(manifest['generator']['version'], __version__)
         self.assertEqual(manifest['input_text'], text)
         self.assertEqual(manifest['input_sha256'], hashlib.sha256(text.encode('utf-8')).hexdigest())
+        # Recorded from the 0.4.5 catalog-only baseline before expanding task scope.
+        self.assertEqual(manifest['input_sha256'], 'c290fca68017131a35e33c0b5cf2749c2359a17add55a75f2ae8ef4a5e605fd1')
         source = manifest['source_structure']['source']
         self.assertEqual(source['path'], str(self.source.resolve()))
         self.assertEqual(source['sha256'], hashlib.sha256(self.original).hexdigest())

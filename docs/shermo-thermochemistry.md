@@ -115,6 +115,6 @@ invalid reference choices, timeout or nonzero tool exit return 2; CP2K ambiguity
 returns 3; unsupported or incomplete output returns 4; collision returns 5.
 Failure publishes no result JSON. Neither a report nor a zero exit certifies
 scientific validity. Automated tests use source-format synthetic records and a
-mocked Shermo process. The [0.4.5 handoff](development-handoff.md#current-handoff-045)
+mocked Shermo process. The [0.4.5 handoff](development-handoff.md#historical-handoff-045)
 separately records the bounded native water comparisons and their limitations.
 See the [third-party notice](../THIRD_PARTY_NOTICES.md#shermo) for the reviewed source and terms.

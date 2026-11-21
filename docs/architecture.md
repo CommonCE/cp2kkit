@@ -1,4 +1,4 @@
-# cp2kkit v0.4.5 architecture
+# cp2kkit v0.4.6 architecture
 
 ## Design principles
 
@@ -24,8 +24,9 @@ No submission system or deferred Bader/PDOS/NEB post-processing is introduced.
 
 `vibration.py` owns the bounded task policy, numerical presets, source identities
 and top-level finite-difference section. `inputgen.generate_input` validates new
-requests before method/workflow dispatch, then checks resolved spin, basis and
-boundary conditions. The molecular MT preset checks the emitted orthorhombic
+requests before method/workflow dispatch, then checks the resolved basis and
+boundary conditions. UKS and pair dispersion reuse the shared generator paths
+and validation (0.4.6). The molecular MT preset checks the emitted orthorhombic
 cell and displaced atomic envelope without changing source/user cell or SCF
 choices; unavailable electronic-density containment is explicitly unverified.
 Existing geometry/data resolution, provenance and staged
@@ -91,7 +92,7 @@ cli.py
  |-- export.py ----- structure.py / io.py / models.py / quality.py (shared structure export/CSV)
  |-- structure.py -- models.py / io.py (independent geometry)
  |-- plot.py ------- export.py / quality.py / optional matplotlib
- |-- main_tui.py --- input_tui.py / structure.py / export.py (menu/load/grouped operations)
+ |-- main_tui.py --- input_tui.py / structure.py / export.py (menu/load/grouped analysis adapters)
  |-- vibration_results.py -- parser.py (helpers) / models.py / io.py (frequency observations)
  |-- thermochemistry.py -- vibration_results.py / parser.py / quality.py / structure.py / models.py / io.py / errors.py
  |   Explicit external Shermo 2.6.2 thermochemistry; read-only import of existing stdout.

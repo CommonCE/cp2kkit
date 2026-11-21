@@ -1,4 +1,4 @@
-# Molecular vibrational generation contract (software 0.4.3)
+# Molecular vibrational generation contract (software 0.4.6)
 
 This is an input-generation contract for independent API/CLI consumers, not a
 frequency-result or execution contract. See the separate [result contract](vibration-results-contract.md)
@@ -60,9 +60,18 @@ Generation writes no JSON to stdout: success/warnings are human text on stderr.
   must be finite positive numbers, not Booleans, and pass displacement/box
   checks. Absent/null eps_scf selects this task's 1e-8 preset; explicit values
   must be finite positive and <=1e-8. There is no accuracy-safe DX guarantee.
-- Existing charge defaults to integer 0. Multiplicity may be auto/null and is
-  resolved by electron parity, then checked against the closed-shell task gate.
-  Do not use electron parity as a ground-state spin prediction.
+- Existing charge defaults to integer 0. Auto/null multiplicity resolves to 1
+  for even and 2 for odd valence-electron counts; explicit values must pass the
+  same parity and electron-count checks. Multiplicity >1 or explicit `magnetism`
+  (including `()` for seedless UKS) enables UKS. Atomic seeds are initial guesses
+  only, not moment constraints or a reason to change charge or multiplicity.
+  Do not use electron parity as a ground-state spin prediction. UKS vibration
+  manifests warn that displaced-geometry SCF solutions are not verified to remain
+  on the same spin/electronic state, including when no seeds were requested.
+- `dispersion` accepts `none` (unchanged default), `d3` and `d3bj`. When a data
+  directory is selected, `dftd3.dat` must be readable and its byte identity is
+  recorded in `data_sources.dispersion`; otherwise CP2K must resolve the basename
+  at runtime and the manifest warns that it was unchecked.
 - `data_dir`, explicit library paths and the CP2K_DATA_DIR fallback affect data
   resolution. For the catalog-only public expectation, unset CP2K_DATA_DIR and
   do not supply data files. Real checked libraries change validation/provenance;
@@ -86,7 +95,7 @@ read the opt-in sidecar or call generate_input for metadata.
 | schema_version; generator.name/version | Strings; exchange and toolkit identities, not CP2K runtime identity |
 | target_software/target_version | Strings CP2K/2026.2 for this task; requested target, not detected installed version |
 | runtime_version; runtime_validated | Null and false; no runtime probe performed |
-| settings | Normalized settings object; not a lossless copy of the original request. DX/eps_scf auto nulls remain null, but e.g. auto multiplicity resolves to 1 |
+| settings | Normalized settings object; not a lossless copy of the original request. DX/eps_scf auto nulls remain null, but auto multiplicity is stored as the resolved integer |
 | input_text; input_sha256 | Generated string and SHA-256 of its UTF-8 bytes; recompute if bytes change |
 | source_structure; generated_structure | Independent Structure objects in JSON form; original versus emitted/rounded/possibly auto-centered geometry |
 | coordinates_translated | Boolean describing generator translation, not optimization |
@@ -109,6 +118,27 @@ object means unavailable metadata, not a successful/failed vibrational result.
 can be false while vibrational PROGRAM_RUN_INFO force diagnostics are enabled.
 Do not mistake it for an overall "no forces printed" flag. No frequencies,
 Hessian observations, stationary-point judgment or scheduler outcome are exported.
+
+## Pair dispersion force path
+
+Static inspection of CP2K tag **v2026.2** traced `+DX` and `-DX` in
+[`motion/vibrational_analysis.F`](https://github.com/cp2k/cp2k/blob/v2026.2/src/motion/vibrational_analysis.F)
+through the force-enabled replica call (`replica_methods.F`, `f77_interface.F`)
+and Quickstep dispatch (`force_env_methods.F`, `qs_force.F`). The force call
+passes `calc_forces=.TRUE.` to `qs_energies`; `qs_energy_init.F` invokes
+`calculate_dispersion_pairpot` with that flag. Both DFTD3 and DFTD3(BJ) in
+`qs_dispersion_pairpot.F` dispatch to `calculate_dispersion_d3_pairpot`;
+`qs_dispersion_d3.F` accumulates in the dispersion force component, which
+`replicate_qs_force` in `qs_force_types.F` includes in the total. The replica
+forces are differenced to form the Hessian. These links are hash-recorded in
+`vibrational_analysis.sources` for D3/D3(BJ) requests. The shared method profile
+already records the tagged D3 parameter lookup source (PBE in both branches).
+
+This is source-path evidence, not native execution, measured force/frequency
+agreement, SCF spin-state continuity or scientific validation. Closed-shell
+`dispersion='none'` inputs and input hashes are unchanged since 0.4.5; the
+software identity in new sidecars advances to 0.4.6. No new request keys or
+exchange schema changes are needed.
 
 ## Publication, failures and replay
 

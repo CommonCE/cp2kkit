@@ -18,7 +18,8 @@ SCF_FAIL = re.compile(r"SCF run NOT converged|SCF run did not converge|SCF NOT c
 VERSION = re.compile(r"CP2K\|\s+version string:\s*(.+)", re.I)
 PROJECT = re.compile(r"GLOBAL\|\s+Project name\s+(\S+)", re.I)
 RUN_TYPE = re.compile(r"GLOBAL\|\s+Run type\s+(\S+)", re.I)
-WALL = re.compile(r"(?:Total wall time|WALL TIME)\s*\[s\]\s*[:=]?\s*(" + NUMBER + r")", re.I)
+WALL_LABEL = re.compile(r"\b(?:Total wall time|WALL TIME)\s*\[s\]", re.I)
+WALL = re.compile(WALL_LABEL.pattern + r"\s*[:=]?\s*(" + NUMBER + r")(?=\s|$)", re.I)
 SETTING = re.compile(r"^\s*(DFT|QS|XC|CELL|GLOBAL)\|\s*(.*?)\s{2,}(\S.*)$")
 DIAGNOSTIC = re.compile(r"\b(?:ERROR|WARNING|ABORT)\b|\*{3}\s*(?:ERROR|WARNING)", re.I)
 
@@ -155,9 +156,16 @@ def parse_output(path):
             # their convergence to a later, unrelated energy record.
             pending_scf = None
             scf_evidence = []
-        match = WALL.search(line)
-        if match:
-            current.wall_time = Quantity(number(match[1], evidence), "s", evidence)
+        if WALL_LABEL.search(line):
+            current.wall_time = None
+            match = WALL.search(line)
+            if match:
+                try:
+                    current.wall_time = Quantity(number(match[1], evidence), "s", evidence)
+                except ParseError as exc:
+                    warnings.append(f"Invalid wall-time record at line {line_no}: {exc}")
+            else:
+                warnings.append(f"Malformed wall-time record at line {line_no}")
         if DIAGNOSTIC.search(line):
             current.diagnostics.append(evidence)
         if "PROGRAM ENDED AT" in line:

@@ -1,4 +1,4 @@
-"""Synthetic ENERGY token boundaries, not CP2K runtime validation."""
+"""Synthetic output token boundaries, not CP2K runtime validation."""
 import hashlib
 import io
 import json
@@ -15,6 +15,31 @@ from cp2kkit.cli import main
 from cp2kkit.errors import ParseError
 from cp2kkit.parser import parse_output
 from cp2kkit.quality import quality_report
+
+
+class WallTimeBoundaryTests(unittest.TestCase):
+    def test_wall_time_requires_a_complete_finite_token(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/'synthetic.out'
+            for label in ('Total wall time', 'WALL TIME'):
+                for token in ('12.5e+garbage', '12.5e+', '12.5D+1junk', '12.5.1', '', 'NaN', '1e999', '1e-999'):
+                    with self.subTest(label=label, token=token):
+                        path.write_text(f'CP2K| version string: synthetic\n {label} [s]: {token}')
+                        run = parse_output(path)
+                        self.assertIsNone(run.segments[0].wall_time)
+                        self.assertTrue(any('wall-time record at line 2' in w for w in run.parser_warnings))
+
+    def test_wall_time_preserves_valid_tokens_and_does_not_reuse_an_earlier_value(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/'synthetic.out'
+            text = 'CP2K| version string: synthetic\n WALL TIME [s] = 1.25D+1\t annotation\n'
+            path.write_text(text)
+            wall = parse_output(path).segments[0].wall_time
+            self.assertEqual((wall.value, wall.unit, wall.source.line), (12.5, 's', 2))
+            path.write_text(text + ' Total wall time [s]: 12.5e+garbage')
+            run = parse_output(path)
+            self.assertIsNone(run.segments[0].wall_time)
+            self.assertIn('Malformed wall-time record at line 3', run.parser_warnings)
 
 
 class EnergyBoundaryTests(unittest.TestCase):

@@ -129,6 +129,26 @@ class VibrationResultTests(unittest.TestCase):
         self.assertFalse(parse_vibration(self.source(stripped)).complete)
         self.assertEqual(parse_vibration(self.source(stripped)).counts['observed'], 3)
 
+    def test_displacement_tokens_must_be_finite_numbers_at_full_row_width(self):
+        row = next(line for line in TEXT.splitlines() if line.startswith('     1  O '))
+        prefix = row.rsplit(maxsplit=1)[0]
+        accepted = self.source(TEXT.replace(row, f'{prefix} -.25D+0', 1))
+        self.assertTrue(parse_vibration(accepted).strict_passed)
+        for token in ('NaN', '****', 'damaged', '1e+', '1e999', '1e-999'):
+            with self.subTest(token=token):
+                damaged = f'{prefix} {token}'
+                self.assertEqual(len(damaged.split()), len(row.split()))
+                path = self.source(TEXT.replace(row, damaged, 1))
+                report = parse_vibration(path)
+                self.assertFalse(report.complete)
+                self.assertFalse(report.strict_passed)
+                self.assertEqual([m.mode_id for m in report.modes], [1, 2, 3, 4])
+                self.assertEqual([e.text for e in report.diagnostics], [damaged])
+                self.assertTrue(any('displacement token' in warning for warning in report.warnings))
+        result = self.cli(path, '--strict')
+        self.assertEqual(result.returncode, 7, result.stderr)
+        self.assertFalse(json.loads(result.stdout)['strict_passed'])
+
     def test_distinct_displacement_atom_orders_mark_block_incomplete(self):
         start = TEXT.index(' VIB|                         4\n')
         report = parse_vibration(self.source(TEXT[:start] + TEXT[start:].replace('2  C', '2  O')))

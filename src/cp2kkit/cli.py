@@ -4,6 +4,7 @@
 import argparse
 import os
 import sys
+from pathlib import Path
 
 from . import __version__
 from .cube import DIALECTS, SCALAR_TYPES, SCALAR_UNITS, CubeOptions, check_cube, diff_cubes
@@ -287,8 +288,9 @@ def execute(args):
             report = check_cube(args.path, options)
             emit(report, args.output)
         elif args.command == 'cube-planar':
-            report = write_planar_profile(args.path, args.output, args.axis, options)
-            print(f"Wrote {args.output} and {args.output}.json", file=sys.stderr)
+            output = Path(args.output)
+            report = write_planar_profile(args.path, output, args.axis, options)
+            print(f"Wrote {output} and {Path(str(output) + '.json')}", file=sys.stderr)
         else:
             count = len(args.paths)
             lengths = args.input_length_units or [args.length_unit]*count
@@ -296,8 +298,9 @@ def execute(args):
             if len(lengths) != count or len(units) != count:
                 raise KitError("Per-file unit options must match the number of CUBE inputs")
             options = [CubeOptions(args.dialect, length, args.scalar_type, unit) for length, unit in zip(lengths, units)]
-            report = diff_cubes(args.paths, args.output, options, args.grid_atol, args.grid_rtol, args.integral_atol)
-            print(f"Wrote {args.output} and {args.output}.json", file=sys.stderr)
+            output = Path(args.output)
+            report = diff_cubes(args.paths, output, options, args.grid_atol, args.grid_rtol, args.integral_atol)
+            print(f"Wrote {output} and {Path(str(output) + '.json')}", file=sys.stderr)
         for warning in report["warnings"]:
             print(f"WARNING: {warning}", file=sys.stderr)
         return 0

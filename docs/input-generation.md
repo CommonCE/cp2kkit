@@ -73,21 +73,21 @@ is promised.
 
 ## Molecular vibrational inputs (0.4.3)
 
-This is a new **input task**, not frequency-output analysis or an execution
-workflow. It targets **CP2K 2026.2** only. The initial generator policy is
-intentionally narrower than native CP2K; excluded combinations are not claims
-that CP2K universally cannot calculate them. The bounded development stage is
-complete; the [consumer contract](vibration-contract.md) covers public calls,
-file effects and replay. See the [0.4.3 closeout](closeout-0.4.3.md) for actual checks, compatibility
-and the distinction between native input acceptance and scientific validation.
+This is an **input task**, not frequency-output analysis or an execution
+workflow. It targets **CP2K 2026.2** only. The generator policy is narrower than
+native CP2K; exclusions are not claims that CP2K cannot calculate those cases.
+Version 0.4.6 adds pair dispersion and UKS without changing the closed-shell
+no-dispersion input text or numerical presets. The [consumer contract](vibration-contract.md)
+covers public calls, file effects and replay. The [0.4.3 closeout](closeout-0.4.3.md)
+records the earlier baseline checks, not native validation of the new cases.
 
-| Dimension | Allowed | Rejected in this first subset |
+| Dimension | Allowed | Rejected or unsupported in this subset |
 |---|---|---|
 | Boundary | Explicit/resolved PERIODIC NONE, Gamma; MT electrostatics; positive axis-aligned orthorhombic cell | Unknown PBC, any periodic direction, non-Gamma, skew/rotated cells |
-| Method | DFT/PBE, GPW, classic MOLOPT/UCL orbital registry and existing fixed-q GTH-PBE resolution | Other functionals, GAPW, UZH protocols, custom bases, xTB, +U, extra pair dispersion, ADMM/RI |
-| Spin | Closed-shell RKS, multiplicity 1; charge retained | UKS, multiplicity >1, any explicit magnetism (including empty UKS request) |
+| Method | DFT/PBE, GPW, classic MOLOPT/UCL orbital registry and existing fixed-q GTH-PBE resolution; no dispersion, D3 or D3(BJ) | Other functionals, GAPW, UZH protocols, custom bases, xTB, +U, other dispersion models, ADMM/RI |
+| Spin | RKS or collinear UKS with parity-compatible multiplicity, with optional initial atomic magnetization; charge retained | Inconsistent charge/multiplicity, noncollinear or constrained magnetism |
 | SCF | OT, STRICT (auto or explicit), no added MOs/smearing | diag, IRAC, smearing; no automatic solver switch |
-| Analysis | Molecules with at least two atoms; full central finite-difference Hessian from forces, rotation cleaning | Isolated single atoms (no internal vibrations), MODE_SELECTIVE, periodic phonons/dispersion, IR/Raman, thermochemistry |
+| Analysis | Molecules with at least two atoms; full central finite-difference Hessian from forces, rotation cleaning | Isolated single atoms (no internal vibrations), partial Hessians/FIXED_ATOMS, MODE_SELECTIVE, periodic phonons, IR/Raman, thermochemistry |
 | Outputs/workflows | Native vibrational task defaults, existing source/manifest writer | CUBE requests and density-difference bundles |
 
 Every selected per-element orbital basis must belong to the classic protocol;
@@ -95,9 +95,19 @@ existing element/q/data-availability gates still apply. In particular, UCL SR
 TZVP/TZV2P do not acquire missing H/C/N/O entries. Catalog-only generation is
 still labeled an unverified template; actual supplied data are hashed and
 checked using the existing resolver, not bundled or treated as converged bases.
-Even-electron charge states may be requested explicitly; electron/parity checks
-remain authoritative. Auto multiplicity retains the existing electron-parity
-rule; an odd-electron result is rejected, not forced into a singlet.
+Charge and explicit multiplicity are preserved and checked for electron-count
+parity. Auto multiplicity remains 1 for even and 2 for odd electron counts,
+not a ground-state spin prediction. Multiplicity >1 or an explicit magnetic
+request emits UKS T. Use `--magnetism uks` (`magnetism=()` in Python) to request
+UKS without seeds, or `--magnetism 'H=1; @2=-1'` to set initial guesses only.
+The generator does not constrain moments, adjust charge/multiplicity, or verify
+that displaced SCF solutions stay on the same electronic state.
+
+`--dispersion d3` / `d3bj` emits DFTD3 / DFTD3(BJ) with PBE as the reference
+functional. With `--data-dir` or CP2K_DATA_DIR, `dftd3.dat` must be readable and
+its bytes are hashed; without either directory, the manifest warns that CP2K
+must resolve the unchecked basename at runtime. Byte checks do not validate the
+numerical parameters. See the [tagged force-path evidence](vibration-contract.md#pair-dispersion-force-path).
 
 ### Parameters and numerical provenance
 

@@ -408,7 +408,7 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
     extra_cubes, cube_warnings = resolve_extra_cubes(s, all_electron=all_electron,
                                                     electrons=electrons, uks=uks, stride=stride)
     periodic, positions, cell, translated = resolve_geometry(structure, s)
-    vib = vibration.resolve(s, periodic=periodic, all_electron=all_electron, uks=uks,
+    vib = vibration.resolve(s, periodic=periodic, all_electron=all_electron,
                             elements=elements, cell=cell, positions=positions)
     effective_qs_eps = vibration.EPS_DEFAULT if vib else qs_eps_default(s.run_type)
     if s.kpoints != (1, 1, 1) and (periodic != "XYZ" or s.scf != "diag"):
@@ -427,6 +427,8 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
     warnings.extend(cube_warnings)
     if vib:
         warnings.extend(vibration.WARNINGS)
+        if uks:
+            warnings.append(vibration.UKS_WARNING)
     warnings.append('SCF/PRINT/RESTART BACKUP_COPIES 0 disables wavefunction restart backups, not restart writing; archive existing wavefunctions before running in a reused directory.')
     if s.fixed_atoms != 'off' and not optimizing:
         warnings.append('Fixed-atom selection is retained but inactive outside GEO_OPT/CELL_OPT.')

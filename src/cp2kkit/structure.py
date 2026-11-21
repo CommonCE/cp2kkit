@@ -5,7 +5,7 @@ import shlex
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from .errors import ParseError
+from .errors import KitError, ParseError
 from .io import read_text
 from .models import SCHEMA_VERSION
 
@@ -283,6 +283,8 @@ def xyz_text(structure, extended=True):
     if extended:
         comment = "Properties=species:S:1:pos:R:3"
         if structure.cell is not None:
+            if structure.pbc is None:
+                raise KitError("Cannot export extXYZ with a known cell and unknown periodicity")
             lattice = " ".join(format(v, ".17g") for row in structure.cell for v in row)
             comment += f' Lattice="{lattice}"'
             comment += ' pbc="' + " ".join("T" if v else "F" for v in structure.pbc) + '"'

@@ -28,6 +28,18 @@ SOURCES = {
 }
 
 
+# Additional links in the tagged displaced-force path, only for pair dispersion.
+DISPERSION_SOURCES = {
+    'f77_interface.F': 'f744057c28f560e73a48077c3cd7f5a9fba26f84771e9c6d87d24401fcdea43a',
+    'force_env_methods.F': '82b08e7e477c1fe2f1f0ce82b80202dd93863b0b3ab420fa9ba5fe1f35851ada',
+    'qs_energy.F': 'b8a96d8e99938dd822260a92c370b7b2a88068a377fef58db65dafcf62c457ce',
+    'qs_energy_init.F': '7b57ace7f2fbc7efb3dfe93eaa10d840a13a3f43827805515e212841ac1939fe',
+    'qs_dispersion_pairpot.F': '47ec827a9760fa38ba53e055e22884d2bbe7631b61ea2087a747e8c03bda8889',
+    'qs_dispersion_d3.F': '447982f6ff48157367fde23cb24af58d21b0728a5b0c75ec77923544c02c2f66',
+    'qs_force_types.F': '9539bc1a9c36194231ccee5b02134bac59e23d4f747e3c0daeb5756423a1e37b',
+}
+
+
 def _positive(value, name):
     try:
         valid = type(value) in (int, float) and math.isfinite(value) and value > 0
@@ -59,11 +71,8 @@ def validate_request(settings):
     if (settings.scf != 'ot' or settings.ot_algorithm not in (None, 'STRICT')
             or settings.smearing is not None or settings.kpoints != (1, 1, 1)):
         raise KitError('VIBRATIONAL_ANALYSIS requires Gamma OT/STRICT without smearing; no solver is changed')
-    if settings.magnetism is not None or settings.multiplicity not in (None, 1):
-        raise KitError('VIBRATIONAL_ANALYSIS currently requires closed-shell RKS without explicit magnetism')
-    if (settings.dispersion != 'none' or settings.dft_plus_u or settings.admm
-            or settings.ri_hfx or settings.density_difference):
-        raise KitError('VIBRATIONAL_ANALYSIS excludes dispersion, +U, ADMM/RI and density-difference workflows')
+    if settings.dft_plus_u or settings.admm or settings.ri_hfx or settings.density_difference:
+        raise KitError('VIBRATIONAL_ANALYSIS excludes +U, ADMM/RI and density-difference workflows')
     if (settings.electron_density or settings.spin_density or settings.hartree_potential
             or settings.mo_cubes):
         raise KitError('VIBRATIONAL_ANALYSIS CUBE outputs are outside the initial task scope; reset requests explicitly')
@@ -104,12 +113,12 @@ def mt_box(cell, positions, displacement_bohr):
             'density_extent_verified': False}
 
 
-def resolve(settings, *, periodic, all_electron, uks, elements, cell, positions):
-    """Check resolved spin, geometry and every selected basis, not only UI state."""
+def resolve(settings, *, periodic, all_electron, elements, cell, positions):
+    """Check resolved geometry and every selected basis, not only UI state."""
     if settings.run_type != TASK:
         return None
-    if periodic != 'NONE' or all_electron or uks:
-        raise KitError('VIBRATIONAL_ANALYSIS requires isolated PERIODIC NONE, GPW and closed-shell RKS')
+    if periodic != 'NONE' or all_electron:
+        raise KitError('VIBRATIONAL_ANALYSIS requires isolated PERIODIC NONE and GPW')
     if len(positions) < 2:
         raise KitError('Molecular VIBRATIONAL_ANALYSIS requires at least two atoms; '
                        'an isolated single atom has no internal vibrational modes')
@@ -118,6 +127,7 @@ def resolve(settings, *, periodic, all_electron, uks, elements, cell, positions)
         raise KitError('VIBRATIONAL_ANALYSIS requires classic MOLOPT/UCL orbital bases; no UZH/custom/GAPW')
     dx = (DEFAULT_DISPLACEMENT_BOHR if settings.vibration_displacement_bohr is None
           else settings.vibration_displacement_bohr)
+    sources = SOURCES if settings.dispersion == 'none' else {**SOURCES, **DISPERSION_SOURCES}
     return {
         'algorithm': 'central_finite_difference_of_forces',
         'displacement_bohr': dx,
@@ -131,7 +141,7 @@ def resolve(settings, *, periodic, all_electron, uks, elements, cell, positions)
         'fully_periodic': False, 'intensities': False, 'thermochemistry': False,
         'program_run_info': True, 'program_run_info_origin': 'task_preset',
         'stationary_point_verified': False, 'runtime_validated': False,
-        'sources': [{'url': SOURCE_ROOT + path, 'sha256': digest} for path, digest in SOURCES.items()],
+        'sources': [{'url': SOURCE_ROOT + path, 'sha256': digest} for path, digest in sources.items()],
     }
 
 
@@ -144,6 +154,9 @@ def input_lines(vibration):
             '  &PRINT', '    &PROGRAM_RUN_INFO ON', '      FILENAME __STD_OUT__',
             '    &END PROGRAM_RUN_INFO', '  &END PRINT', '&END VIBRATIONAL_ANALYSIS']
 
+
+UKS_WARNING = ('For UKS vibrational analysis, displaced-geometry SCF solutions are not verified to remain '
+               'on the same spin/electronic state.')
 
 WARNINGS = (
     'Vibrational input generation does not establish a stationary point, a minimum, vibrational convergence or physical validity. '

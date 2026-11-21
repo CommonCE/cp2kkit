@@ -42,6 +42,8 @@ native acceptance, convergence, and physical validity remain distinct.
 
 ## Application workflow layout (0.4.4)
 
+Local analysis adapters were added in 0.4.6 without renumbering this layout.
+
 This is implemented routing. Pre-release application numbers migrate explicitly;
 existing batch CLI commands and generator function IDs do not migrate with them.
 
@@ -61,14 +63,20 @@ Top-level entries represent workflows, not every individual operation. Entries
 structure on return. Additional required sources are requested explicitly inside
 the workflow; the loaded geometry is not automatically associated with a result.
 
-Implemented local operations (and separately labeled future adapters):
+Implemented local operations:
 
-- **5 / 1 Quality report:** retain the current main-5 operation. Parsed-observation
-  export and energy/SCF plots are later adapters over existing CLI/core functions,
-  not required additions in the bounded vibration round.
-- **6 / 1 Check scalar CUBE; 6 / 2 Subtract density CUBEs:** move the current
-  main-6/main-7 operations here. **6 / 3 Planar averages and integrals** is a later
-  adapter over cube-planar, not an implemented menu entry or this round's gate.
+- **5 / 1 Quality report:** unchanged text-quality view.
+- **5 / 2 Parse & export output:** read-only summary from an explicit output
+  file or an unambiguous directory. `d` shows full JSON; `j` and `c` explicitly
+  export the batch-equivalent JSON and long-form CSV to new files.
+- **5 / 3 Plot energy / SCF convergence:** same source selection, energy by
+  default or SCF, and an explicit new `.png` path. Uses optional Matplotlib and
+  writes the PNG, same-stem CSV and JSON together.
+- **6 / 1 Check scalar CUBE; 6 / 2 Subtract density CUBEs:** unchanged.
+- **6 / 3 Planar averages and cumulative integrals:** use native grid index
+  `x`, `y` or `z` (default), not necessarily a Cartesian cut. Reuses the CUBE
+  interpretation assertions and writes an exclusive CSV and `<output>.json`
+  sidecar; `d` shows full details. Integrals are not charge partitioning.
 - **7 Vibrational analysis:** directly opens the [bounded frequency workflow](vibration-results-contract.md),
   with semantic ID `vibration` and no structure requirement.
 - Local **0 Back** returns without writing. Merely opening a group or inspecting
@@ -403,7 +411,7 @@ not post-processing of existing results.
 | 622 | Band-path calculations | Planned |
 | 630 | Atomic population-charge analysis settings | Planned |
 | 631 | Localized orbitals / Wannier-related settings | Planned |
-| 640 | Vibrational finite-difference DX [bohr] | Implemented 0.4.3; select VIBRATIONAL_ANALYSIS at -1 first; auto = explicit 0.01 bohr; bounded isolated PBE GPW RKS OT/STRICT |
+| 640 | Vibrational finite-difference DX [bohr] | Implemented 0.4.3; select VIBRATIONAL_ANALYSIS at -1 first; auto = explicit 0.01 bohr; bounded isolated PBE GPW RKS/UKS OT/STRICT; none/D3/D3(BJ) since 0.4.6 |
 | 641 | Finite-displacement / phonon input preparation | Planned |
 | 642 | IR/Raman-related preparation | Planned; method/workflow checks required |
 | 650 | TDDFT / excited-state settings | Planned |

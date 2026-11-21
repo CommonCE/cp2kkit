@@ -185,9 +185,8 @@ class VibrationTests(unittest.TestCase):
         cases += [dict(cp2k_version=v) for v in ('2024.1', '2024.2', '2024.3', '2025.1', '2025.2', '2026.1')]
         cases += [dict(periodic=p) for p in ('X', 'Y', 'Z', 'XY', 'XZ', 'YZ', 'XYZ')]
         cases += [dict(scf='diag'), dict(ot_algorithm='IRAC'), dict(kpoints=(2, 1, 1)),
-                  dict(smearing=300.), dict(added_mos=1), dict(charge=1), dict(multiplicity=3),
-                  dict(magnetism=()), dict(magnetism=(('O', 0.),)), dict(dft_plus_u=(('O', 1, 2.),)),
-                  dict(dispersion='d3'), dict(dispersion='d3bj'), dict(density_difference=True),
+                  dict(smearing=300.), dict(added_mos=1), dict(dft_plus_u=(('O', 1, 2.),)),
+                  dict(dispersion='d4'), dict(density_difference=True),
                   dict(admm=True), dict(ri_hfx=True), dict(basis='ae-6-31g-star'), dict(basis='uzh-pbe-dzvp'),
                   dict(basis='custom'), dict(basis_overrides=(('H', 'uzh-pbe-dzvp'),))]
         cases += [{name: True} for name in ('electron_density', 'spin_density', 'hartree_potential', 'mo_cubes')]
@@ -200,6 +199,80 @@ class VibrationTests(unittest.TestCase):
             generate_input(solid, replace(self.settings, periodic=None))
         with self.assertRaisesRegex(KitError, 'Periodicity is unknown'):
             self.generate(periodic=None)
+
+    def test_pair_dispersion_data_resolution_and_force_source_provenance(self):
+        data = self.root/'data'
+        data.mkdir()
+        (data/'BASIS_MOLOPT').write_text(basis_entry('H', 'DZVP-MOLOPT-SR-GTH-q1') +
+                                         basis_entry('O', 'DZVP-MOLOPT-SR-GTH-q6'))
+        (data/'GTH_POTENTIALS').write_text(potential_entry('H', 1, 'GTH-PBE-q1') +
+                                            potential_entry('O', 6, 'GTH-PBE-q6'))
+        parameters = data/'dftd3.dat'
+        for mode, keyword in (('d3', 'DFTD3'), ('d3bj', 'DFTD3(BJ)')):
+            with self.subTest(dispersion=mode):
+                text, m = self.generate(dispersion=mode)
+                self.assertIn('POTENTIAL_TYPE PAIR_POTENTIAL', text)
+                self.assertIn(f'TYPE {keyword}\n', text)
+                self.assertIn('REFERENCE_FUNCTIONAL PBE\n', text)
+                self.assertIn('PARAMETER_FILE_NAME dftd3.dat\n', text)
+                self.assertNotIn('dispersion', m['data_sources'])
+                self.assertTrue(any('dftd3.dat have not been checked' in w for w in m['warnings']))
+                self.assertTrue(any(s['url'].endswith('/qs_dispersion_d3.F')
+                                    for s in m['vibrational_analysis']['sources']))
+                self.assertFalse(m['runtime_validated'])
+                settings = replace(self.settings, dispersion=mode, data_dir=str(data), write_json=True)
+                with self.assertRaisesRegex(KitError, 'dftd3.dat'):
+                    write_input(self.water, settings, self.output)
+                self.assertFalse(self.output.exists())
+                self.assertFalse(Path(str(self.output)+'.json').exists())
+                parameters.write_text('synthetic bytes only; not native dispersion data\n')
+                checked_text, checked = generate_input(self.water, settings)
+                self.assertIn(f'PARAMETER_FILE_NAME {parameters.resolve()}\n', checked_text)
+                self.assertEqual(checked['data_sources']['dispersion']['sha256'],
+                                 hashlib.sha256(parameters.read_bytes()).hexdigest())
+                self.assertFalse(any('dftd3.dat have not been checked' in w for w in checked['warnings']))
+                self.assertFalse(checked['runtime_validated'])
+                with patch.dict(os.environ, CP2K_DATA_DIR=str(data)):
+                    self.assertEqual(self.generate(dispersion=mode)[1]['data_sources'], checked['data_sources'])
+                parameters.unlink()  # Test-owned fixture, absent for the next case.
+
+    def test_uks_auto_explicit_and_seeded_preserve_requested_electronic_state(self):
+        cases = (
+            ({'charge': 1}, 2),  # Odd valence-electron count, auto multiplicity.
+            ({'multiplicity': 3}, 3),
+            ({'magnetism': ()}, 1),  # Existing API representation of explicit UKS.
+            ({'magnetism': (('H', 0.5), ('@2', -0.25))}, 1),
+        )
+        for changes, multiplicity in cases:
+            with self.subTest(changes=changes):
+                text, manifest = self.generate(**changes)
+                self.assertIn('UKS T\n', text)
+                self.assertIn(f'MULTIPLICITY {multiplicity}\n', text)
+                self.assertIn(f'CHARGE {changes.get("charge", 0)}\n', text)
+                self.assertIn('POISSON_SOLVER MT\n', text)
+                self.assertEqual(manifest['settings']['multiplicity'], multiplicity)
+                self.assertFalse(manifest['vibrational_analysis']['mt_box']['density_extent_verified'])
+                if changes.get('magnetism'):
+                    self.assertIn('MAGNETIZATION -0.25\n', text)
+                    self.assertIn('MAGNETIZATION 0.5\n', text)
+                    self.assertTrue(any('only an atomic initial guess' in w for w in manifest['warnings']))
+                    self.assertTrue(any('Neither value is adjusted automatically' in w for w in manifest['warnings']))
+        for changes in ({'charge': 1, 'multiplicity': 1}, {'multiplicity': 2, 'magnetism': ()}):
+            with self.subTest(changes=changes), self.assertRaisesRegex(KitError, 'Charge/multiplicity inconsistent'):
+                self.generate(**changes)
+        with self.assertRaisesRegex(KitError, 'twice the displaced atomic span'):
+            self.generate(multiplicity=3, dispersion='d3bj', vacuum=.5)
+
+    def test_seedless_uks_vibration_warns_about_displaced_spin_state(self):
+        warning = 'not verified to remain on the same spin/electronic state'
+        for changes in ({'charge': 1}, {'multiplicity': 3}):
+            with self.subTest(changes=changes):
+                text, manifest = self.generate(**changes)
+                self.assertIn('UKS T\n', text)
+                self.assertIsNone(manifest['settings']['magnetism'])
+                self.assertTrue(any(warning in w for w in manifest['warnings']))
+        for changes in ({}, {'run_type': 'ENERGY', 'charge': 1}):
+            self.assertFalse(any(warning in w for w in self.generate(**changes)[1]['warnings']))
 
     def test_damaged_numeric_configs(self):
         for field in ('vibration_displacement_bohr', 'eps_scf'):
@@ -218,6 +291,7 @@ class VibrationTests(unittest.TestCase):
         self.assertFalse(m['constraints']['enabled'])
         self.assertFalse(m['motion_output']['enabled'])
         self.assertNotIn('TRUST_RADIUS', text)
+        self.assertNotIn('FIXED_ATOMS', text)
         self.assertTrue(any('retained but inactive' in w for w in m['warnings']))
         for task in ('ENERGY', 'ENERGY_FORCE', 'GEO_OPT', 'CELL_OPT'):
             with self.subTest(task=task), self.assertRaisesRegex(KitError, 'requires VIBRATIONAL_ANALYSIS'):
@@ -242,11 +316,23 @@ class VibrationTests(unittest.TestCase):
     def test_tui_edit_review_and_generation_match_api(self):
         log = TTY()
         code = run_interactive(str(self.path), -1, str(self.output), InputSettings(periodic='NONE', write_json=True),
-                               stdin=TTY('-1\nVIBRATIONAL_ANALYSIS\n640\n0.02\n303\n2e-9\nr\n\n0\n'),
-                               stdout=log, plain=True)
+                               stdin=TTY('-1\nVIBRATIONAL_ANALYSIS\n640\n0.02\n303\n2e-9\n'
+                                         '3\nd3bj\n102\n3\n103\nH=1\nr\n\n0\n'), stdout=log, plain=True)
         self.assertEqual(code, 0, log.getvalue())
-        settings = replace(self.settings, vibration_displacement_bohr=.02, eps_scf=2e-9, write_json=True)
-        self.assertEqual(self.output.read_text(), generate_input(self.water, settings)[0])
+        settings = replace(self.settings, vibration_displacement_bohr=.02, eps_scf=2e-9, write_json=True,
+                           dispersion='d3bj', multiplicity=3, magnetism=(('H', 1.),))
+        text, manifest = generate_input(self.water, settings)
+        self.assertEqual(self.output.read_text(), text)
+        sidecar = json.loads(Path(str(self.output)+'.json').read_text())
+        self.assertEqual(sidecar, json.loads(json.dumps(manifest)))
+        for config in (json.loads(json.dumps(asdict(settings))), sidecar):
+            self.assertEqual(generate_input(self.water, InputSettings.from_config(config))[0], text)
+        cli_output = self.root/'cli.inp'
+        result = subprocess.run(command_arguments(self.path, -1, cli_output, settings),
+                                capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(cli_output.read_text(), text)
+        self.assertEqual(json.loads(Path(str(cli_output)+'.json').read_text()), sidecar)
         self.assertIn('0.02 bohr [user_explicit]', log.getvalue())
         self.assertIn('QS EPS_DEFAULT: 1e-14 [task_preset]', ' '.join(log.getvalue().split()))
         self.assertIn('stationary point NOT verified', log.getvalue())

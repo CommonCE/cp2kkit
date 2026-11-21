@@ -8,12 +8,12 @@ from pathlib import Path
 from cp2kkit.cli import main
 from cp2kkit.discovery import discover, resolve_output
 from cp2kkit.errors import AmbiguousProject, KitError, OutputExists, ParseError
-from cp2kkit.export import write_csv
+from cp2kkit.export import export_structure_files, write_csv
 from cp2kkit.io import json_text, new_file
 from cp2kkit.parser import parse_output
 from cp2kkit.plot import plot_run
 from cp2kkit.quality import quality_report
-from cp2kkit.structure import BOHR_TO_ANGSTROM, read_restart, read_xyz, xyz_text
+from cp2kkit.structure import BOHR_TO_ANGSTROM, Structure, read_restart, read_xyz, xyz_text
 from contextlib import redirect_stdout, redirect_stderr
 from importlib.util import find_spec
 from unittest.mock import patch
@@ -231,6 +231,16 @@ class StructureTests(unittest.TestCase):
             self.assertEqual(result.pbc, original.pbc)
             self.assertEqual(result.positions, original.positions)
 
+    def test_extxyz_rejects_known_cell_with_unknown_periodicity(self):
+        structure = Structure(['H'], [[0., 0., 0.]], [[2., 0., 0.], [0., 2., 0.], [0., 0., 2.]], None, {})
+        with self.assertRaisesRegex(KitError, 'unknown periodicity'):
+            xyz_text(structure)
+        self.assertNotIn('pbc=', xyz_text(structure, extended=False))
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(KitError, 'unknown periodicity'):
+                export_structure_files(structure, Path(directory)/'unknown.extxyz')
+            self.assertEqual(list(Path(directory).iterdir()), [])
+
     def test_bohr_and_scaled(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "atom.restart"
@@ -360,6 +370,16 @@ class CLITests(unittest.TestCase):
                     stream.write("partial")
                     raise RuntimeError("test")
             self.assertFalse(path.exists())
+
+    def test_invalid_plot_kind_raises_before_dependency_or_publication(self):
+        run = parse_output(FIXTURES/'normal.out')
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)/'invalid.png'
+            for kind in ('typo', 'SCF', None, []):
+                with self.subTest(kind=kind), patch.dict('sys.modules', {'matplotlib.figure': None}):
+                    with self.assertRaisesRegex(KitError, 'Plot kind'):
+                        plot_run(run, output, kind)
+                    self.assertEqual(list(Path(directory).iterdir()), [])
 
     def test_missing_plot_dependency_code(self):
         with tempfile.TemporaryDirectory() as directory:

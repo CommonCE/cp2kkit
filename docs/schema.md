@@ -130,6 +130,9 @@ Original evidence retains the printed label. Unsupported units and malformed
 records remain unparsed; energy extraction alone does not imply convergence.
 This compatibility fix does not change schema 0.1.0.
 SCF counts use iteration; wall_time uses s; coordinates/cells use angstrom.
+A malformed or unrepresentable value on a recognized wall-time line leaves
+`wall_time` null and adds a parser warning, rather than retaining a numeric
+prefix or an earlier measurement.
 Settings retain original strings, source, and nullable unit; unknown semantics are
 not automatically converted to numbers. Added in software 0.4.2:
 
@@ -183,12 +186,15 @@ XYZ source includes selected-frame line_start/line_end.
 Export sidecars add export_format/warnings.
 Unknown periodicity is not non-periodic; a cell-less XYZ has pbc=null.
 Formats explicitly establishing non-periodicity, such as GJF without TV, can record false flags.
+The extXYZ writer rejects a known cell with unknown periodicity rather than
+inventing PBC flags.
 
 ## Plot manifest
 
 source, kind, x_label, y_label, segments_connected=false, data/path/sha256,
 image/path/sha256, run, quality.
-CSV contains both record types; kind chooses the plotted subset.
+CSV contains both record types; kind chooses the plotted subset. The Python
+plot writer rejects kinds other than `energy` and `scf` before creating files.
 Plot segments independently without cross-segment connections.
 
 ## Generated input JSON: menu/workflow additions (software 0.2.9)

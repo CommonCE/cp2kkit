@@ -261,8 +261,16 @@ def _read_table(report: VibrationReport, lines: list[str], start: int, stop: int
             stage, atoms = 'atoms', []
         elif stage == 'atoms' and (atom := ATOM.fullmatch(line)):
             atoms.append((int(atom[1]), atom[2]))
-            if previous_width is not None and len(atom[3].split()) != 3 * previous_width:
-                _issue(report, evidence(i), 'Incomplete displacement row')
+            components = atom[3].split()
+            src = evidence(i)
+            if previous_width is not None and len(components) != 3 * previous_width:
+                _issue(report, src, 'Incomplete displacement row')
+            for token in components:
+                try:
+                    _numeric(token, src)
+                except ParseError:
+                    _issue(report, src, f'Invalid or out-of-range displacement token: {token!r}')
+                    break  # One numeric diagnostic per damaged row is enough.
         else:
             _issue(report, evidence(i), 'Unexpected record in the normal-mode table')
     else:

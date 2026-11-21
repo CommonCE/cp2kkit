@@ -8,6 +8,18 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.4.6
+
+- Add application-menu adapters **5/2** (parse summary, details and explicit
+  JSON/CSV export), **5/3** (energy/SCF plot with optional Matplotlib) and **6/3**
+  (native-grid planar density and cumulative integral CSV/JSON). Reuse existing
+  readers and exclusive writers; batch CLI, top-level IDs and **7 / s** are unchanged.
+- Allow D3/D3(BJ) and parity-compatible collinear UKS in the existing CP2K 2026.2
+  isolated MT/PBE/classic GPW/Gamma OT/STRICT vibration generator. Reuse data
+  checks and magnetization initialization; preserve the closed-shell no-dispersion
+  input text and hash. Tagged-source and synthetic checks do not establish native
+  execution, spin-state continuity or frequency accuracy. Schema remains 0.1.0.
+
 ## 0.4.5
 
 - Add explicit local Shermo 2.6.2 molecular thermochemistry via Python, the

@@ -1,6 +1,19 @@
 # Development status and next steps
 
-Current software: **0.4.5**; schema: **0.1.0**.
+Current software: **0.4.6**; schema: **0.1.0**.
+
+## 0.4.6 analysis menu parity and molecular vibration inputs
+
+- Implement local adapters **5/2** (parse/export), **5/3** (plot) and **6/3**
+  (planar profiles) over the existing analysis operations. Keep main **7** and
+  its **s** action, other menu numbers and batch CLI commands unchanged.
+- Extend only the [molecular generation subset](vibration-contract.md) to
+  D3/D3(BJ) and collinear UKS with existing charge/multiplicity checks. Keep
+  isolated MT, classic PBE GPW, Gamma OT/STRICT and the other task restrictions.
+  Tagged-source force-path inspection is not native validation.
+
+Internal/surface thermochemistry, architecture refactoring and packaging remain
+separate work.
 
 ## 0.4.5 stabilization: energy, vibrations and Shermo
 
@@ -20,7 +33,7 @@ Current software: **0.4.5**; schema: **0.1.0**.
   Existing Shermo output can be read without execution. Source-format synthetic
   and mocked-process tests are not native execution or scientific validation.
 
-The [0.4.5 handoff](development-handoff.md#current-handoff-045) records two
+The [0.4.5 handoff](development-handoff.md#historical-handoff-045) records two
 bounded native water adapter comparisons, not general CP2K/Shermo validation.
 The [source-tree closeout](development-handoff.md#045-source-tree-closeout)
 records completed regression checks separately from packaging or publication.
@@ -41,8 +54,8 @@ CP2K 2026.2 molecular Cartesian normal-mode tables, explicit block selection,
 signed frequencies, textual completeness and JSON/CSV. The
 [application layout](menu-numbering-draft.md#application-workflow-layout-044)
 retains main entries 1-4, groups quality at 5/1, CUBE operations at 6/1 and 6/2,
-and places vibration at 7. Existing parse/plot/cube-planar CLI functions can
-gain local menu adapters later. Formal packaging is deferred to 0.5.
+and places vibration at 7. Local parse/plot/cube-planar adapters followed in
+0.4.6. Formal packaging is deferred to 0.5.
 
 Shermo molecular thermochemistry is a separate 0.4.5 operation, not part of
 this 0.4.4 historical baseline. Periodic phonons need their own q-point,

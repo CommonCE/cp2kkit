@@ -32,9 +32,12 @@ ACTIONS = (
 )
 
 ANALYSIS_GROUPS = {
-    'output_analysis': ('Output analysis', (('quality', 'Quality report'),)),
+    'output_analysis': ('Output analysis', (('quality', 'Quality report'),
+                                            ('parse', 'Parse & export output'),
+                                            ('plot', 'Plot energy / SCF convergence'))),
     'cube_analysis': ('CUBE analysis', (('cube_check', 'Check scalar CUBE'),
-                                        ('cube_diff', 'Subtract density CUBEs'))),
+                                        ('cube_diff', 'Subtract density CUBEs'),
+                                        ('cube_planar', 'Planar averages and cumulative integrals'))),
 }
 
 
@@ -118,6 +121,97 @@ def cube_options(menu):
                   Field('unit', 'Scalar unit', choices=SCALAR_UNITS))
         values = [menu.edit(f, v) for f, v in zip(fields, values)]
     return CubeOptions(*values)
+
+
+def analysis_choice(menu, label, choices, default):
+    while True:
+        raw = menu.ask(f'{label} ({"/".join(choices)}); Enter uses {default}; 0/back/cancel/q: ').lower()
+        if raw in {'0', 'back'}:
+            raise Cancelled
+        if not raw or raw in choices:
+            return raw or default
+        menu.show(f'Error: Choose {" or ".join(choices)}.')
+
+
+def read_analysis_output(menu):
+    from .discovery import resolve_output
+    from .parser import parse_output
+
+    return parse_output(resolve_output(required_path(menu, 'CP2K output file/directory path')))
+
+
+def parse_analysis(menu):
+    from .export import write_csv
+    from .io import json_text, new_file
+    from .quality import quality_report
+
+    run = read_analysis_output(menu)
+    menu.show(f"Source: {run.source['path']}")
+    menu.show(f'Software: {run.software}; version: {run.software_version or "Unknown"}; '
+              f'project: {run.project or "Unknown"}')
+    energies = sum(len(segment.energies) for segment in run.segments)
+    scf = sum(len(segment.scf_iterations) for segment in run.segments)
+    menu.show(f'Segments: {len(run.segments)}; observed records: energy={energies}, SCF={scf}')
+    menu.show(f'Parser warnings: {len(run.parser_warnings)}')
+    for warning in run.parser_warnings[:8]:
+        menu.show(f'Warning: {warning}')
+    if len(run.parser_warnings) > 8:
+        menu.show('Additional warnings are available in full details.')
+    menu.show('Parsed observations do not establish calculation convergence.')
+    while True:
+        raw = menu.ask('Enter/0/back returns; d details; j JSON; c CSV; cancel/q: ').lower()
+        if raw in {'', '0', 'back'}:
+            return
+        if raw in {'d', 'j'}:
+            output = required_path(menu, 'New parsed output JSON path') if raw == 'j' else None
+            details = json_text({**run.to_dict(), 'quality': quality_report(run)})
+            if output is None:
+                menu.show(details)
+                continue
+            with new_file(output) as stream:
+                stream.write(details)
+        elif raw == 'c':
+            output = required_path(menu, 'New parsed output CSV path')
+            with new_file(output) as stream:
+                write_csv(stream, run)
+        else:
+            menu.show('Error: Select d, j, c or Enter.')
+            continue
+        menu.show(f'Generated path: {Path(output).resolve()}')
+
+
+def plot_analysis(menu):
+    from .plot import plot_run
+    from .quality import quality_report
+
+    run = read_analysis_output(menu)
+    kind = analysis_choice(menu, 'Plot kind', ('energy', 'scf'), 'energy')
+    output = required_path(menu, 'New plot .png output path')
+    for target in plot_run(run, output, kind):
+        menu.show(f'Generated path: {target.resolve()}')
+    menu.show(f'Text quality status: {quality_report(run)["status"]}. A plot does not certify convergence or physical validity.')
+    for warning in run.parser_warnings[:8]:
+        menu.show(f'Warning: {warning}')
+    if len(run.parser_warnings) > 8:
+        menu.show('Additional warnings are available in the plot JSON sidecar.')
+
+
+def planar_analysis(menu):
+    from .cube_profile import write_planar_profile
+
+    path = required_path(menu, 'CUBE path')
+    axis = analysis_choice(menu, 'Native grid index axis (not necessarily Cartesian)', ('x', 'y', 'z'), 'z')
+    options = cube_options(menu)
+    output = Path(required_path(menu, 'New planar profile CSV output path'))
+    report = write_planar_profile(path, output, axis, options)
+    for target in (output, Path(str(output)+'.json')):
+        menu.show(f'Generated path: {target.resolve()}')
+    menu.show(f"Native grid axis: {report['axis']}; planes: {len(report['planes'])}; "
+              f"perpendicular spacing: {report['plane_spacing_angstrom']:.6g} angstrom")
+    menu.show(f"Total integral: {report['total_integral_electrons']:.8g} {report['integral_unit']}")
+    for warning in report['warnings']:
+        menu.show(f'Warning: {warning}')
+    return report
 
 
 def analysis_group(menu, action):
@@ -217,19 +311,31 @@ def shermo_analysis(menu, report):
         raise KitError('No unique native vibration reference energy; supply a single-point output')
     executable = required_path(menu, 'Trusted Shermo 2.6.2 executable path')
     geometry = required_path(menu, 'Reference XYZ geometry file')
+
+    class BackToReport(Exception):
+        pass
+
+    def ask_setting(label):
+        value = menu.ask(f'{label}; back returns: ')
+        if value.lower() == 'back':
+            raise BackToReport
+        return value
+
     try:
-        energy_segment = (menu.ask('Single-point segment (1-based); Enter requires a unique candidate: ')
+        energy_segment = (ask_setting('Single-point segment (1-based); Enter requires a unique candidate')
                           if energy_output is not None else '')
         energy_segment = int(energy_segment) if energy_segment else None
-        frame = int(menu.ask('Zero-based XYZ frame: '))
-        masses = [float(m) for m in menu.ask('Atomic masses [amu] in XYZ order, space separated: ').split()]
-        multiplicity = int(menu.ask('Spin multiplicity: '))
-        temperature = float(menu.ask('Temperature [K]; Enter uses 298.15: ') or '298.15')
-        pressure = float(menu.ask('Pressure [atm]; Enter uses 1: ') or '1')
-        scale = float(menu.ask('Shared frequency scale; Enter uses 1: ') or '1')
+        frame = int(ask_setting('Zero-based XYZ frame'))
+        masses = [float(m) for m in ask_setting('Atomic masses [amu] in XYZ order, space separated').split()]
+        multiplicity = int(ask_setting('Spin multiplicity'))
+        temperature = float(ask_setting('Temperature [K]; Enter uses 298.15') or '298.15')
+        pressure = float(ask_setting('Pressure [atm]; Enter uses 1') or '1')
+        scale = float(ask_setting('Shared frequency scale; Enter uses 1') or '1')
+        low = ask_setting('Low-frequency treatment: grimme (default) or harmonic').lower() or 'grimme'
+    except BackToReport:
+        return
     except ValueError as exc:
         raise KitError('Invalid numeric Shermo setting') from exc
-    low = menu.ask('Low-frequency treatment: grimme (default) or harmonic: ').lower() or 'grimme'
     menu.show(f'Shermo will run at {temperature:g} K, {pressure:g} atm, scale {scale:g}, {low}.')
     menu.show(f'Electronic energy source: {energy_output if energy_output is not None else "vibration footer"}')
     if menu.ask('Confirm matching reference geometry and molecular state for all sources, and run Shermo? [y/N]: ').lower() not in {'y', 'yes'}:
@@ -251,12 +357,17 @@ def shermo_analysis(menu, report):
 
 
 def analysis(menu, action):
-    if action == 'quality':
-        from .parser import parse_output
-        from .discovery import resolve_output
+    if action == 'parse':
+        return parse_analysis(menu)
+    if action == 'plot':
+        plot_analysis(menu)
+        menu.ask('Enter/0/back returns; cancel/q: ')
+        return
+    if action == 'cube_planar':
+        report = planar_analysis(menu)
+    elif action == 'quality':
         from .quality import quality_report
-        path = required_path(menu, 'CP2K output file/directory path')
-        report = quality_report(parse_output(resolve_output(path)))
+        report = quality_report(read_analysis_output(menu))
         menu.show('Success: Output parsed. Parsing success is not calculation convergence.')
         menu.show(f"Source: {report['source']['path']}")
         menu.show(f"Software: {report['software']} {report['software_version']}; project: {report['project']}")
@@ -288,13 +399,13 @@ def analysis(menu, action):
                     raise Cancelled
                 else:
                     paths.append(str(Path(raw).expanduser()))
-            output = required_path(menu, 'New difference CUBE output path')
+            output = Path(required_path(menu, 'New difference CUBE output path'))
         options = cube_options(menu)
         report = check_cube(first, options) if output is None else diff_cubes(paths, output, options)
         menu.show('Success: Scalar CUBE processing completed; reference-state validity is not certified.')
-        if output:
-            for target in (output, output+'.json'):
-                menu.show(f'Generated path: {Path(target).resolve()}')
+        if output is not None:
+            for target in (output, Path(str(output)+'.json')):
+                menu.show(f'Generated path: {target.resolve()}')
         else:
             menu.show(f'Source: {Path(first).resolve()}')
         # The summary is bounded; complete format/unit/hash/statistics evidence is optional.

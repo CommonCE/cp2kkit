@@ -1,4 +1,4 @@
-# Development handoff: 0.4.5 thermochemistry and follow-up priorities
+# Development handoff: 0.4.6 and follow-up priorities
 
 Task keyword: **CP2KKIT-NEXT**. This is a reference label for this document.
 
@@ -17,15 +17,29 @@ and [result contract](vibration-results-contract.md). The original
 and delivery steps below are retained as scope and acceptance history. The
 [0.4.5 stage](roadmap.md#045-stabilization-energy-vibrations-and-shermo)
 adds external Shermo thermochemistry and bounded CP2K reference observations.
-A future internal engine is a separate task, not a capability in 0.4.5.
+A future internal engine remains a separate task.
 
-## Current handoff: 0.4.5
+## Current handoff: 0.4.6
 
-The 0.4.5 implementation is in the uncommitted working tree, including new
-files. The latest committed baseline at handoff is `9392ced` (0.4.4). Preserve
-both tracked edits and untracked additions; use `git status --short` and do not
-assume checking out `HEAD` reconstructs 0.4.5. The working-tree software version
-is 0.4.5 and the exchange schema is 0.1.0.
+The working-tree software version is 0.4.6 with exchange schema 0.1.0. The
+[0.4.6 stage](roadmap.md#046-analysis-menu-parity-and-molecular-vibration-inputs)
+adds only three local analysis adapters and widens the existing molecular input
+subset to D3/D3(BJ) and UKS. See the [tagged-source force path](vibration-contract.md#pair-dispersion-force-path)
+for static evidence. No CP2K or Shermo execution is part of this milestone;
+closed-shell no-dispersion inputs, batch CLI commands and main **7 / s** are retained.
+
+Source-tree checks: Python 3.12.16 passed all 38 focused and 726 regression
+checks with no skips. Python 3.10.22 passed 37 of 38 focused and 722 of 726
+regression checks, with one and four optional Matplotlib skips, respectively.
+The seven project text/link and version tests, compileall, and the CLI version
+check passed on both interpreters; `git diff --check` passed. These checks do
+not establish native CP2K or Shermo acceptance, force/frequency convergence,
+spin-state continuity, scientific validity, or packaging readiness.
+
+## Historical handoff: 0.4.5
+
+Historical 0.4.5 workflow and acceptance notes follow; they do not validate
+0.4.6 inputs or expand its scope.
 
 The target workflow starts from an optimized molecular geometry. The user runs
 vibrations and a separate, possibly larger-basis single point in parallel on
@@ -248,7 +262,7 @@ reorganization is not a prerequisite for completing 0.4.4.
 | External in 0.4.5; internal later | Shermo-related thermochemistry | Preserve independent provenance for exchange, read-only import and explicit external execution. Establish external comparison evidence and terms before implementing the internal backend. |
 | Later independent workflows | Periodic phonons, trajectories, MD and reaction paths | Establish each workflow's inputs, normalization, scientific meaning and acceptance separately. Do not expand the molecular frequency parser to imply these capabilities. |
 
-Follow the roadmap's bounded 0.4.5 scope; the remaining candidates are not
+Follow the roadmap's bounded 0.4.6 scope; the remaining candidates are not
 part of that release. Incrementally separate generator validation/resolution,
 rendering and manifest assembly when a concrete preview/capability consumer needs
 it, following ARC-3 in the roadmap. Avoid broad preparatory refactoring.

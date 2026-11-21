@@ -129,6 +129,8 @@ heading or program-end banner). A following start or normal-mode heading is not
 such a footer. Without an independent count, even a well-formed table and footer
 cannot detect a group excised from the end of an edited log. EOF immediately
 following an otherwise closed group is insufficient without corroborating count.
+Each displacement row must contain three valid finite numeric components per
+mode in its group. The components are checked but not exported as vectors.
 Recognizable broken blocks return retained observations (possibly none) and
 `diagnostics`/`warnings`; they do not silently pass. No supported heading,
 invalid UTF-8, explicit unsupported scope/version or only unsupported frequency

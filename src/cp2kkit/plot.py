@@ -10,6 +10,8 @@ from .quality import quality_report
 
 
 def plot_run(run, output, kind="energy"):
+    if not isinstance(kind, str) or kind not in {"energy", "scf"}:
+        raise KitError("Plot kind must be 'energy' or 'scf'")
     try:
         from matplotlib.figure import Figure
         from matplotlib.backends.backend_agg import FigureCanvasAgg

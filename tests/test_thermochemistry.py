@@ -252,6 +252,19 @@ class ShermoTests(unittest.TestCase):
         self.assertEqual(data['operation'], 'shermo_thermochemistry')
         self.assertEqual(data['cp2k_reference']['selected_electronic_energy']['kind'], 'cp2k_single_point')
 
+    def test_tui_back_at_each_numeric_or_low_frequency_prompt_returns_without_running(self):
+        report = parse_vibration(self.cp2k)
+        paths = [str(self.sp), str(self.exe), str(self.xyz)]
+        fields = ['1', '0', '16 1 1', '1', '', '', '', '']
+        for index in range(len(fields)):
+            with self.subTest(prompt=index), patch('cp2kkit.thermochemistry.run_shermo') as run:
+                menu = Mock()
+                menu.ask.side_effect = [*paths, *fields[:index], 'BaCk', 'yes']
+                shermo_analysis(menu, report)
+                self.assertEqual(menu.ask.call_count, len(paths) + index + 1)
+                run.assert_not_called()
+                menu.show.assert_not_called()
+
     def test_tui_decline_never_launches_and_yes_shows_same_backend(self):
         report = parse_vibration(self.cp2k)
         fields = [str(self.sp), str(self.exe), str(self.xyz), '1', '0', '16 1 1', '1', '', '', '', '']

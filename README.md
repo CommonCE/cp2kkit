@@ -2,7 +2,7 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.4.5 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.4.6 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 cp2kkit is an independent CP2K toolkit, not an internal component of a workflow
@@ -39,7 +39,15 @@ input generation; version 0.3.3 adds BHandHLYP, M06-2X and configurable PBEh.
 All 21 referenced DFT selections now have bounded generation support; this is
 not full Multiwfn feature/combination coverage.
 
-## Current version: 0.4.5
+## Current version: 0.4.6
+
+The [application menu](docs/menu-numbering-draft.md#application-workflow-layout-044)
+adds **5/2** parsed-output inspection and JSON/CSV export, **5/3** energy/SCF
+plots (optional Matplotlib), and **6/3** native-grid planar density profiles.
+Exports require explicit new paths. These actions need no structure and keep
+any loaded structure on return. Batch CLI commands and main menu **7** are unchanged.
+
+### Retained external Shermo thermochemistry (0.4.5 baseline)
 
 [External Shermo 2.6.2 thermochemistry](docs/shermo-thermochemistry.md) is available
 as an explicit `thermochemistry` command and from the selected vibration report
@@ -73,11 +81,13 @@ and [synthetic example](examples/vibration-results/README.md). The
 validation with existing CP2K output. Schema remains **0.1.0**; packaging and
 publication are not part of this stage.
 
-### Retained molecular vibrational input generation (0.4.3)
+### Molecular vibrational input generation (0.4.3, expanded in 0.4.6)
 
-Version **0.4.3** adds bounded **frequency/vibrational input generation**:
-CP2K target 2026.2, isolated Gamma PBE/classic MOLOPT-UCL GPW, closed-shell
-RKS and OT/STRICT only. The molecular task uses an explicit **MT Poisson**
+Bounded **frequency/vibrational input generation** targets CP2K 2026.2,
+isolated Gamma PBE/classic MOLOPT-UCL GPW and OT/STRICT without smearing.
+Version 0.4.6 accepts D3/D3(BJ) and parity-compatible collinear UKS, including
+optional atomic magnetization seeds (initial guesses only). The closed-shell
+no-dispersion baseline is unchanged. The molecular task uses an explicit **MT Poisson**
 preset with PERIODIC NONE, preserving the isolated model and existing cell.
 A displaced-atom box check is necessary but cannot verify electronic-density
 containment; converge the box independently. Old tasks keep their defaults.
@@ -670,8 +680,11 @@ Complete CLI calls remain noninteractive. Rich is optional; --plain/NO_COLOR
 disables styling; neither curses nor Multiwfn is a runtime dependency.
 See [input generation](docs/input-generation.md).
 
-Supported: ENERGY/ENERGY_FORCE/GEO_OPT/CELL_OPT subject to the
-[per-profile limits](docs/input-generation.md#non-hybrid-xc-profiles-030), 15 non-hybrid
+Supported tasks: ENERGY/ENERGY_FORCE/GEO_OPT/CELL_OPT subject to the
+[per-profile limits](docs/input-generation.md#non-hybrid-xc-profiles-030), and
+[VIBRATIONAL_ANALYSIS](docs/input-generation.md#molecular-vibrational-inputs-043)
+for the bounded CP2K 2026.2 isolated PBE/classic GPW, Gamma OT/STRICT subset.
+The generator supports 15 non-hybrid
 XC profiles plus the six [bounded direct-HFX hybrid profiles](docs/input-generation.md#direct-hfx-hybrids-032),
 MOLOPT-GTH, checked D3/D3(BJ) combinations, charge/multiplicity,
 cell/PBC, OT/diagonalization, and k-points on the existing semilocal paths.
