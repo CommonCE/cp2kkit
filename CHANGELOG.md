@@ -8,6 +8,55 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.4.7
+
+- Extend bounded CP2K 2026.2 `VIBRATIONAL_ANALYSIS` input generation to periodic
+  surface partial-Hessian workflows (`PERIODIC XYZ`, explicit whole-atom
+  `--fixed-atoms` / menu **9** / **420** with at least one fixed and one active
+  atom, `POISSON_SOLVER PERIODIC`, `FULLY_PERIODIC T`, skew cells allowed,
+  `OT/STRICT` or `diag` with optional Fermi-Dirac smearing and `ADDED_MOS`,
+  PBE/classic MOLOPT-UCL GPW, `none`/D3/D3(BJ), RKS/UKS, Gamma only). Isolated
+  molecular defaults, restrictions and catalog-only input hashes are unchanged.
+- Extend `parse_vibration` / `cp2kkit vibration` / main menu **7** to observe
+  periodic `XYZ` CP2K 2026.2 Cartesian normal-mode tables without gas-phase
+  rotovibrational projection, adding `periodicity`, `periodicity_sources` and
+  `rotovibrational_vectors` metadata and checking positive unique displacement
+  atom indices per group. Unsupported or conflicting periodicities and `ROT|`
+  conflicts remain rejected.
+- Add external Shermo 2.6.2 `imode=1` surface-mode thermochemistry across Python,
+  `cp2kkit thermochemistry`, `shermo-read` and main menu **7 / s** via explicit
+  `--thermo-model ideal-gas|vibrational-only` (default `ideal-gas` preserved),
+  required `--active-atoms` and independent full-system `--energy-output` for
+  `vibrational-only`, and explicit `--element-masses EL=MASS ...` as an
+  alternative to `--masses-amu` (no built-in mass tables). Invokes Shermo with
+  `-imode 1 -PGlabel C1`, defaults `--low-frequency` to `harmonic` for
+  `vibrational-only` (preserving `grimme` for `ideal-gas`) while allowing explicit
+  `grimme` with a rotational-inertia caveat, verifies `3 * active_atom_count`
+  positive modes and `U == H` equality, and sets inapplicable rotational/linearity/
+  point-group fields to `null`.
+- Pre-release 0.4.7 hardening:
+  - Reject selected single-point segments containing nonzero Fermi-Dirac
+    `Electronic entropic energy` (`-T_e S_e`), nonzero Gaussian/Methfessel-Paxton/
+    Marzari-Vanderbilt `Smearing free energy correction` (kept distinct from
+    physical electronic entropy), a differing `Total energy (extrapolated to
+    T->0)` or `Total energy (extrapolated to sigma->0)`, or damaged/unsupported
+    records (including missing colon or broken unit brackets) before launching
+    Shermo; never substitute extrapolated values or subtract corrections
+    automatically, keep missing records as `null` (distinct from explicit `0.0`),
+    and preserve raw `ENERGY` parser semantics.
+  - Cross-check observable single-point total atom count (`- Atoms:`) against
+    the full reference XYZ atom count (not `active_atoms`) and observable
+    periodicity against vibration/XYZ/model evidence on the selected segment only.
+  - Recognize complete `CELL|`/`POISSON| Periodicity`, `ROT|` count and energy
+    metadata field names before validating native delimiters, units and full
+    values so malformed records (e.g. `POISSON| Periodicity: XY`, missing colon,
+    broken unit bracket) raise `ParseError` / `KitError` instead of being
+    downgraded to `null`/`missing`.
+  - Reject `DX` values whose `2*DX` denominator or displaced `+/-DX` bohr
+    coordinates overflow double precision (e.g. `1e308`), without adding an
+    arbitrary scientific upper bound or altering normal molecular inputs.
+  Exchange schema remains **0.1.0**.
+
 ## 0.4.6
 
 - Add application-menu adapters **5/2** (parse summary, details and explicit

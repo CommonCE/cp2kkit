@@ -1,6 +1,6 @@
 # CP2K input generation
 
-This guide describes the generator in cp2kkit **0.4.4**. Older defaults and migration notes are in
+This guide describes the generator in cp2kkit **0.4.7**. Older defaults and migration notes are in
 [the changelog](../CHANGELOG.md). AE automatic setup is described in
 [the basis guide](basis-selection.md#all-electron-automatic-setup-027).
 The [registry-v1 basis guide](basis-selection.md) defines permanent numbering toward
@@ -77,17 +77,21 @@ This is an **input task**, not frequency-output analysis or an execution
 workflow. It targets **CP2K 2026.2** only. The generator policy is narrower than
 native CP2K; exclusions are not claims that CP2K cannot calculate those cases.
 Version 0.4.6 adds pair dispersion and UKS without changing the closed-shell
-no-dispersion input text or numerical presets. The [consumer contract](vibration-contract.md)
+no-dispersion input text or numerical presets. Version **0.4.7** adds the
+bounded **periodic surface partial-Hessian** branch (`PERIODIC XYZ` + explicit
+whole-atom `--fixed-atoms` leaving at least one active atom, `POISSON_SOLVER
+PERIODIC`, `FULLY_PERIODIC T`, skew cells allowed, and `OT/STRICT` or `diag` with
+optional Fermi-Dirac smearing and `ADDED_MOS`). The [consumer contract](vibration-contract.md)
 covers public calls, file effects and replay. The [0.4.3 closeout](closeout-0.4.3.md)
 records the earlier baseline checks, not native validation of the new cases.
 
 | Dimension | Allowed | Rejected or unsupported in this subset |
 |---|---|---|
-| Boundary | Explicit/resolved PERIODIC NONE, Gamma; MT electrostatics; positive axis-aligned orthorhombic cell | Unknown PBC, any periodic direction, non-Gamma, skew/rotated cells |
+| Boundary | Isolated `PERIODIC NONE` (Gamma, `MT`, axis-aligned orthorhombic cell) or periodic surface `PERIODIC XYZ` (Gamma, `PERIODIC`, skew cells allowed, partial `--fixed-atoms` required) | Unknown PBC, low-dimensional `X`/`Y`/`Z`/`XY`/`XZ`/`YZ`, non-Gamma, skew cells with `MT` |
 | Method | DFT/PBE, GPW, classic MOLOPT/UCL orbital registry and existing fixed-q GTH-PBE resolution; no dispersion, D3 or D3(BJ) | Other functionals, GAPW, UZH protocols, custom bases, xTB, +U, other dispersion models, ADMM/RI |
 | Spin | RKS or collinear UKS with parity-compatible multiplicity, with optional initial atomic magnetization; charge retained | Inconsistent charge/multiplicity, noncollinear or constrained magnetism |
-| SCF | OT, STRICT (auto or explicit), no added MOs/smearing | diag, IRAC, smearing; no automatic solver switch |
-| Analysis | Molecules with at least two atoms; full central finite-difference Hessian from forces, rotation cleaning | Isolated single atoms (no internal vibrations), partial Hessians/FIXED_ATOMS, MODE_SELECTIVE, periodic phonons, IR/Raman, thermochemistry |
+| SCF | Isolated `NONE`: `OT`/`STRICT` without smearing. Periodic `XYZ` partial Hessian: `OT`/`STRICT` without smearing, or `diag` with optional Fermi-Dirac smearing and `ADDED_MOS` | `diag`/smearing on isolated `NONE`, `IRAC`; no automatic solver switch |
+| Analysis | Isolated molecules (>=2 atoms, full Hessian, `FULLY_PERIODIC F`) or periodic partial Hessians (`>=1` fixed atom and `>=1` active atom, `&MOTION/&CONSTRAINT/&FIXED_ATOMS`, `FULLY_PERIODIC T`, `3 * active_atom_count` modes) | Isolated single atoms, unconstrained full-system periodic Gamma vibrations, all-fixed periodic slabs, `MODE_SELECTIVE`, periodic phonons, IR/Raman, thermochemistry |
 | Outputs/workflows | Native vibrational task defaults, existing source/manifest writer | CUBE requests and density-difference bundles |
 
 Every selected per-element orbital basis must belong to the classic protocol;
@@ -158,8 +162,9 @@ numerical parameters. See the [tagged force-path evidence](vibration-contract.md
   not total processors and not a single-replica guarantee. CP2K derives replica
   distribution from its MPI environment. This stage has no configurable replica
   count, processor topology, scheduler resource or mode-selective controls.
-- Explicit `FULLY_PERIODIC F`, `INTENSITIES F`, `THERMOCHEMISTRY F` retain native
-  defaults. No dipole/polarizability, TC temperature/pressure or thermochemical
+- Explicit `FULLY_PERIODIC F` (molecular) or `FULLY_PERIODIC T` (periodic partial
+  Hessian since 0.4.7), `INTENSITIES F`, and `THERMOCHEMISTRY F` are always
+  emitted. No dipole/polarizability, TC temperature/pressure or thermochemical
   processing is requested. Global PRINT_LEVEL stays LOW, but the task explicitly
   enables `VIBRATIONAL_ANALYSIS/PRINT/PROGRAM_RUN_INFO ON` to stdout. Its native
   default MEDIUM would otherwise hide the displaced/reference energy and force
@@ -174,17 +179,20 @@ numerical parameters. See the [tagged force-path evidence](vibration-contract.md
 
 The manifest's optional `vibrational_analysis` records effective values,
 requested-vs-auto origins and tagged-source hashes. `settings` preserves null
-requests for replay. Review displays DX, EPS_SCF, QS EPS_DEFAULT and the MT Poisson task preset
-with origins, together with the unverified electronic-density extent and
-explicit diagnostic-print preset.
+requests for replay. Review displays DX, EPS_SCF, QS EPS_DEFAULT and the active
+Poisson/boundary preset (`MT` with unverified electronic-density extent for
+isolated molecules, or `PERIODIC` + `FULLY_PERIODIC T` + active/fixed counts
+for periodic partial Hessians), together with the explicit diagnostic-print preset.
 All API/CLI/TUI/config/replay paths call the same validator and generator.
 
 A non-null displacement retained after changing to another task is an error,
 never silently emitted/ignored. In the TUI, return to the vibration task and
 reset **640** to `auto` before switching away; config/API reset to null/None.
-Previously supported fixed-atom/optimizer/trust-radius/trajectory controls retain
-the existing inactive-outside-optimization policy: no MOTION/constraints are
-emitted, fixed selections produce a warning, effective motion metadata is off.
+Optimizer/trust-radius/trajectory controls retain the inactive-outside-optimization
+policy (`motion_output.enabled` is false). Fixed-atom selections (`--fixed-atoms`
+/ **9** / **420**) are active in periodic `XYZ` partial-Hessian vibration (emitting
+a minimal `&MOTION/&CONSTRAINT/&FIXED_ATOMS` block) and remain retained-but-inactive
+for isolated `NONE` vibration, `ENERGY` and `ENERGY_FORCE` (with a warning).
 Other incompatible method/CUBE requests must be reset explicitly.
 
 ### Explicit geometry and examples

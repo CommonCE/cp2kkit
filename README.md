@@ -2,7 +2,7 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.4.6 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.4.7 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 cp2kkit is an independent CP2K toolkit, not an internal component of a workflow
@@ -39,10 +39,53 @@ input generation; version 0.3.3 adds BHandHLYP, M06-2X and configurable PBEh.
 All 21 referenced DFT selections now have bounded generation support; this is
 not full Multiwfn feature/combination coverage.
 
-## Current version: 0.4.6
+## Current version: 0.4.7
+
+Version **0.4.7** adds bounded **periodic surface adsorbate partial-Hessian vibration**
+across input generation, read-only frequency observation, and external **Shermo 2.6.2
+`imode=1`** thermochemistry, while keeping all isolated molecular defaults, input hashes,
+batch CLI commands and exchange schema **0.1.0** compatible.
+
+- **Periodic surface partial-Hessian inputs (`generate-input`):** target CP2K 2026.2,
+  `PERIODIC XYZ` (skew cells allowed), Gamma, PBE/classic MOLOPT-UCL GPW, `none`/D3/D3(BJ),
+  RKS/UKS, `OT/STRICT` or `diag` with optional Fermi-Dirac smearing and `ADDED_MOS`.
+  Requires explicit whole-atom `--fixed-atoms` (menu **9** / **420**) leaving at least
+  one active atom; emits `&MOTION/&CONSTRAINT/&FIXED_ATOMS` (`COMPONENTS_TO_FIX XYZ`),
+  `POISSON_SOLVER PERIODIC` and `FULLY_PERIODIC T`. Full-system periodic Gamma vibrations
+  and periodic phonons remain excluded.
+- **Periodic partial-Hessian frequency parsing (`vibration` / main 7):** accepts
+  consistent `CELL|`/`POISSON| Periodicity XYZ` outputs without gas-phase `ROT|`
+  projection, records `periodicity`, `periodicity_sources`, `rotovibrational_vectors`
+  and partial `displacement_atoms` indices/elements, and continues to reject unsupported
+  or conflicting periodicities and `ROT|` conflicts.
+- **Surface-mode Shermo `imode=1` (`thermochemistry` / `shermo-read` / main 7 -> s):**
+  adds `--thermo-model ideal-gas|vibrational-only` (default `ideal-gas` preserved),
+  required `--active-atoms` and required independent full-system `--energy-output` for
+  `vibrational-only`, plus optional `--element-masses EL=MASS ...` (mutually exclusive
+  with `--masses-amu`; no built-in mass tables). Invokes Shermo with `-imode 1 -PGlabel C1`,
+  verifies `3 * active_atom_count` strictly positive modes and `U == H` equality, represents
+  inapplicable rotational symmetry/linearity/point group as `null` with `standard_state:
+  "vibrational_only_no_translation_rotation"`, defaults low-frequency handling to `harmonic`
+  for `vibrational-only`, and allows explicit `grimme` with an explicit rotational-inertia
+  caveat. `shermo-read` imports both `imode=0` and `imode=1` stdout.
+
+```bash
+# Surface partial-Hessian vibration input (substrate atoms 1-180 fixed)
+cp2kkit generate-input slab.extxyz -o slab-freq.inp --run-type VIBRATIONAL_ANALYSIS \
+  --fixed-atoms 1-180 --dispersion d3bj --scf diag --smearing 150 --write-json
+
+# Surface-mode Shermo imode=1 thermochemistry with independent full-system single point
+cp2kkit thermochemistry slab-freq.out --shermo /path/to/Shermo \
+  --thermo-model vibrational-only --active-atoms 181-183 \
+  --energy-output slab-sp.out --geometry slab.extxyz --frame 0 \
+  --element-masses Ga=69.723 O=15.9994 H=1.0079 --multiplicity 1 \
+  --confirm-reference -o slab-thermo.json
+```
+
+### Retained 0.4.6 application-menu parity
 
 The [application menu](docs/menu-numbering-draft.md#application-workflow-layout-044)
-adds **5/2** parsed-output inspection and JSON/CSV export, **5/3** energy/SCF
+retains **5/2** parsed-output inspection and JSON/CSV export, **5/3** energy/SCF
 plots (optional Matplotlib), and **6/3** native-grid planar density profiles.
 Exports require explicit new paths. These actions need no structure and keep
 any loaded structure on return. Batch CLI commands and main menu **7** are unchanged.

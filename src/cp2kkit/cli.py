@@ -48,7 +48,7 @@ def build_parser():
             cmd.add_argument("--strict", action="store_true", help="Exit 7 if quality is not passed")
         else:
             cmd.add_argument("--kind", choices=["energy", "scf"], default="energy")
-    vibration = sub.add_parser('vibration', help='Observe a CP2K 2026.2 molecular normal-mode table')
+    vibration = sub.add_parser('vibration', help='Observe a CP2K 2026.2 Cartesian normal-mode table')
     vibration.add_argument('path', help='Explicit CP2K output file')
     vibration.add_argument('--segment', type=int, help='1-based program segment')
     vibration.add_argument('--block', type=int, help='1-based normal-mode block within a segment')
@@ -56,27 +56,34 @@ def build_parser():
     vibration.add_argument('--format', choices=('json', 'csv'), default='json')
     vibration.add_argument('-o', '--output', help='Exclusive new file; default writes to stdout')
     vibration.add_argument('--strict', action='store_true', help='Exit 7 if textual checks do not pass')
-    thermo = sub.add_parser('thermochemistry', help='Explicitly run local Shermo 2.6.2 on CP2K molecular modes')
+    thermo = sub.add_parser('thermochemistry', help='Explicitly run local Shermo 2.6.2 on CP2K molecular or surface-selected modes')
     thermo.add_argument('path', help='CP2K vibrational output file')
     thermo.add_argument('--shermo', required=True, help='Path to the trusted Shermo executable')
     thermo.add_argument('--geometry', required=True, help='XYZ file containing the actual reference geometry')
     thermo.add_argument('--frame', type=int, required=True, help='Explicit zero-based XYZ frame')
     thermo.add_argument('--segment', type=int, help='1-based CP2K segment')
     thermo.add_argument('--block', type=int, help='1-based CP2K mode block')
-    thermo.add_argument('--energy-output', help='Use electronic energy from this separate CP2K single-point output')
+    thermo.add_argument('--thermo-model', choices=('ideal-gas', 'vibrational-only'), default='ideal-gas',
+                        help='Shermo model: ideal-gas (imode=0, default) or vibrational-only (imode=1 for surface modes)')
+    thermo.add_argument('--active-atoms', type=parse_fixed_atoms,
+                        help='Required for vibrational-only: 1-based active Hessian atom indices/ranges in full XYZ (e.g. 181-183)')
+    thermo.add_argument('--energy-output', help='Use electronic energy from this separate CP2K single-point output (required for vibrational-only)')
     thermo.add_argument('--energy-segment', type=int, help='1-based segment of --energy-output if ambiguous')
-    thermo.add_argument('--masses-amu', required=True, type=float, nargs='+', help='One mass per atom in XYZ order')
+    masses = thermo.add_mutually_exclusive_group(required=True)
+    masses.add_argument('--masses-amu', type=float, nargs='+', help='One mass [amu] per atom in XYZ order')
+    masses.add_argument('--element-masses', nargs='+', metavar='EL=MASS',
+                        help='Explicit per-element masses [amu] covering every XYZ element (e.g. Ga=69.723 O=15.9994 H=1.0079)')
     thermo.add_argument('--multiplicity', required=True, type=int, help='Spin multiplicity (ground-level degeneracy)')
     thermo.add_argument('--confirm-reference', action='store_true', required=True,
-                        help='Assert the XYZ and molecular state match the vibration and any separate single point')
+                        help='Assert the XYZ and electronic state match the vibration and any separate single point')
     thermo.add_argument('--temperature-k', type=float, default=298.15)
     thermo.add_argument('--pressure-atm', type=float, default=1.0)
     thermo.add_argument('--frequency-scale', type=float, default=1.0, help='Shared ZPE/U/S/CV factor (default 1)')
-    thermo.add_argument('--low-frequency', choices=('harmonic', 'grimme'), default='grimme',
-                        help='Low-frequency treatment (default Grimme entropy interpolation at 100 cm^-1)')
+    thermo.add_argument('--low-frequency', choices=('harmonic', 'grimme'), default=None,
+                        help='Low-frequency treatment (default: grimme for ideal-gas, harmonic for vibrational-only)')
     thermo.add_argument('--timeout', type=float, default=30, help='Shermo timeout in seconds (default 30)')
     thermo.add_argument('-o', '--output', help='Exclusive new JSON file; default stdout')
-    shermo = sub.add_parser('shermo-read', help='Read existing supported Shermo 2.6.2 stdout without running it')
+    shermo = sub.add_parser('shermo-read', help='Read existing supported Shermo 2.6.2 stdout (imode=0 or imode=1) without running it')
     shermo.add_argument('path')
     shermo.add_argument('-o', '--output', help='Exclusive new JSON file; default stdout')
     structure = sub.add_parser("export-structure", help="Read XYZ/restart/GJF/CIF/POSCAR; export with a provenance sidecar")
@@ -180,7 +187,7 @@ def build_parser():
     gen.add_argument("--fragment-b-charge", type=int)
     gen.add_argument("--fragment-b-multiplicity", type=int)
     gen.add_argument("--fixed-atoms", type=parse_fixed_atoms, default="off",
-                     help="Optimization: 1-based atoms/ranges, e.g. 1,3-5; off/0 clears; fractional XYZ. DFT target 2026.2; xTB checked targets 2024.2-2026.2")
+                     help="Optimization or periodic partial-Hessian vibration: 1-based atoms/ranges, e.g. 1,3-5; off/0 clears; fractional XYZ. DFT target 2026.2; xTB checked targets 2024.2-2026.2")
     gen.add_argument("--trust-radius", type=float, default=0.2, help="Angstrom; BFGS/LBFGS optimization only")
     gen.add_argument("--trajectory-format", type=str.upper, choices=TRAJECTORY_FORMATS, default="XYZ",
                      help="Optimization position trajectory; EXTXYZ requires target 2026.2 for DFT, >=2026.1 for xTB")
@@ -257,19 +264,24 @@ def emit(data, output):
 
 def execute(args):
     if args.command in {'thermochemistry', 'shermo-read'}:
-        from .thermochemistry import read_shermo, run_shermo
+        from .thermochemistry import parse_element_masses, read_shermo, run_shermo
         if args.output and os.path.lexists(args.output):
             raise OutputExists(f'Refusing to overwrite: {args.output}')
         if args.command == 'shermo-read':
             data = read_shermo(args.path)
         else:
+            element_masses = parse_element_masses(args.element_masses) if args.element_masses else None
             data = run_shermo(args.path, args.geometry, executable=args.shermo, frame=args.frame,
-                              masses_amu=args.masses_amu, multiplicity=args.multiplicity,
-                              confirm_reference=args.confirm_reference, segment=args.segment, block=args.block,
-                              temperature=args.temperature_k, pressure=args.pressure_atm, scale=args.frequency_scale,
+                              masses_amu=args.masses_amu, element_masses=element_masses,
+                              multiplicity=args.multiplicity, confirm_reference=args.confirm_reference,
+                              segment=args.segment, block=args.block, temperature=args.temperature_k,
+                              pressure=args.pressure_atm, scale=args.frequency_scale,
                               low_frequency=args.low_frequency, timeout=args.timeout,
-                              energy_output=args.energy_output, energy_segment=args.energy_segment)
+                              energy_output=args.energy_output, energy_segment=args.energy_segment,
+                              thermo_model=args.thermo_model, active_atoms=args.active_atoms)
         emit(data, args.output)
+        for warning in data.get('warnings', ()):
+            print(f'WARNING: {warning}', file=sys.stderr)
         return 0
     if args.command == 'vibration':
         from .vibration_results import export_vibration, parse_threshold, parse_vibration, write_vibration

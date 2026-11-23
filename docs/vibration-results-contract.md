@@ -1,10 +1,11 @@
-# Molecular vibrational result observations (since software 0.4.4)
+# Vibrational result observations (since software 0.4.4, extended in 0.4.7)
 
-This read-only contract covers CP2K 2026.2 molecular Cartesian normal-mode
-frequency tables. It is independent of the [input-generation contract](vibration-contract.md)
-and the [GEO_OPT observation contract](geo-opt-contract.md). No method, basis,
-spin or solver is inferred or required by the frequency parser. No CP2K, scheduler
-or external analysis program is launched.
+This read-only contract covers CP2K 2026.2 Cartesian normal-mode frequency tables
+for isolated molecules and periodic `XYZ` partial-Hessian calculations. It is
+independent of the [input-generation contract](vibration-contract.md) and the
+[GEO_OPT observation contract](geo-opt-contract.md). No method, basis, spin or
+solver is inferred or required by the frequency parser. No CP2K, scheduler or
+external analysis program is launched.
 
 ## Entry points
 
@@ -63,15 +64,23 @@ structure is needed for analysis.
   counts translations and usable rotation vectors; the writer uses its actual
   reduced dimension. The parser never computes a mode count from atoms,
   linearity, constraints or a filename and never adds/removes any modes.
-- Explicit incompatible release/run-type metadata, non-`NONE` printed
-  `POISSON|`/`CELL| Periodicity`, or a printed `ROT| Number of rotovibrational
-  vectors` other than 5 or 6 are rejected for this molecular scope. When such
-  metadata are absent, the table grammar alone cannot prove the underlying
-  boundary conditions or projections. Unknown version/task excerpts may be
-  observed (with a warning) but cannot pass strict. The checked source tag is
-  `09496e055e132aa3dba53a7751ebdf432b4ebb78`; existing local CP2K 2026.2 molecular
-  output was inspected read-only. Public tests use independent synthetic records,
-  not private logs or a new run.
+- Explicit incompatible release/run-type metadata, recognized `POISSON|`/`CELL|
+  Periodicity` records that are empty, malformed (including non-native
+  punctuation such as `POISSON| Periodicity: XY` or trailing tokens such as
+  `XY extra`), outside `NONE`/`XYZ`, or conflicting within the same segment,
+  recognized `ROT| Number of rotovibrational vectors` records that are malformed
+  (including non-native punctuation or trailing tokens) or outside 5 or 6, or
+  any `ROT|` rotovibrational projection combined with `XYZ` periodicity are
+  rejected with `ParseError` (CLI exit 4).
+  Periodic `XYZ` partial-Hessian outputs (with frozen substrate atoms and
+  `FULLY_PERIODIC T`, omitting `ROT|`) are accepted and preserve their printed
+  1-based active atom indices in `displacement_atoms`. Only genuinely absent
+  periodicity records remain `null`; when absent, the table grammar alone cannot
+  prove the underlying boundary conditions or projections. Unknown version/task
+  excerpts may be observed (with a warning) but cannot pass strict. The checked
+  source tag is `09496e055e132aa3dba53a7751ebdf432b4ebb78`; existing local CP2K
+  2026.2 molecular and periodic partial-Hessian outputs were inspected read-only.
+  Public tests use independent synthetic records, not private logs or a new run.
 
 ## Output, classification and status
 
@@ -87,11 +96,15 @@ terminator or, for a complete table, a recognized following footer when present.
 `expected_mode_count_from_diagnostic` is a nullable integer, not an atom-based
 count or assurance that all physical modes exist.
 
-Version 0.4.5 adds JSON/Python `displacement_atoms` (ordered index/element pairs
-from the first closed group; inconsistent later groups make the table incomplete)
-and `reference_electronic_energy`. The additive `reference_state` object records
+Version 0.4.5 adds JSON/Python `displacement_atoms` (ordered positive unique
+index/element pairs from the first closed group; duplicate/nonpositive indices or
+inconsistent later groups make the table incomplete) and
+`reference_electronic_energy`. The additive `reference_state` object records
 pre-table `DFT| Charge` and `DFT| Multiplicity` evidence for the selected segment.
-Each field uses the [normalized settings convention](geo-opt-contract.md):
+Version 0.4.7 adds `periodicity` (`"NONE"`, `"XYZ"` or `null`),
+`periodicity_sources` (list of line evidence) and `rotovibrational_vectors`
+(`5`, `6` or `null`). Each `reference_state` field uses the
+[normalized settings convention](geo-opt-contract.md):
 a value is non-null only with `parsed` status; `missing`, `conflicting` and
 `unsupported` retain null rather than assuming a state. This evidence does not
 change the frequency report's strict status.

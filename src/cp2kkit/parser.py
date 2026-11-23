@@ -33,11 +33,13 @@ def number(token, source):
     return value
 
 
-def parse_output(path):
+def _parse_output_with_ranges(path):
     text, provenance = read_text(path)
     if not CP2K_MARKER.search(text):
         raise ParseError(f"No recognizable CP2K output markers: {path}")
+    lines = text.splitlines()
     segments = []
+    ranges = []
     current = None
     step = None
     pending_scf = None
@@ -46,31 +48,37 @@ def parse_output(path):
     version = project = None
     warnings = []
 
-    def begin(started=False):
+    def begin(line_no, started=False):
         nonlocal current, step, pending_scf, scf_evidence, step_source
         current = Segment(id=len(segments), started=started)
         segments.append(current)
+        ranges.append([line_no, line_no])
         step = None
         step_source = None
         pending_scf = None
         scf_evidence = []
 
-    for line_no, line in enumerate(text.splitlines(), 1):
+    for line_no, line in enumerate(lines, 1):
         evidence = Evidence(provenance["path"], line_no, line)
-        if current is not None and current.completed and (VERSION.search(line) or RUN_TYPE.search(line)
+        was_completed = current is not None and current.completed
+        if was_completed and (VERSION.search(line) or RUN_TYPE.search(line)
                 or STEP.search(line) or SCF_OK.search(line) or SCF_FAIL.search(line)
                 or SETTING.match(line) or re.search(r"ENERGY\|\s+Total FORCE_EVAL", line, re.I)):
-            begin()
+            begin(line_no)
+            was_completed = False
         if "PROGRAM STARTED AT" in line:
             if current is None:
-                begin(True)
+                begin(line_no, True)
+                was_completed = False
             elif current.started or current.energies or current.completed:
-                begin(True)
+                begin(line_no, True)
+                was_completed = False
             else:
                 current.started = True
             current.evidence.append(evidence)
         if current is None:
-            begin()
+            begin(line_no)
+            was_completed = False
         match = VERSION.search(line)
         if match:
             new_version = match[1].strip()
@@ -102,7 +110,8 @@ def parse_output(path):
             new_step = int(match[1])
             if current.completed or (step is not None and new_step <= step):
                 old_run_type = current.run_type
-                begin()
+                begin(line_no)
+                was_completed = False
                 current.run_type = old_run_type
                 warnings.append(f"Step reset at line {line_no}: new segment, no inferred restart continuity")
             step = new_step
@@ -171,16 +180,23 @@ def parse_output(path):
         if "PROGRAM ENDED AT" in line:
             current.completed = True
             current.evidence.append(evidence)
+        if not was_completed:
+            ranges[-1][1] = line_no
     for segment in segments:
         segment.normalized_settings = normalize_settings(segment.settings_records)
         for field, setting in segment.normalized_settings.items():
             if field != "uks" and setting["status"] in {"unsupported", "conflicting"}:
-                lines = ", ".join(str(source["line"]) for source in setting["sources"])
+                setting_lines = ", ".join(str(source["line"]) for source in setting["sources"])
                 warnings.append(f"{setting['status'].capitalize()} setting {field} "
-                                f"in segment {segment.id} at lines {lines}")
+                                f"in segment {segment.id} at lines {setting_lines}")
     if not version:
         warnings.append("CP2K version not found; compatibility cannot be established")
     if any(not segment.completed for segment in segments):
         warnings.append("At least one segment lacks PROGRAM ENDED AT (partial/aborted/unknown)")
-    return Run(SCHEMA_VERSION, "CP2K", version, project, provenance, segments,
-               parser_warnings=warnings)
+    run = Run(SCHEMA_VERSION, "CP2K", version, project, provenance, segments,
+              parser_warnings=warnings)
+    return run, lines, tuple(tuple(span) for span in ranges)
+
+
+def parse_output(path):
+    return _parse_output_with_ranges(path)[0]

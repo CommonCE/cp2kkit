@@ -61,6 +61,7 @@ class VibrationTests(unittest.TestCase):
         v = m['vibrational_analysis']
         self.assertEqual(v['displacement_origin'], 'native_default_explicit')
         self.assertEqual(v['eps_scf_origin'], 'task_preset')
+        self.assertEqual(v['fully_periodic_origin'], 'native_default_explicit')
         self.assertEqual(v['qs_eps_default'], 1e-14)
         self.assertEqual(m['poisson_solver'], 'MT')
         self.assertEqual(v['poisson_solver_origin'], 'task_preset')
@@ -406,3 +407,99 @@ class VibrationTests(unittest.TestCase):
         with self.assertRaises(OutputExists):
             write_input(self.water, settings, symlink)
         self.assertEqual(self.output.read_text(), 'existing input')
+
+    def test_periodic_surface_partial_hessian_ot_diag_smearing_and_single_active(self):
+        slab = Structure(
+            ['Ga', 'O', 'O', 'H', 'H'],
+            [[0., 0., 1.], [2., 2., 1.], [3., 3., 5.], [3.76, 3., 5.58], [2.24, 3., 5.58]],
+            [[12., 0., 0.], [2., 11., 0.], [0., 0., 22.]],  # Skew periodic slab cell.
+            [True, True, True],
+            {'path': str(self.root/'slab.extxyz')},
+        )
+        base = InputSettings(run_type='VIBRATIONAL_ANALYSIS', periodic='XYZ', fixed_atoms='1-2',
+                             dispersion='d3bj', scf='diag', smearing=150., added_mos=30)
+        text, m = generate_input(slab, base)
+        for line in ('RUN_TYPE VIBRATIONAL_ANALYSIS', 'PERIODIC XYZ', 'POISSON_SOLVER PERIODIC',
+                     'EPS_DEFAULT 1.0E-14', 'EPS_SCF 1.0E-08', 'ADDED_MOS 30', 'ELECTRONIC_TEMPERATURE [K] 150',
+                     'TYPE DFTD3(BJ)', 'COMPONENTS_TO_FIX XYZ', 'LIST 1 2',
+                     'FULLY_PERIODIC T', 'NPROC_REP 1', 'INTENSITIES F', 'THERMOCHEMISTRY F',
+                     '&PROGRAM_RUN_INFO ON'):
+            self.assertIn(line, text)
+        self.assertNotIn('&GEO_OPT', text)
+        self.assertNotIn('&TRAJECTORY', text)
+        self.assertNotIn('POISSON_SOLVER MT', text)
+        stack = []
+        for line in text.splitlines():
+            words = line.split()
+            if words and words[0] == '&END':
+                self.assertEqual(stack.pop(), words[1])
+            elif words and words[0].startswith('&'):
+                stack.append(words[0][1:])
+        self.assertEqual(stack, [])
+        vib = m['vibrational_analysis']
+        self.assertEqual(vib['scope'], 'periodic_partial_hessian')
+        self.assertEqual(vib['poisson_solver'], 'PERIODIC')
+        self.assertTrue(vib['fully_periodic'])
+        self.assertEqual(vib['fully_periodic_origin'], 'task_preset')
+        self.assertIsNone(vib['mt_box'])
+        self.assertEqual(vib['active_atoms'], [3, 4, 5])
+        self.assertEqual((vib['active_atom_count'], vib['fixed_atom_count']), (3, 2))
+        self.assertFalse(any(src['url'].endswith('/mt_util.F') for src in vib['sources']))
+        self.assertTrue(m['constraints']['enabled'])
+        self.assertEqual(m['constraints']['fixed_atoms'], [1, 2])
+        self.assertFalse(m['motion_output']['enabled'])
+        self.assertTrue(any('3 * active_atom_count' in w for w in m['warnings']))
+        self.assertTrue(any('Fermi-Dirac smearing' in w for w in m['warnings']))
+        # Replay via config/sidecar and OT + UKS + single active atom.
+        for config in (asdict(base), json.loads(json.dumps(m))):
+            self.assertEqual(generate_input(slab, InputSettings.from_config(config))[0], text)
+        single_active = InputSettings(run_type='VIBRATIONAL_ANALYSIS', periodic='XYZ',
+                                      fixed_atoms='1-4', scf='ot', multiplicity=2)
+        ot_text, ot_m = generate_input(slab, single_active)
+        self.assertIn('UKS T\n', ot_text)
+        self.assertIn('LIST 1 2 3 4\n', ot_text)
+        self.assertEqual(ot_m['vibrational_analysis']['active_atoms'], [5])
+        self.assertTrue(any('same spin/electronic state' in w for w in ot_m['warnings']))
+
+    def test_periodic_surface_vibration_rejections_and_tui_parity(self):
+        slab_path = self.root/'slab.extxyz'
+        slab_path.write_text(
+            '3\nLattice="12 0 0 2 11 0 0 0 22" Properties=species:S:1:pos:R:3 pbc="T T T"\n'
+            'O 1 1 1\nH 1 1 3\nH 2 1 3\n'
+        )
+        slab = read_structure(slab_path)
+        for changes, pattern in (
+            ({'fixed_atoms': 'off'}, 'requires explicit --fixed-atoms'),
+            ({'fixed_atoms': '1-3'}, 'at least one unfixed'),
+            ({'fixed_atoms': '1-4'}, '3 atoms'),
+            ({'fixed_atoms': '1', 'kpoints': (2, 1, 1)}, 'Gamma-only'),
+            ({'fixed_atoms': '1', 'periodic': 'XY'}, 'PERIODIC NONE or periodic partial-Hessian'),
+            ({'fixed_atoms': '1', 'ot_algorithm': 'IRAC'}, 'STRICT'),
+            ({'fixed_atoms': '1', 'eps_scf': 1e-6}, '<= 1e-8'),
+            ({'fixed_atoms': '1', 'vibration_displacement_bohr': 1e-300}, 'coordinate precision'),
+            ({'fixed_atoms': '1', 'vibration_displacement_bohr': 1e308}, 'overflows'),
+        ):
+            with self.subTest(changes=changes), self.assertRaisesRegex(KitError, pattern):
+                generate_input(slab, InputSettings(run_type='VIBRATIONAL_ANALYSIS', **changes))
+        # Also reject DX where 2*DX is finite but coord +/- DX overflows double precision.
+        far_slab = replace(slab, positions=[[0., 0., 1.], [5e307, 1., 3.], [2., 1., 3.]])
+        with self.assertRaisesRegex(KitError, 'overflows'):
+            generate_input(far_slab, InputSettings(run_type='VIBRATIONAL_ANALYSIS', fixed_atoms='1',
+                                                   vibration_displacement_bohr=8.9e307))
+        # TUI makes fixed atoms editable for periodic XYZ vibration and matches API/CLI.
+        log = TTY()
+        code = run_interactive(str(slab_path), -1, str(self.output), InputSettings(write_json=True),
+                               stdin=TTY('-1\nVIBRATIONAL_ANALYSIS\n9\n1\n4\ndiag\n6\n150\nr\n\n0\n'),
+                               stdout=log, plain=True)
+        self.assertEqual(code, 0, log.getvalue())
+        self.assertIn('FULLY_PERIODIC: T [task_preset]', ' '.join(log.getvalue().split()))
+        self.assertIn('active atoms: 2 (fixed: 1)', ' '.join(log.getvalue().split()))
+        expected_settings = InputSettings(run_type='VIBRATIONAL_ANALYSIS', fixed_atoms='1',
+                                          scf='diag', smearing=150., write_json=True)
+        expected_text, _ = generate_input(slab, expected_settings)
+        self.assertEqual(self.output.read_text(), expected_text)
+        cli_out = self.root/'slab-cli.inp'
+        result = subprocess.run(command_arguments(slab_path, -1, cli_out, expected_settings),
+                                capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(cli_out.read_text(), expected_text)

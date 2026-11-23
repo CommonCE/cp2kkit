@@ -19,24 +19,33 @@ and migration decision, rather than silently reusing this contract. Conservative
 text-quality fixes are documented separately from schema compatibility.
 Structure and generated-input contracts are not changed by this batch.
 
-## Shermo molecular thermochemistry (software 0.4.5)
+## Shermo thermochemistry (software 0.4.5, extended in 0.4.7)
 
 `operation: "shermo_thermochemistry"` uses schema 0.1.0. It separates printed
 reference energy, ZPE, corrections and corrected totals (Hartree) and records
-conditions, processing parameters, and line evidence. CP2K association and
-external process metadata are present only for a managed invocation. See the
-[Shermo contract](shermo-thermochemistry.md).
+conditions, processing parameters, and line evidence. Software 0.4.7 adds
+`thermo_model` (`"ideal-gas"` or `"vibrational-only"`), `imode` (`0` or `1`) and
+`warnings`, sets `standard_state` to `"vibrational_only_no_translation_rotation"`
+and `point_group`/`rotational_symmetry_number`/`linear` to `null` for `imode=1`,
+and records `periodicity`, `thermo_model`, `hessian_atom_scope` and `active_atoms`
+inside managed `cp2k_reference` (plus selected-segment `atom_count`,
+`periodicity`, `electronic_entropic_energy`, `smearing_free_energy_correction`,
+`extrapolated_t0_energy` and `extrapolated_sigma0_energy` provenance inside
+`cp2k_single_point`, keeping missing values `null`). CP2K
+association and external process metadata are present only for a managed
+invocation. See the [Shermo contract](shermo-thermochemistry.md).
 
-## Vibrational result observations (since software 0.4.4)
+## Vibrational result observations (since software 0.4.4, extended in 0.4.7)
 
 The distinct `operation: "vibration_observation"` uses schema **0.1.0** and
 does not add fields to `Run` or reinterpret input manifests. It carries a selected
 segment/block, source and parser identity, frequency quantities in `cm^-1`,
-printed mode IDs/tokens when available, and independent text completeness and
-program-end evidence. See the [result contract](vibration-results-contract.md)
+printed mode IDs/tokens when available, additive `periodicity`,
+`periodicity_sources` and `rotovibrational_vectors` (since 0.4.7), and independent
+text completeness and program-end evidence. See the [result contract](vibration-results-contract.md)
 for fields, nullability, classification, CSV and eligibility for strict mode.
 
-## Generated vibrational inputs (software 0.4.3)
+## Generated vibrational inputs (software 0.4.3, extended in 0.4.7)
 
 The [consumer contract](vibration-contract.md) specifies public calls, normalized
 settings, publication/errors and replay. The
@@ -52,18 +61,23 @@ retain their prior contracts.
 
 Optional top-level `vibrational_analysis` is null for ordinary non-vibrational DFT
 inputs and may be absent (including older manifests and xTB). For the new task
-it records `algorithm`, `displacement_bohr`, `displacement_origin`, `eps_scf`,
+it records `scope` (`"molecular"` or `"periodic_partial_hessian"`, since 0.4.7),
+`algorithm`, `displacement_bohr`, `displacement_origin`, `eps_scf`,
 `eps_scf_origin`, `qs_eps_default`, `qs_eps_default_origin`, `nproc_rep`,
-`nproc_rep_origin`, `fully_periodic`, `intensities`, `thermochemistry`,
-`stationary_point_verified`, `runtime_validated` and tagged `sources` (URL/SHA-256).
-Optional additions in the MT follow-up are `poisson_solver` (MT),
-`poisson_solver_origin` (task_preset) and `mt_box`: `cell_lengths_angstrom`,
+`nproc_rep_origin`, `fully_periodic`, `fully_periodic_origin`,
+`intensities`, `thermochemistry`, `active_atoms`, `active_atom_count`,
+`fixed_atom_count`, `stationary_point_verified`, `runtime_validated` and tagged
+`sources` (URL/SHA-256).
+Optional additions in the MT follow-up are `poisson_solver` (`MT` or `PERIODIC`),
+`poisson_solver_origin` (`task_preset`) and `mt_box`: `cell_lengths_angstrom`,
 `displaced_atomic_span_angstrom`, `minimum_lengths_from_atoms_angstrom`,
-`check_scope` and `density_extent_verified` (false). They describe a necessary
+`check_scope` and `density_extent_verified` (false) for isolated molecular `MT`,
+or `null` for periodic partial Hessians. They describe a necessary
 atomic-envelope check, not an observed electronic-density size. Top-level
 `poisson_solver` retains its meaning (the emitted effective solver); its value
-changes only for the new vibrational task. Existing settings/config fields and
-schema 0.1.0 remain unchanged.
+changes only for the vibrational task. For periodic partial Hessians,
+`constraints.enabled` is `true` while `motion_output.enabled` stays `false`.
+Existing settings/config fields and schema 0.1.0 remain unchanged.
 
 Optional `program_run_info` (true) and `program_run_info_origin` (task_preset)
 record explicit native vibration diagnostics to stdout at global LOW verbosity.

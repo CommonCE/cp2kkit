@@ -139,7 +139,7 @@ GROUPS = (
 
 def visible_fields(fields, values):
     periodic = values['periodic']
-    if periodic is None and values.get('path') and any(f.name == 'vacuum' for f in fields):
+    if periodic is None and values.get('path') and any(f.name in {'vacuum', 'fixed_atoms'} for f in fields):
         try:
             structure = read_structure(values['path'], values['frame'])
             if structure.pbc is not None:
@@ -178,7 +178,9 @@ def visible_fields(fields, values):
                  and not (f.name == 'gapw_profile' and not has_ae)
                  and not (f.name == 'vibration_displacement_bohr' and values['run_type'] != 'VIBRATIONAL_ANALYSIS')
                  and not (f.name == 'pressure' and values['run_type'] != 'CELL_OPT')
-                 and not (f.name in {'optimizer', 'max_iter', 'trust_radius', 'trajectory_format', 'fixed_atoms'} and values['run_type'] not in {'GEO_OPT', 'CELL_OPT'})
+                 and not (f.name in {'optimizer', 'max_iter', 'trust_radius', 'trajectory_format'} and values['run_type'] not in {'GEO_OPT', 'CELL_OPT'})
+                 and not (f.name == 'fixed_atoms' and not (values['run_type'] in {'GEO_OPT', 'CELL_OPT'}
+                                                           or (values['run_type'] == 'VIBRATIONAL_ANALYSIS' and periodic == 'XYZ')))
                  and not (f.name == 'density_difference' and (values['run_type'] != 'ENERGY' or has_ae))
                  and not (f.name == 'trust_radius' and values['optimizer'] not in {'BFGS', 'LBFGS'})
                  and not (f.name == 'vacuum' and periodic != 'NONE')
@@ -533,8 +535,15 @@ class Menu:
                 self.show(f"Vibration DX: {vib['displacement_bohr']} bohr [{vib['displacement_origin']}]; "
                           f"EPS_SCF: {vib['eps_scf']} [{vib['eps_scf_origin']}]; "
                           f"QS EPS_DEFAULT: {vib['qs_eps_default']} [task_preset]")
-                self.show(f"Poisson: {vib['poisson_solver']} [{vib['poisson_solver_origin']}]; "
-                          "MT atomic-envelope check only; electronic-density extent NOT verified; cell unchanged.")
+                if vib.get('scope') == 'periodic_partial_hessian':
+                    self.show(f"Poisson: {vib['poisson_solver']} [{vib['poisson_solver_origin']}]; "
+                              f"FULLY_PERIODIC: T [{vib['fully_periodic_origin']}]; "
+                              f"active atoms: {vib['active_atom_count']} (fixed: {vib['fixed_atom_count']}); "
+                              "partial Hessian only (not periodic phonons).")
+                    self.show(f"Fixed atoms (1-based, fractional XYZ): {manifest['settings']['fixed_atoms']}; count={len(manifest['constraints']['fixed_atoms'])}")
+                else:
+                    self.show(f"Poisson: {vib['poisson_solver']} [{vib['poisson_solver_origin']}]; "
+                              "MT atomic-envelope check only; electronic-density extent NOT verified; cell unchanged.")
                 self.show("Central finite differences of forces; NPROC_REP=1 (processors per replica); "
                           "no intensities/thermochemistry; stationary point NOT verified.")
                 self.show("Vibrational PROGRAM_RUN_INFO: ON [task_preset]; forces/Hessian to stdout; "

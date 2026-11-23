@@ -30,8 +30,10 @@ FOOTER = re.compile(THERMO_HEADING.pattern + r'|-\s+(?:DBCSR STATISTICS|T I M I 
 REFERENCE = re.compile(r'VIB\|\s+Electronic energy \(U\) \[kJ/mol\]:\s*(\S+)')
 START = re.compile(r'[ *]*PROGRAM STARTED AT\s+\S.*')
 END = re.compile(r'[ *]*PROGRAM ENDED AT\s+\S.*')
-PERIODICITY = re.compile(r'(?:POISSON|CELL)\|\s+Periodicity\s+(\S+)')
-ROTATIONS = re.compile(r'ROT\|\s+Number of rotovibrational vectors\s+(\d+)')
+PERIODICITY_LINE = re.compile(r'(?:POISSON|CELL)\|\s+Periodicity(?=$|[^A-Za-z0-9_])(.*)')
+NATIVE_PERIODICITY_VALUE = re.compile(r'\s+(\S+)')
+ROTATIONS_LINE = re.compile(r'ROT\|\s+Number of rotovibrational vectors(?=$|[^A-Za-z0-9_])(.*)')
+NATIVE_ROTATIONS_VALUE = re.compile(r'\s+(\d+)')
 NUMERIC = re.compile(NUMBER, re.ASCII)
 RELEASE = re.compile(r'CP2K version 2026\.2', re.I)
 
@@ -69,6 +71,9 @@ class VibrationReport:
     displacement_atoms: list[tuple[int, str]] = field(default_factory=list)
     reference_electronic_energy: Quantity | None = None
     reference_state: dict = field(default_factory=dict)
+    periodicity: str | None = None
+    periodicity_sources: list[Evidence] = field(default_factory=list)
+    rotovibrational_vectors: int | None = None
 
     @property
     def counts(self) -> dict[str, int]:
@@ -260,9 +265,12 @@ def _read_table(report: VibrationReport, lines: list[str], start: int, stop: int
         elif stage == 'atom_header' and ATOM_HEADER.fullmatch(line):
             stage, atoms = 'atoms', []
         elif stage == 'atoms' and (atom := ATOM.fullmatch(line)):
-            atoms.append((int(atom[1]), atom[2]))
-            components = atom[3].split()
+            index = int(atom[1])
             src = evidence(i)
+            if index < 1 or any(existing == index for existing, _ in atoms):
+                _issue(report, src, f'Invalid or duplicate displacement atom index: {atom[1]!r}')
+            atoms.append((index, atom[2]))
+            components = atom[3].split()
             if previous_width is not None and len(components) != 3 * previous_width:
                 _issue(report, src, 'Incomplete displacement row')
             for token in components:
@@ -354,6 +362,9 @@ def parse_vibration(path: str | Path, *, segment: int | None = None, block: int 
         raise AmbiguousVibration(choices, source)
     s, b, begin, start, stop, end_marker, count_window = selected[0]
     version = version_source = run_type = run_source = None
+    periodicity_value = None
+    periodicity_sources = []
+    rotovibrational = None
     summaries = {'converged': 0, 'not_converged': 0}
     state_records = []
     for i in range(begin, start):
@@ -368,17 +379,40 @@ def parse_vibration(path: str | Path, *, segment: int | None = None, block: int 
             run_type, run_source = match[1].upper(), evidence(i)
             if run_type != 'VIBRATIONAL_ANALYSIS':
                 raise ParseError(f'Unsupported run type at line {i + 1}: {run_type}')
-        periodicity = PERIODICITY.fullmatch(line)
-        rotations = ROTATIONS.fullmatch(line)
-        if ((periodicity and periodicity[1] != 'NONE') or (rotations and rotations[1] not in ('5', '6'))):
-            raise ParseError(f'Non-molecular or unsupported vibration scope at line {i + 1}')
+        periodicity = PERIODICITY_LINE.fullmatch(line)
+        if periodicity:
+            value_match = NATIVE_PERIODICITY_VALUE.fullmatch(periodicity[1])
+            if value_match is None:
+                raise ParseError(f'Malformed vibration periodicity at line {i + 1}')
+            token = value_match[1]
+            observed = token.upper()
+            if observed not in ('NONE', 'XYZ'):
+                raise ParseError(f'Unsupported vibration periodicity at line {i + 1}: {token}')
+            if periodicity_value is not None and periodicity_value != observed:
+                raise ParseError(f'Conflicting vibration periodicity at line {i + 1}: {token}')
+            if observed == 'XYZ' and rotovibrational is not None:
+                raise ParseError(f'Periodic XYZ vibration conflicts with rotovibrational projection at line {i + 1}')
+            periodicity_value = observed
+            periodicity_sources.append(evidence(i))
+        rotations = ROTATIONS_LINE.fullmatch(line)
+        if rotations:
+            value_match = NATIVE_ROTATIONS_VALUE.fullmatch(rotations[1])
+            if value_match is None:
+                raise ParseError(f'Malformed rotovibrational vector count at line {i + 1}')
+            count = int(value_match[1])
+            if count not in (5, 6) or periodicity_value == 'XYZ':
+                raise ParseError(f'Non-molecular or unsupported vibration scope at line {i + 1}')
+            if rotovibrational is not None and rotovibrational != count:
+                raise ParseError(f'Conflicting rotovibrational vector count at line {i + 1}')
+            rotovibrational = count
         if SCF_FAIL.search(line):
             summaries['not_converged'] += 1
         elif SCF_OK.search(line):
             summaries['converged'] += 1
     report = VibrationReport(source, version, version_source, run_type, run_source, s, b,
                              evidence(start), evidence(end_marker) if end_marker is not None else None,
-                             summaries, threshold)
+                             summaries, threshold, periodicity=periodicity_value,
+                             periodicity_sources=periodicity_sources, rotovibrational_vectors=rotovibrational)
     normalized = normalize_settings(state_records)
     report.reference_state = {key: normalized[key] for key in ('charge', 'multiplicity')}
     _read_table(report, lines, start, stop, evidence, count_window)

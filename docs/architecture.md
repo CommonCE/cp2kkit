@@ -20,40 +20,46 @@ No submission system or deferred Bader/PDOS/NEB post-processing is introduced.
    never sources/data/symlinks. Density bundles require all requested targets to be new.
 7. **Minimal dependencies:** standard-library core, isolated optional plotting/Rich presentation, no ASE requirement.
 
-## Vibrational input task (0.4.3)
+## Vibrational input task (0.4.3, extended in 0.4.6–0.4.7)
 
 `vibration.py` owns the bounded task policy, numerical presets, source identities
 and top-level finite-difference section. `inputgen.generate_input` validates new
-requests before method/workflow dispatch, then checks the resolved basis and
-boundary conditions. UKS and pair dispersion reuse the shared generator paths
-and validation (0.4.6). The molecular MT preset checks the emitted orthorhombic
-cell and displaced atomic envelope without changing source/user cell or SCF
-choices; unavailable electronic-density containment is explicitly unverified.
-Existing geometry/data resolution, provenance and staged
-publication remain shared. CLI/TUI expose semantic settings, not copied science
-rules; config/replay retain optional requests and distinguish effective presets.
-The task explicitly enables native PROGRAM_RUN_INFO diagnostics at global LOW
-verbosity without adding output interpretation or changing force calculations.
-This module is generation only, with no task execution or automatic
-optimization-to-frequency chain. See [task scope](input-generation.md#molecular-vibrational-inputs-043).
+requests before method/workflow dispatch, then checks the resolved basis,
+constraints and boundary conditions. UKS and pair dispersion reuse the shared
+generator paths and validation (0.4.6). The molecular MT preset checks the
+emitted orthorhombic cell and displaced atomic envelope without changing
+source/user cell or SCF choices; unavailable electronic-density containment is
+explicitly unverified. Since 0.4.7, periodic `XYZ` surface partial-Hessian
+requests reuse `constraints.py` (`FIXED_ATOMS`, fractional XYZ) with
+`POISSON_SOLVER PERIODIC`, `FULLY_PERIODIC T`, skew-cell support and optional
+`diag`/Fermi-Dirac smearing at Gamma. Existing geometry/data resolution,
+provenance and staged publication remain shared. CLI/TUI expose semantic
+settings, not copied science rules; config/replay retain optional requests and
+distinguish effective presets. The task explicitly enables native
+PROGRAM_RUN_INFO diagnostics at global LOW verbosity without adding output
+interpretation or changing force calculations. This module is generation only,
+with no task execution or automatic optimization-to-frequency chain. See
+[task scope](input-generation.md#molecular-vibrational-inputs-043).
 
-## Vibrational result observations (0.4.4)
+## Vibrational result observations (0.4.4, extended in 0.4.7)
 
-`vibration_results.py` owns the bounded CP2K 2026.2 table parser, textual
-completeness, threshold classification and deterministic JSON/CSV. CLI and main
-TUI use the same report and exclusive writer. It shares numerical and evidence
-helpers, not the GEO_OPT result/quality model or generation policy. See the
+`vibration_results.py` owns the bounded CP2K 2026.2 table parser (isolated
+molecular and periodic `XYZ` partial-Hessian outputs), textual completeness,
+threshold classification and deterministic JSON/CSV. CLI and main TUI use the
+same report and exclusive writer. It shares numerical and evidence helpers, not
+the GEO_OPT result/quality model or generation policy. See the
 [result contract](vibration-results-contract.md).
 
-## External molecular thermochemistry (0.4.5)
+## External thermochemistry (0.4.5, extended in 0.4.7)
 
-`thermochemistry.py` validates the selected CP2K result and explicit geometry,
+`thermochemistry.py` validates the selected CP2K result, explicit geometry,
+explicit masses and (for `vibrational-only` / `imode=1`) active-atom selection,
 prepares a temporary Shermo exchange input, invokes a caller-selected local
-executable and parses its stdout. Managed execution and read-only import share
-one output parser; normal CP2K result observation invokes neither. Inputs,
-process metadata and derived values remain separate; no code is bundled from
-Shermo and no scheduler/general execution service is introduced. See the
-[thermochemistry contract](shermo-thermochemistry.md).
+executable (`imode=0` or `imode=1`) and parses its stdout. Managed execution and
+read-only import share one output parser; normal CP2K result observation invokes
+neither. Inputs, process metadata and derived values remain separate; no code is
+bundled from Shermo and no scheduler/general execution service is introduced.
+See the [thermochemistry contract](shermo-thermochemistry.md).
 
 ## Producer and consumer responsibilities
 
@@ -94,15 +100,15 @@ cli.py
  |-- plot.py ------- export.py / quality.py / optional matplotlib
  |-- main_tui.py --- input_tui.py / structure.py / export.py (menu/load/grouped analysis adapters)
  |-- vibration_results.py -- parser.py (helpers) / models.py / io.py (frequency observations)
- |-- thermochemistry.py -- vibration_results.py / parser.py / quality.py / structure.py / models.py / io.py / errors.py
- |   Explicit external Shermo 2.6.2 thermochemistry; read-only import of existing stdout.
+ |-- thermochemistry.py -- vibration_results.py / constraints.py / parser.py / quality.py / structure.py / models.py / io.py / errors.py
+ |   Explicit external Shermo 2.6.2 thermochemistry (imode=0 and imode=1); read-only import of existing stdout.
  |-- structure_formats.py (strict GJF/CIF/POSCAR; lazy dispatch from structure.py)
  |-- input_tui.py -- input_editor.py / inputgen.py / structure.py (TTY navigation/fields)
  |-- input_editor.py -- menu_registry.py (category/direct routing, aliases, drafts; same generator/writer)
  |-- presentation.py (scrolling text, optional Rich; no batch rendering)
  |-- inputgen.py --- structure.py / spin_settings.py / method_profiles.py / models.py / io.py
  |   `-- vibration.py -- functional_registry.py / basis_registry.py / structure.py / errors.py
- |       Molecular finite-difference task validation, presets and CP2K input rendering; no execution.
+ |       Molecular and periodic partial-Hessian finite-difference task validation, presets and rendering; no execution.
  |-- xtb.py -- xtb_versions.py (GFN model/backend/count/data policy; tagged-version syntax and sources)
  |-- functional_registry.py (shared XC definitions/aliases, exact-exchange/nonlocal/build/dispersion/scope policy)
  |-- hybrid.py (shared HFX validation/operator/radius/data provenance and direct/RI rendering; no executor)

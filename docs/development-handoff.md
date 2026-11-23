@@ -1,4 +1,4 @@
-# Development handoff: 0.4.6 and follow-up priorities
+# Development handoff: 0.4.7 and follow-up priorities
 
 Task keyword: **CP2KKIT-NEXT**. This is a reference label for this document.
 
@@ -16,10 +16,126 @@ and [result contract](vibration-results-contract.md). The original
 [implementation prompt](../.agents/prompts/implement-vibration-postprocessing-0.4.4.md)
 and delivery steps below are retained as scope and acceptance history. The
 [0.4.5 stage](roadmap.md#045-stabilization-energy-vibrations-and-shermo)
-adds external Shermo thermochemistry and bounded CP2K reference observations.
+adds external Shermo thermochemistry and bounded CP2K reference observations;
+[0.4.7](roadmap.md#047-surface-adsorbate-vibrations-and-shermo-imode1) extends
+the full generation/parsing/Shermo chain to periodic surface partial-Hessian
+adsorbate vibrations and external Shermo `imode=1`.
 A future internal engine remains a separate task.
 
-## Current handoff: 0.4.6
+## Current handoff: 0.4.7
+
+The working-tree software version is **0.4.7** with exchange schema **0.1.0**.
+This stage implements the end-to-end bounded periodic surface adsorbate workflow:
+
+- **Generation (`vibration.py`, `inputgen.py`, `input_tui.py`, `cli.py`):**
+  accepts `PERIODIC XYZ` + explicit whole-atom `--fixed-atoms` (at least one
+  fixed and one active atom), skew cells, `POISSON_SOLVER PERIODIC`,
+  `FULLY_PERIODIC T`, minimal `&MOTION/&CONSTRAINT/&FIXED_ATOMS`, and `OT/STRICT`
+  or `diag` with optional Fermi-Dirac smearing and `ADDED_MOS` at Gamma. Isolated
+  molecular inputs keep their exact 0.4.6 text and catalog-only SHA-256.
+- **Observation (`vibration_results.py`):** accepts consistent `CELL|`/`POISSON|
+  Periodicity XYZ` outputs without `ROT|` projection, preserves non-unit starting
+  `displacement_atoms`, checks positive unique atom indices per group, and adds
+  `periodicity`, `periodicity_sources` and `rotovibrational_vectors`.
+- **External Shermo `imode=1` (`thermochemistry.py`, `cli.py`, `main_tui.py`):**
+  adds explicit `--thermo-model ideal-gas|vibrational-only`, required
+  `--active-atoms` and independent full-system `--energy-output` for
+  `vibrational-only`, explicit `--element-masses EL=MASS ...` alongside
+  `--masses-amu`, `-imode 1 -PGlabel C1` execution, default `harmonic` with
+  optional `grimme` (carrying an explicit rotational-inertia caveat), `U == H`
+  verification, nullable gas-phase rotation/linearity/point-group fields and
+  `shermo-read` import for both `imode=0` and `imode=1`.
+
+- **Source-tree, interpreter and packaging checks (Linux):**
+  - Python 3.12.16 full environment (with optional Matplotlib/Rich): all **731**
+    tests passed with **0** skips; `compileall` (bytecode directed to a
+    temporary cache), `cp2kkit 0.4.7` CLI version check and `git diff --check`
+    passed.
+  - Python 3.12.16 core-only environment (no Matplotlib/Rich): **727** of
+    **731** tests passed with **4** optional Matplotlib skips; `compileall` and
+    CLI version check passed.
+  - Python 3.14.10 core-only environment: **727** of **731** tests passed with
+    **4** optional Matplotlib skips; `compileall` and CLI version check passed.
+  - Offline wheel build and isolated virtual-environment install: built
+    `cp2kkit-0.4.7-py3-none-any.whl` (52 files including `THIRD_PARTY_NOTICES.md`,
+    `third_party/multiwfn/TERMS.md`, `third_party/multiwfn/PROVENANCE.md` and
+    the `cp2kkit` console script), installed offline into a clean venv, and
+    verified `cp2kkit --version` (`cp2kkit 0.4.7`) and `cp2kkit vibration --strict`
+    outside the source tree. Python 3.10 was not locally installed and remains
+    untested.
+- **Pre-release 0.4.7 hardening (P1/P2 fixes):**
+  - `_select_single_point()` now inspects only the selected `ENERGY`/`ENERGY_FORCE`
+    segment's line range (without altering raw `parser.parse_output` energy
+    semantics) and rejects nonzero Fermi-Dirac `Electronic entropic energy`
+    (`-T_e S_e`), nonzero Gaussian/Methfessel-Paxton/Marzari-Vanderbilt
+    `Smearing free energy correction` (kept distinct from physical electronic
+    entropy), differing `Total energy (extrapolated to T->0)` or `Total energy
+    (extrapolated to sigma->0)`, damaged field delimiters/unit brackets/values,
+    total atom-count conflicts against the full reference XYZ, and periodicity
+    conflicts against the vibration segment / reference XYZ / thermal model
+    before launching Shermo. Genuinely unprinted fields remain `missing` (`null`).
+  - `vibration_results.parse_vibration()` recognizes complete `CELL|`/`POISSON|
+    Periodicity` and `ROT|` field names before validating native whitespace
+    separators and full values so malformed lines (including non-native
+    punctuation such as `POISSON| Periodicity: XY` or trailing tokens) raise
+    `ParseError` instead of being downgraded to `null`.
+  - `vibration._check_dx_resolvable()` rejects `DX` values that overflow `2*DX`
+    or displaced `+/-DX` bohr coordinates (e.g. `1e308`), preserving normal
+    molecular input bytes and defaults.
+- **Post-fix native CP2K 2026.2 and Shermo 2.6.2 acceptance (bounded):**
+  - **Periodic surface generation and `imode=1` end-to-end (35-atom periodic
+    `XYZ` MgO(001) 2x2x2 slab with atoms `1-32` fixed + adsorbed H2O active
+    atoms `33-35`, PBE-D3(BJ)/DZVP-MOLOPT-SR-GTH):**
+    - Verbatim 0.4.7-generated `VIBRATIONAL_ANALYSIS` inputs ran cleanly on
+      CP2K 2026.2 with both `OT/STRICT` (on an initial symmetry-constrained
+      saddle point, detecting `-270.51 cm^-1` and confirming `cp2kkit
+      thermochemistry` rejects imaginary modes before Shermo launch) and
+      non-smearing `--scf diag` (on the symmetry-broken local minimum, yielding
+      9 strictly positive modes `287.08..3760.83 cm^-1`, passing `cp2kkit
+      vibration --strict` with active atoms `33-35`).
+    - Pairing that local-minimum vibration output with its verbatim
+      0.4.7-generated non-smearing `--scf diag` `ENERGY` single point
+      (`-1288.062278931975470` Hartree, `- Atoms: 35`, no smearing/entropic
+      records) through `cp2kkit thermochemistry --thermo-model vibrational-only
+      --active-atoms 33-35` and local Shermo 2.6.2 succeeded for both default
+      `harmonic` (`ZPE = 0.026431`, `corr U = corr H = 0.027815`, `corr G =
+      0.025789`, `tot U = tot H = -1288.0344638`, `tot G = -1288.0364899`
+      Hartree; exact printed-precision parity with independent direct Shermo
+      2.6.2 `-imode 1 -PGlabel C1` imported via `cp2kkit shermo-read`) and
+      explicit `grimme` (`tot G = -1288.036494` Hartree with the rotational-
+      inertia caveat).
+    - Observed SCF caveat: on the minimum geometry without a wavefunction
+      restart, tight `EPS_SCF 1e-8` with `OT DIIS / ALGORITHM STRICT / FULL_ALL`
+      diverged in outer SCF, whereas non-smearing `--scf diag` converged cleanly.
+  - **Native CP2K 2026.2 Gaussian-smearing gate check (4-atom periodic fcc Al,
+    `METHOD GAUSSIAN`):** CP2K 2026.2 printed `Smearing free energy correction:
+    -0.00308524639573` and `Total energy (extrapolated to sigma->0):
+    -8.03013924817456` alongside `Total FORCE_EVAL: -8.031681871372426` Hartree;
+    raw `parser.parse_output` preserved `-8.031681871372426`, while hardened
+    `cp2kkit thermochemistry` rejected it before Shermo launch without
+    mislabeling it as physical electronic entropy and wrote no output file.
+  - **Scope limit:** these bounded native checks verify the 0.4.7 generation,
+    parsing, smearing-gate and Shermo `imode=1` pipeline on specific small test
+    systems; they do not certify arbitrary chemical systems, SCF/frequency
+    convergence or scientific accuracy.
+- **Historical adapter-parity evidence (pre-smearing-gate; NOT post-fix end-to-end acceptance):**
+  - Prior to adding the P1 smearing electronic-entropy gate, an authorized
+    read-only local Shermo 2.6.2 comparison used an existing periodic `XYZ` CP2K
+    2026.2 surface partial-Hessian output (183-atom slab+adsorbate, 180 frozen
+    atoms, active atoms `181-183`, 9 positive modes) paired with its matching
+    Fermi-Dirac smearing single-point output (`-7122.823623845493` Hartree, which
+    contains a nonzero `Electronic entropic energy: -0.00015332267878` Hartree).
+  - That historical check established that `cp2kkit vibration --strict`,
+    `cp2kkit shermo-read`, and the Shermo `-imode 1` adapter agreed at printed
+    precision with a direct Shermo 2.6.2 harmonic run (`ZPE = 0.025945`,
+    `corr U = corr H = 0.028040`, `corr G = 0.024002`, `tot U = tot H =
+    -7122.7955838`, `tot G = -7122.7996217` Hartree) and exercised the
+    below-cutoff `56.08 cm^-1` mode under explicit `grimme`.
+  - **Post-fix status:** verified against local Shermo 2.6.2 that hardened 0.4.7
+    rejects combining that nonzero `-T_e S_e` single-point output automatically
+    with Shermo before launching Shermo and writes no output file.
+
+## Historical handoff: 0.4.6
 
 The working-tree software version is 0.4.6 with exchange schema 0.1.0. The
 [0.4.6 stage](roadmap.md#046-analysis-menu-parity-and-molecular-vibration-inputs)

@@ -1,6 +1,30 @@
 # Development status and next steps
 
-Current software: **0.4.6**; schema: **0.1.0**.
+Current software: **0.4.7**; schema: **0.1.0**.
+
+## 0.4.7 surface adsorbate vibrations and Shermo imode=1
+
+- Extend bounded CP2K 2026.2 `VIBRATIONAL_ANALYSIS` input generation to periodic
+  surface partial-Hessian calculations (`PERIODIC XYZ`, explicit whole-atom
+  `--fixed-atoms` / menu **9** / **420** with at least one fixed and one active
+  atom, `POISSON_SOLVER PERIODIC`, `FULLY_PERIODIC T`, skew cells allowed,
+  `OT/STRICT` or `diag` with optional Fermi-Dirac smearing and `ADDED_MOS`).
+  Keep isolated molecular defaults, input hashes and constraints unchanged.
+- Extend `parse_vibration` / `cp2kkit vibration` / main **7** to observe periodic
+  `XYZ` partial-Hessian normal-mode tables without gas-phase `ROT|` projection,
+  recording `periodicity`, `periodicity_sources`, `rotovibrational_vectors` and
+  positive unique `displacement_atoms`.
+- Extend external Shermo 2.6.2 thermochemistry (`thermochemistry`, `shermo-read`
+  and main **7 / s**) with explicit `--thermo-model ideal-gas|vibrational-only`,
+  required `--active-atoms` and independent full-system `--energy-output` for
+  `vibrational-only`, explicit `--element-masses EL=MASS ...`, `-imode 1 -PGlabel C1`
+  invocation, default `harmonic` low-frequency handling (and explicit `grimme`
+  with rotational-inertia caveat), `U == H` precision checks and nullable
+  gas-phase rotation/linearity/point-group fields.
+
+Internal thermochemistry, full-system periodic phonons/q-point integration,
+adsorption free-energy subtraction, review backlog cleanup and 0.5 packaging
+remain separate work.
 
 ## 0.4.6 analysis menu parity and molecular vibration inputs
 

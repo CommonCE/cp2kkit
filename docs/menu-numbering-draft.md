@@ -348,7 +348,7 @@ convergence, and target-property convergence require separate evidence.
 | 403 | TRUST_RADIUS | Existing BFGS/LBFGS control |
 | 410 | Maximum/RMS force convergence thresholds | Planned editable controls |
 | 411 | Maximum/RMS displacement thresholds | Planned editable controls |
-| 420 | Fixed-atom selection | Existing; explicit 1-based indices/ranges |
+| 420 | Fixed-atom selection | Existing; explicit 1-based indices/ranges (GEO_OPT/CELL_OPT and 0.4.7 periodic partial-Hessian VIBRATIONAL_ANALYSIS) |
 | 421 | Fixed coordinate components | Planned; current XYZ only |
 | 422 | Distance/angle/dihedral hard constraints | Planned |
 | 423 | Soft restraints / restraining potentials | Planned |
@@ -411,7 +411,7 @@ not post-processing of existing results.
 | 622 | Band-path calculations | Planned |
 | 630 | Atomic population-charge analysis settings | Planned |
 | 631 | Localized orbitals / Wannier-related settings | Planned |
-| 640 | Vibrational finite-difference DX [bohr] | Implemented 0.4.3; select VIBRATIONAL_ANALYSIS at -1 first; auto = explicit 0.01 bohr; bounded isolated PBE GPW RKS/UKS OT/STRICT; none/D3/D3(BJ) since 0.4.6 |
+| 640 | Vibrational finite-difference DX [bohr] | Implemented 0.4.3; select VIBRATIONAL_ANALYSIS at -1 first; auto = explicit 0.01 bohr; isolated PBE GPW RKS/UKS OT/STRICT (none/D3/D3(BJ) since 0.4.6) or periodic XYZ partial-Hessian with 420 fixed atoms and OT/diag/smearing since 0.4.7 |
 | 641 | Finite-displacement / phonon input preparation | Planned |
 | 642 | IR/Raman-related preparation | Planned; method/workflow checks required |
 | 650 | TDDFT / excited-state settings | Planned |

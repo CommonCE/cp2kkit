@@ -263,6 +263,9 @@ def vibration_analysis(menu):
     menu.show(f"Source: {report.source['path']}")
     menu.show(f'Segment {report.segment}, block {report.block}: {report.status}; '
               f'program end marker: {"observed" if report.program_end else "not observed"}')
+    if report.periodicity is not None or report.displacement_atoms:
+        menu.show(f'Periodicity: {report.periodicity or "unknown"}; '
+                  f'displacement atoms: {len(report.displacement_atoms)}')
     energy = report.reference_electronic_energy
     if energy is not None:
         menu.show(f'CP2K reference electronic energy: {energy.value:.8f} {energy.unit} '
@@ -298,19 +301,13 @@ def vibration_analysis(menu):
 
 
 def shermo_analysis(menu, report):
+    from .constraints import parse_fixed_atoms
     from .io import write_json
-    from .thermochemistry import run_shermo
+    from .thermochemistry import (THERMO_MODELS, VIBRATIONAL_ONLY_GRIMME_WARNING,
+                                  parse_element_masses, run_shermo)
 
     if not report.strict_passed:
         raise KitError('Shermo requires a strict vibration report')
-    raw = menu.ask('CP2K single-point output path; Enter uses the vibration reference energy: ')
-    if raw.lower() == 'back':
-        return
-    energy_output = Path(raw).expanduser() if raw else None
-    if energy_output is None and report.reference_electronic_energy is None:
-        raise KitError('No unique native vibration reference energy; supply a single-point output')
-    executable = required_path(menu, 'Trusted Shermo 2.6.2 executable path')
-    geometry = required_path(menu, 'Reference XYZ geometry file')
 
     class BackToReport(Exception):
         pass
@@ -322,33 +319,80 @@ def shermo_analysis(menu, report):
         return value
 
     try:
+        model_raw = ask_setting('Thermal model: ideal-gas (default, imode=0) or vibrational-only (imode=1)').lower()
+        thermo_model = model_raw or 'ideal-gas'
+        if thermo_model not in THERMO_MODELS:
+            raise KitError('Thermal model must be ideal-gas or vibrational-only')
+        if thermo_model == 'vibrational-only':
+            raw = ask_setting('CP2K single-point output path (required for vibrational-only)')
+            if not raw:
+                raise KitError('vibrational-only requires an independent full-system single-point output')
+            energy_output = Path(raw).expanduser()
+        else:
+            raw = menu.ask('CP2K single-point output path; Enter uses the vibration reference energy: ')
+            if raw.lower() == 'back':
+                return
+            energy_output = Path(raw).expanduser() if raw else None
+            if energy_output is None and report.reference_electronic_energy is None:
+                raise KitError('No unique native vibration reference energy; supply a single-point output')
+        executable = required_path(menu, 'Trusted Shermo 2.6.2 executable path')
+        geometry = required_path(menu, 'Reference XYZ geometry file')
         energy_segment = (ask_setting('Single-point segment (1-based); Enter requires a unique candidate')
                           if energy_output is not None else '')
         energy_segment = int(energy_segment) if energy_segment else None
         frame = int(ask_setting('Zero-based XYZ frame'))
-        masses = [float(m) for m in ask_setting('Atomic masses [amu] in XYZ order, space separated').split()]
+        if thermo_model == 'vibrational-only':
+            raw_active = ask_setting('Active Hessian atoms (1-based indices/ranges in full XYZ, e.g. 181-183)')
+            try:
+                active_atoms = parse_fixed_atoms(raw_active)
+            except ValueError as exc:
+                raise KitError(str(exc)) from exc
+            if active_atoms == 'off':
+                raise KitError('vibrational-only requires at least one active atom')
+        else:
+            active_atoms = None
+        mass_tokens = ask_setting('Atomic masses [amu] in XYZ order, or El=mass pairs (e.g. Ga=69.723 O=15.9994 H=1.0079)').split()
+        if mass_tokens and any('=' in token for token in mass_tokens):
+            masses_amu, element_masses = None, parse_element_masses(mass_tokens)
+        else:
+            masses_amu, element_masses = [float(m) for m in mass_tokens], None
         multiplicity = int(ask_setting('Spin multiplicity'))
         temperature = float(ask_setting('Temperature [K]; Enter uses 298.15') or '298.15')
-        pressure = float(ask_setting('Pressure [atm]; Enter uses 1') or '1')
+        pressure = (float(ask_setting('Pressure [atm]; Enter uses 1') or '1')
+                    if thermo_model == 'ideal-gas' else 1.0)
         scale = float(ask_setting('Shared frequency scale; Enter uses 1') or '1')
-        low = ask_setting('Low-frequency treatment: grimme (default) or harmonic').lower() or 'grimme'
+        default_low = 'grimme' if thermo_model == 'ideal-gas' else 'harmonic'
+        low_prompt = ('Low-frequency treatment: grimme (default) or harmonic' if default_low == 'grimme'
+                      else 'Low-frequency treatment: harmonic (default) or grimme')
+        low = ask_setting(low_prompt).lower() or default_low
     except BackToReport:
         return
     except ValueError as exc:
         raise KitError('Invalid numeric Shermo setting') from exc
-    menu.show(f'Shermo will run at {temperature:g} K, {pressure:g} atm, scale {scale:g}, {low}.')
+    if thermo_model == 'ideal-gas':
+        menu.show(f'Shermo (ideal-gas) will run at {temperature:g} K, {pressure:g} atm, scale {scale:g}, {low}.')
+    else:
+        menu.show(f'Shermo (vibrational-only, imode=1) will run at {temperature:g} K, scale {scale:g}, {low} '
+                  '(pressure unused in imode=1).')
     menu.show(f'Electronic energy source: {energy_output if energy_output is not None else "vibration footer"}')
-    if menu.ask('Confirm matching reference geometry and molecular state for all sources, and run Shermo? [y/N]: ').lower() not in {'y', 'yes'}:
+    if active_atoms is not None:
+        menu.show(f'Active Hessian atoms (1-based in full XYZ): {active_atoms}')
+    if thermo_model == 'vibrational-only' and low == 'grimme':
+        menu.show(f'Warning: {VIBRATIONAL_ONLY_GRIMME_WARNING}')
+    if menu.ask('Confirm matching reference geometry and electronic state for all sources, and run Shermo? [y/N]: ').lower() not in {'y', 'yes'}:
         return
     data = run_shermo(report.source['path'], geometry, executable=executable, frame=frame,
-                      masses_amu=masses, multiplicity=multiplicity, confirm_reference=True,
-                      temperature=temperature, pressure=pressure, scale=scale, low_frequency=low,
-                      segment=report.segment, block=report.block, expected_source_sha256=report.source['sha256'],
-                      energy_output=energy_output, energy_segment=energy_segment)
-    menu.show('Shermo thermochemistry [hartree]:')
+                      masses_amu=masses_amu, element_masses=element_masses, multiplicity=multiplicity,
+                      confirm_reference=True, temperature=temperature, pressure=pressure, scale=scale,
+                      low_frequency=low, segment=report.segment, block=report.block,
+                      expected_source_sha256=report.source['sha256'], energy_output=energy_output,
+                      energy_segment=energy_segment, thermo_model=thermo_model, active_atoms=active_atoms)
+    menu.show(f"Shermo thermochemistry ({data['thermo_model']}, imode={data['imode']}) [hartree]:")
     menu.show(f"  ZPE: {data['zero_point_energy']['value']:.6f}")
     for key, total in data['corrected_totals'].items():
         menu.show(f"  {key}: {total['value']:.7f} (correction {data['thermal_corrections'][key]['value']:+.6f})")
+    for warning in data.get('warnings', ()):
+        menu.show(f'Warning: {warning}')
     menu.show(data['citation'])
     if menu.ask('Export Shermo result as JSON? [y/N]: ').lower() in {'y', 'yes'}:
         path = required_path(menu, 'New Shermo JSON path')

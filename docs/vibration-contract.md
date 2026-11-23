@@ -1,7 +1,9 @@
-# Molecular vibrational generation contract (software 0.4.6)
+# Vibrational generation contract (software 0.4.7)
 
 This is an input-generation contract for independent API/CLI consumers, not a
-frequency-result or execution contract. See the separate [result contract](vibration-results-contract.md)
+frequency-result or execution contract. It covers both the isolated molecular
+subset (0.4.3–0.4.6) and the bounded periodic surface partial-Hessian subset
+added in **0.4.7**. See the separate [result contract](vibration-results-contract.md)
 for read-only frequency observations. Generation reuses schema **0.1.0** and the
 [shared consumer rules](contracts.md). The authoritative supported/rejected
 scientific combinations, presets and numerical limits are in the
@@ -53,13 +55,28 @@ Generation writes no JSON to stdout: success/warnings are human text on stderr.
   optimization or association with a parsed output. Non-XYZ readers have their
   own frame restrictions. Plain XYZ has unknown PBC/cell, not isolated PBC.
 - `InputSettings(...)` or `InputSettings.from_config(mapping)` use existing
-  settings, not a separate request format. Set run_type=VIBRATIONAL_ANALYSIS and
-  resolve periodicity explicitly (NONE for this plain XYZ). Source geometry does
-  not supply charge, spin, functional, basis or other calculation settings.
+  settings, not a separate request format. Set `run_type=VIBRATIONAL_ANALYSIS` and
+  resolve periodicity explicitly (`NONE` for isolated molecules; `XYZ` with
+  explicit partial `--fixed-atoms` for periodic surface partial Hessians). Source
+  geometry does not supply charge, spin, functional, basis or other calculation
+  settings.
+- Periodic surface partial-Hessian requests (`periodic="XYZ"`) require explicit
+  whole-atom `fixed_atoms` constraining at least one atom and leaving at least one
+  unfixed (active) atom. Full-system periodic Gamma vibrations (`fixed_atoms="off"`
+  with `XYZ`) and all-fixed selections are rejected. Skew periodic cells are
+  accepted; `POISSON_SOLVER PERIODIC`, `FULLY_PERIODIC T` and a minimal
+  `&MOTION/&CONSTRAINT/&FIXED_ATOMS` block (`COMPONENTS_TO_FIX XYZ`) are emitted.
+  Both `scf="ot"` (`STRICT`, no smearing) and `scf="diag"` (with optional
+  Fermi-Dirac `smearing` and `added_mos`) are accepted at Gamma `(1, 1, 1)`.
+  Isolated molecular requests (`periodic="NONE"`) retain `MT`, `FULLY_PERIODIC F`,
+  `OT/STRICT` without smearing, at least two atoms, and inactive `fixed_atoms`.
 - Absent/null `vibration_displacement_bohr` means auto 0.01 bohr; explicit values
-  must be finite positive numbers, not Booleans, and pass displacement/box
-  checks. Absent/null eps_scf selects this task's 1e-8 preset; explicit values
-  must be finite positive and <=1e-8. There is no accuracy-safe DX guarantee.
+  must be finite positive numbers, not Booleans, keep finite `2*DX` and finite
+  displaced `+/-DX` bohr coordinates (rejecting finite-difference overflow as
+  well as displacements that round away at coordinate precision), and pass any
+  applicable box checks. Absent/null eps_scf selects this task's 1e-8 preset;
+  explicit values must be finite positive and <=1e-8. There is no accuracy-safe
+  DX guarantee.
 - Existing charge defaults to integer 0. Auto/null multiplicity resolves to 1
   for even and 2 for odd valence-electron counts; explicit values must pass the
   same parity and electron-count checks. Multiplicity >1 or explicit `magnetism`
@@ -99,14 +116,14 @@ read the opt-in sidecar or call generate_input for metadata.
 | input_text; input_sha256 | Generated string and SHA-256 of its UTF-8 bytes; recompute if bytes change |
 | source_structure; generated_structure | Independent Structure objects in JSON form; original versus emitted/rounded/possibly auto-centered geometry |
 | coordinates_translated | Boolean describing generator translation, not optimization |
-| effective_eps_scf; poisson_solver | Finite number and MT string: effective configuration, not observations |
-| vibrational_analysis | Object for this task; may be null/absent for older or other task manifests |
+| effective_eps_scf; poisson_solver | Finite number and `MT` (isolated molecular) or `PERIODIC` (periodic partial Hessian): effective configuration, not observations |
+| vibrational_analysis | Object for this task; may be null/absent for older or other task manifests. `scope` is `"molecular"` or `"periodic_partial_hessian"`; `active_atoms`, `active_atom_count` and `fixed_atom_count` record active/fixed atom scopes |
 | displacement_bohr, eps_scf, qs_eps_default within that object | Finite numbers with origin labels; not observed force/frequency errors |
 | nproc_rep | Integer 1, processors per replica, not total cores or replica count |
-| fully_periodic, intensities, thermochemistry | False configuration flags, not unknown results |
+| fully_periodic, intensities, thermochemistry | Boolean configuration flags (`fully_periodic` is `false` with `fully_periodic_origin: "native_default_explicit"` for molecular, `true` with `fully_periodic_origin: "task_preset"` for periodic partial Hessian), not unknown results |
 | program_run_info; program_run_info_origin | True and task_preset: native diagnostics enabled to stdout |
 | stationary_point_verified; runtime_validated within that object | False: generator did not verify either; not a failed-calculation observation |
-| mt_box.density_extent_verified | False: necessary atomic-envelope check cannot measure electronic-density extent |
+| mt_box | Object (`density_extent_verified: false`) for isolated molecular `MT`, or `null` for periodic partial Hessian |
 | sources within that object | Array of inspected reference URL/SHA-256 objects, not executable/build fingerprints |
 | warnings | Array of strings; wording/order are not stable identifiers |
 
@@ -136,8 +153,8 @@ already records the tagged D3 parameter lookup source (PBE in both branches).
 
 This is source-path evidence, not native execution, measured force/frequency
 agreement, SCF spin-state continuity or scientific validation. Closed-shell
-`dispersion='none'` inputs and input hashes are unchanged since 0.4.5; the
-software identity in new sidecars advances to 0.4.6. No new request keys or
+isolated `dispersion='none'` inputs and input hashes are unchanged since 0.4.5;
+the software identity in new sidecars advances to 0.4.7. No new request keys or
 exchange schema changes are needed.
 
 ## Publication, failures and replay

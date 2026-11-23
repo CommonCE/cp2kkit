@@ -155,6 +155,50 @@ class VibrationResultTests(unittest.TestCase):
         self.assertEqual(report.displacement_atoms, [(1, 'O'), (2, 'C'), (3, 'O')])
         self.assertFalse(report.strict_passed)
         self.assertTrue(any('displacement atom indices or elements' in w for w in report.warnings))
+        for bad_row in (TEXT.replace('     2  C ', '     1  C ', 1), TEXT.replace('     1  O ', '     0  O ', 1)):
+            bad = parse_vibration(self.source(bad_row))
+            self.assertFalse(bad.complete)
+            self.assertTrue(any('Invalid or duplicate displacement atom index' in w for w in bad.warnings))
+
+    def test_periodic_surface_partial_hessian_output_observation(self):
+        surface = (
+            ' **** **** ******  **  PROGRAM STARTED AT                synthetic\n'
+            ' CP2K| version string:                                      CP2K version 2026.2\n'
+            ' GLOBAL| Run type                                            VIBRATIONAL_ANALYSIS\n'
+            ' CELL| Periodicity                                                           XYZ\n'
+            ' DFT| Multiplicity                                                             1\n'
+            ' DFT| Charge                                                                   0\n'
+            ' POISSON| Periodicity                                                        XYZ\n'
+            ' VIB| Internal  Low frequencies ---\n'
+            ' VIB| 1.0E+00 2.0E+00 3.0E+00\n'
+            ' VIB|                        NORMAL MODES - CARTESIAN DISPLACEMENTS\n'
+            ' VIB|\n'
+            ' VIB|                         1                    2                    3\n'
+            ' VIB|Frequency (cm^-1)  5.6081757307E+01    3.2525299057E+02    1.5862967520E+03\n'
+            ' VIB|Red.Masses (a.u.)  1.0000000000E+00    1.0000000000E+00    1.0000000000E+00\n'
+            ' VIB|Frc consts (a.u.)  1.0000000000E-02    2.0000000000E-02    3.0000000000E-01\n'
+            '  ATOM  EL               X     Y     Z       X     Y     Z       X     Y     Z\n'
+            '   181  O              -0.03 -0.02 -0.01    0.22 -0.03  0.08   -0.10 -0.34 -0.03\n'
+            '\n'
+            ' -                                DBCSR STATISTICS                             -\n'
+            + END
+        )
+        path = self.source(surface)
+        report = parse_vibration(path)
+        self.assertTrue(report.complete)
+        self.assertTrue(report.strict_passed)
+        self.assertEqual(report.periodicity, 'XYZ')
+        self.assertEqual(len(report.periodicity_sources), 2)
+        self.assertIsNone(report.rotovibrational_vectors)
+        self.assertEqual(report.displacement_atoms, [(181, 'O')])
+        self.assertIsNone(report.reference_electronic_energy)
+        self.assertEqual(report.expected_mode_count_from_diagnostic, 3)
+        data = report.to_dict()
+        self.assertEqual(data['periodicity'], 'XYZ')
+        self.assertEqual(data['displacement_atoms'], [[181, 'O']])
+        result = self.cli(path, '--strict')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)['periodicity'], 'XYZ')
 
     def test_reference_energy_is_only_from_selected_native_footer(self):
         heading = ' VIB| NORMAL MODES - THERMOCHEMICAL DATA\n'
@@ -195,12 +239,34 @@ class VibrationResultTests(unittest.TestCase):
 
     def test_unsupported_inputs_and_recognizable_empty_partial(self):
         for text in (TEXT.replace('cm^-1', 'THz'), TEXT.replace('2026.2', '2026.1'),
-                     TEXT.replace('VIBRATIONAL_ANALYSIS', 'MODE_SELECTIVE'), TEXT.replace('NONE', 'XYZ'),
+                     TEXT.replace('VIBRATIONAL_ANALYSIS', 'MODE_SELECTIVE'), TEXT.replace('NONE', 'XY'),
+                     TEXT.replace('NONE', 'XY extra'),
+                     TEXT.replace('NONE', 'NONE trailing'),
+                     TEXT.replace('POISSON| Periodicity                                        NONE', 'POISSON| Periodicity: XY'),
+                     TEXT.replace('POISSON| Periodicity                                        NONE', 'POISSON| Periodicity: NONE'),
+                     TEXT.replace('POISSON| Periodicity                                        NONE', 'CELL| Periodicity: XYZ'),
+                     TEXT.replace('POISSON| Periodicity                                        NONE', 'POISSON| Periodicity'),
+                     TEXT.replace('POISSON| Periodicity                                        NONE', 'CELL| Periodicity XYZ extra'),
+                     TEXT.replace('POISSON| Periodicity', 'CELL| Periodicity XYZ\n POISSON| Periodicity'),
+                     TEXT.replace('NONE', 'XYZ').replace(' VIB| REPLICA', ' ROT| Number of rotovibrational vectors     6\n VIB| REPLICA'),
                      TEXT.replace(' VIB| REPLICA', ' ROT| Number of rotovibrational vectors     3\n VIB| REPLICA'),
+                     TEXT.replace(' VIB| REPLICA', ' ROT| Number of rotovibrational vectors: 6\n VIB| REPLICA'),
+                     TEXT.replace(' VIB| REPLICA', ' ROT| Number of rotovibrational vectors     6 extra\n VIB| REPLICA'),
+                     TEXT.replace(' VIB| REPLICA', ' ROT| Number of rotovibrational vectors     bad\n VIB| REPLICA'),
                      TEXT.split(HEAD)[0], ' "' + HEAD + '"\n VIB|Frequency (cm^-1) 12\n',
                      ' VIB|Frequency (cm^-1) 12\n'):
             with self.subTest(text=text[:100]), self.assertRaises(ParseError):
                 parse_vibration(self.source(text))
+        # Damaged periodicity returns CLI exit code 4 (ParseError), not null/strict pass.
+        bad_pbc_path = self.source(TEXT.replace('POISSON| Periodicity                                        NONE',
+                                                'POISSON| Periodicity: XY'))
+        cli_bad = self.cli(bad_pbc_path, '--strict')
+        self.assertEqual((cli_bad.returncode, cli_bad.stdout), (4, ''), cli_bad.stderr)
+        # Genuinely absent periodicity remains null (and still passes strict with version/run-type/end).
+        no_pbc = parse_vibration(self.source(TEXT.replace(' POISSON| Periodicity                                        NONE\n', '')))
+        self.assertIsNone(no_pbc.periodicity)
+        self.assertEqual(no_pbc.periodicity_sources, [])
+        self.assertTrue(no_pbc.strict_passed)
         path = self.source(TEXT[:TEXT.index(HEAD)+len(HEAD)])
         report = parse_vibration(path)
         self.assertFalse(report.complete)

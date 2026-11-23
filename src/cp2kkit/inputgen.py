@@ -291,6 +291,11 @@ def motion_lines(s, fixed_atoms):
                   f"      FORMAT {s.trajectory_format}", "    &END TRAJECTORY", "    &RESTART",
                   "      BACKUP_COPIES 0",
                   "    &END RESTART", "  &END PRINT", "&END MOTION"]
+    elif s.run_type == vibration.TASK and fixed_atoms:
+        lines += ["&MOTION", "  &CONSTRAINT", "    &FIXED_ATOMS",
+                  "      COMPONENTS_TO_FIX XYZ"]
+        lines += ["      LIST "+" ".join(map(str, fixed_atoms[i:i+20])) for i in range(0, len(fixed_atoms), 20)]
+        lines += ["    &END FIXED_ATOMS", "  &END CONSTRAINT", "&END MOTION"]
     return lines
 
 
@@ -408,8 +413,12 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
     extra_cubes, cube_warnings = resolve_extra_cubes(s, all_electron=all_electron,
                                                     electrons=electrons, uks=uks, stride=stride)
     periodic, positions, cell, translated = resolve_geometry(structure, s)
+    constraints_active = optimizing or (s.run_type == vibration.TASK and periodic == 'XYZ')
+    if constraints_active and not optimizing:
+        selection, fixed_atoms = resolve_fixed_atoms(s.fixed_atoms, len(structure.symbols), True, s.cp2k_version)
+        s = replace(s, fixed_atoms=selection)
     vib = vibration.resolve(s, periodic=periodic, all_electron=all_electron,
-                            elements=elements, cell=cell, positions=positions)
+                            elements=elements, cell=cell, positions=positions, fixed_atoms=fixed_atoms)
     effective_qs_eps = vibration.EPS_DEFAULT if vib else qs_eps_default(s.run_type)
     if s.kpoints != (1, 1, 1) and (periodic != "XYZ" or s.scf != "diag"):
         raise KitError("Non-Gamma kpoints require XYZ periodicity and diagonalization (--scf diag)")
@@ -426,12 +435,14 @@ def generate_input(structure: Structure, settings: InputSettings, *, _common_ngr
     warnings.extend(method_warnings)
     warnings.extend(cube_warnings)
     if vib:
-        warnings.extend(vibration.WARNINGS)
+        warnings.extend(vibration.PERIODIC_WARNINGS if vib['scope'] == 'periodic_partial_hessian' else vibration.WARNINGS)
         if uks:
             warnings.append(vibration.UKS_WARNING)
+        if s.scf == 'diag' and s.smearing is not None:
+            warnings.append(vibration.SMEARING_WARNING)
     warnings.append('SCF/PRINT/RESTART BACKUP_COPIES 0 disables wavefunction restart backups, not restart writing; archive existing wavefunctions before running in a reused directory.')
-    if s.fixed_atoms != 'off' and not optimizing:
-        warnings.append('Fixed-atom selection is retained but inactive outside GEO_OPT/CELL_OPT.')
+    if s.fixed_atoms != 'off' and not constraints_active:
+        warnings.append('Fixed-atom selection is retained but inactive outside GEO_OPT/CELL_OPT and periodic partial-Hessian VIBRATIONAL_ANALYSIS.')
     if fixed_atoms and s.run_type == 'CELL_OPT':
         warnings.append('FIXED_ATOMS constrains fractional XYZ coordinates, not absolute Cartesian positions; fixed atoms can move with a changing cell.')
     if fixed_atoms and len(fixed_atoms) == len(structure.symbols):
