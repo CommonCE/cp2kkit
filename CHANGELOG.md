@@ -8,6 +8,33 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.4.8
+
+- Add `build_viewer_scene()` / `export_viewer_scene()` in
+  `cp2kkit.vibration_results` and `cp2kkit vibration --format viewer-scene`
+  (requiring explicit `--geometry`, optional `--frame` and `--fixed-atoms`) to
+  emit deterministic `cp2kkit-viewer-scene-v1` JSON directly from complete CP2K
+  `.out` normal-mode tables without modifying standard vibration JSON/CSV output,
+  and reject incompatible `NONE`/`XYZ` reference geometries.
+- Add optional foreground launcher `src/cp2kkit/viewer.py` for the standalone
+  companion `cp2kkit-viewer` X11 binary (`--viewer`, `CP2KKIT_VIEWER`, active
+  Python environment `bin/`, and `PATH` discovery; exit code 6 when unavailable),
+  standalone `cp2kkit view` CLI subcommand (accepting negative `--boundary`
+  ranges in either argument form and `--cube-length-unit`), opt-in CLI `--view`
+  support for `cube-diff`, `cube-check`, `vibration`, `export-structure`, and
+  batch `generate-input`, and interactive TUI `v` actions in main **2**, **3**,
+  **4** (read-only draft preview), **6/1**, **6/2**, and **7** (staging and
+  automatically cleaning up temporary scene/draft files).
+- Keep CUBE report and viewer length units consistent, including angstrom
+  difference outputs, refusing viewer launch when `cube-check` cannot resolve
+  the spatial length unit. Declare optional `viewer` extra (`cp2kkit-viewer`)
+  while keeping `cp2kkit` itself 100% pure Python (the standalone viewer lives
+  in its own `cp2kkit-viewer` repository).
+- Preserve all batch non-interactive defaults, existing exit codes, main-menu
+  numbering (`1–7`), generator immediate-return behavior, and exchange schema
+  **0.1.0**. Viewer visualization and smoke checks do not certify calculation
+  convergence or scientific validity.
+
 ## 0.4.7
 
 - Extend bounded CP2K 2026.2 `VIBRATIONAL_ANALYSIS` input generation to periodic

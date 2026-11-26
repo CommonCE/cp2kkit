@@ -1,6 +1,24 @@
 # Development status and next steps
 
-Current software: **0.4.7**; schema: **0.1.0**.
+Current software: **0.4.8**; schema: **0.1.0**.
+
+## 0.4.8 optional companion viewer CLI/TUI integration
+
+- Add `cp2kkit vibration --format viewer-scene` (`build_viewer_scene` /
+  `export_viewer_scene`) to export complete CP2K normal-mode tables paired with
+  an explicit reference geometry (rejecting incompatible `NONE`/`XYZ`
+  geometries) without changing standard vibration JSON/CSV.
+- Add foreground launcher `viewer.py` (discovering the standalone companion
+  `cp2kkit-viewer` via `--viewer`, `CP2KKIT_VIEWER`, active Python environment
+  `bin/`, or `PATH`), `cp2kkit view`, opt-in CLI `--view` (`cube-diff`,
+  `cube-check`, `vibration`, `export-structure`, `generate-input`), and
+  interactive TUI `v` actions in main **2**, **3**, **4** (read-only draft
+  preview), **6/1**, **6/2**, and **7**. Batch CLI remains headless by default
+  and schema remains **0.1.0**.
+- Forward resolved CUBE length units (`--cube-length-unit`) and refuse to open
+  unknown-unit CUBEs. Keep `cp2kkit` 100% pure Python; the standalone Rust X11
+  viewer lives in its own `cp2kkit-viewer` repository (packaged separately for
+  `cp2kkit[viewer]`).
 
 ## 0.4.7 surface adsorbate vibrations and Shermo imode=1
 

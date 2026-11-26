@@ -2,7 +2,7 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.4.7 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.4.8 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 cp2kkit is an independent CP2K toolkit, not an internal component of a workflow
@@ -16,14 +16,23 @@ and [public contract index](docs/contracts.md).
 - Analysis does not modify existing inputs, restart files or raw outputs, or run
   or submit CP2K. The optional Shermo integration executes only on explicit request.
 - The six MVP features have entry points, with additional `generate-input`,
-  `cube-check`, `cube-diff`, `cube-planar`, `vibration`, `thermochemistry` and
-  `shermo-read` commands.
+  `cube-check`, `cube-diff`, `cube-planar`, `vibration`, `thermochemistry`,
+  `shermo-read` and `view` commands.
 - The core uses Python's standard library; Rich styling and Matplotlib are optional.
 - Outputs include schema, units, SHA-256, line numbers, and original text.
   Missing values are not zero.
 - Analysis/CSV/JSON/images remain overwrite-protected. Input generation may replace
   an existing regular `.inp`; sources, data files and symlinks remain protected.
 - Energies can be extracted from failed jobs without becoming valid scientific results.
+
+An optional companion Linux X11 viewer (`cp2kkit-viewer`, maintained in its own
+standalone repository) integrates with `cp2kkit` through `cp2kkit view`, CLI
+`--view` (`cube-diff`, `cube-check`, `vibration`, `export-structure`,
+`generate-input`), and `v` inside the interactive TUI menus. `cp2kkit` itself
+remains pure Python; install the companion `cp2kkit-viewer` package/binary into
+the same Python environment (`cp2kkit[viewer]`) or on `PATH` (or configure
+`CP2KKIT_VIEWER` / `--viewer`). Standalone CUBEs are not wrapped by default,
+and dual-CUBE color mapping requires matching spatial grids.
 
 ## Planned 0.3.x functional and method coverage
 
@@ -39,7 +48,49 @@ input generation; version 0.3.3 adds BHandHLYP, M06-2X and configurable PBEh.
 All 21 referenced DFT selections now have bounded generation support; this is
 not full Multiwfn feature/combination coverage.
 
-## Current version: 0.4.7
+## Current version: 0.4.8
+
+Version **0.4.8** integrates the optional companion Linux X11 viewer
+(`cp2kkit-viewer`, maintained as a separate standalone Rust project) into the
+`cp2kkit` CLI and interactive TUI while keeping `cp2kkit` 100% pure Python,
+keeping batch commands headless by default, and preserving all existing exit
+codes (`0/2/3/4/5/6/7`), main-menu numbering (`1–7`), and exchange schema
+**0.1.0**.
+
+- **CP2K vibration scene export (`vibration --format viewer-scene`):** exports
+  complete CP2K Cartesian normal-mode tables paired with an explicit reference
+  geometry (checking every printed 1-based displacement atom index and element,
+  and enforcing observed `NONE`/`XYZ` periodicity compatibility) to
+  `cp2kkit-viewer-scene-v1` JSON without altering the standard JSON/CSV
+  observation contract.
+- **Direct CLI & TUI viewer launch (`src/cp2kkit/viewer.py`):**
+  - Discovers `cp2kkit-viewer` via `--viewer PATH`, `CP2KKIT_VIEWER`, the active
+    Python environment's `bin/` directory, or `PATH`; missing binary exits with
+    code **6** (`MissingDependency`).
+  - `cp2kkit view [FILE]` opens supported files directly and forwards viewer flags
+    (`--cell`, `--cube`, `--cube-length-unit`, `--color-cube`, `--colormap`,
+    `--flip-color-sign`, `--iso`, `--iso-sign`, `--boundary`, `--fixed`,
+    `--no-bond`, etc., accepting negative `--boundary` ranges in either form).
+  - Explicit `--view` (with optional `--viewer PATH`) opens post-processing and
+    export results immediately in the foreground for `cube-diff`, `cube-check`
+    (forwarding the resolved CUBE spatial length unit and refusing unknown units),
+    `vibration` (requires `--geometry`), `export-structure`, and batch
+    `generate-input`.
+  - Interactive TUI adds one-key `v` inspection in main **2** (structure details),
+    **3** (export structure), **4** (read-only draft preview in input generator),
+    **6/1** (scalar CUBE with optional `--color-cube`), **6/2** (newly created
+    difference CUBE with `+/-` lobes), and **7** (vibrational modes via temporary
+    `viewer-scene` JSON cleaned up on close).
+
+```bash
+# Compute charge-density difference and inspect +/- lobes immediately
+cp2kkit cube-diff ab.cube a.cube b.cube -o delta-density.cube --view
+
+# Parse CP2K vibrational output and inspect normal modes in 3D
+cp2kkit vibration slab-freq.out --geometry slab.extxyz --fixed-atoms 1-180 --view
+```
+
+### Retained 0.4.7 surface adsorbate vibrations and Shermo imode=1
 
 Version **0.4.7** adds bounded **periodic surface adsorbate partial-Hessian vibration**
 across input generation, read-only frequency observation, and external **Shermo 2.6.2

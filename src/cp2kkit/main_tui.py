@@ -11,6 +11,7 @@ from .input_tui import Cancelled, SessionExit, Field, Menu, run_interactive
 from .inputgen import InputSettings
 from .presentation import require_terminal
 from .structure import is_structure_path, read_structure
+from .viewer import view_checked_cube, view_structure, view_vibration_scene
 
 
 @dataclass(frozen=True)
@@ -86,15 +87,45 @@ def choose_structure(menu):
             menu.show(f'Error: Cannot load structure: {exc}. Previous structure retained; retry or back.')
 
 
-def optional_details(menu, report):
+def _open_in_viewer(menu, action):
+    menu.show('Opening viewer (close window to return)...')
+    try:
+        action()
+    except (KitError, OSError) as exc:
+        menu.show(f'Error: {exc}')
+
+
+def _view_cube_tui(menu, path, length_unit):
+    if length_unit is None:
+        menu.show('Error: Cannot view CUBE with unknown spatial unit; select an explicit length unit or dialect')
+        return
+    raw = menu.ask('Optional CUBE on the same grid (e.g. v_hartree); Enter skips; back returns: ')
+    if raw.lower() in {'0', 'back'}:
+        return
+    color_cube = str(Path(raw).expanduser()) if raw else None
+    flip_sign = False
+    if color_cube is not None:
+        answer = menu.ask('Flip color-cube sign (-V, e.g. CP2K V_HARTREE_CUBE -> physical ESP)? [y/N]: ').lower()
+        if answer in {'0', 'back'}:
+            return
+        flip_sign = answer in {'y', 'yes'}
+    _open_in_viewer(menu, lambda: view_checked_cube(path, length_unit, color_cube=color_cube,
+                                                      flip_color_sign=flip_sign))
+
+
+def optional_details(menu, report, view_action=None):
     from .io import json_text
-    raw = menu.ask('Enter returns to main menu; d shows full details; q exits: ').lower()
+    prompt = ('Enter returns to main menu; d shows full details; v opens viewer; q exits: '
+              if view_action is not None else 'Enter returns to main menu; d shows full details; q exits: ')
+    raw = menu.ask(prompt).lower()
     while raw not in {'', '0', 'back'}:
         if raw == 'd':
             menu.show(json_text(report))
+        elif raw == 'v' and view_action is not None:
+            view_action()
         else:
-            menu.show('Error: Select d or Enter.')
-        raw = menu.ask('Enter returns to main menu; d shows full details; q exits: ').lower()
+            menu.show('Error: Select d, v or Enter.' if view_action is not None else 'Error: Select d or Enter.')
+        raw = menu.ask(prompt).lower()
 
 
 def required_path(menu, label):
@@ -232,7 +263,45 @@ def analysis_group(menu, action):
         menu.show('Error: Invalid menu number')
 
 
-def vibration_analysis(menu):
+def _view_vibration_tui(menu, report, loaded_path=None):
+    from .constraints import parse_fixed_atoms
+    from .vibration_results import build_viewer_scene
+
+    try:
+        if loaded_path is not None:
+            raw_geom = menu.ask(
+                f'Reference structure path; Enter uses loaded {Path(loaded_path).name}; 0/back returns: '
+            )
+            if raw_geom.lower() in {'0', 'back'}:
+                return
+            geom = loaded_path if not raw_geom else str(Path(raw_geom).expanduser())
+        else:
+            raw_geom = menu.ask('Reference structure path; Enter/0/back returns; cancel/q: ')
+            if not raw_geom or raw_geom.lower() in {'0', 'back'}:
+                return
+            geom = str(Path(raw_geom).expanduser())
+
+        raw_frame = menu.ask('XYZ frame index (0-based or negative); Enter uses -1 (last); back returns: ')
+        if raw_frame.lower() == 'back':
+            return
+        frame = int(raw_frame) if raw_frame else -1
+
+        raw_fixed = menu.ask('Optional fixed atoms (1-based indices/ranges, e.g. 1-180); Enter keeps off; back returns: ')
+        if raw_fixed.lower() == 'back':
+            return
+        fixed_atoms = parse_fixed_atoms(raw_fixed) if raw_fixed else 'off'
+
+        scene = build_viewer_scene(report, geom, frame=frame, fixed_atoms=fixed_atoms)
+    except ValueError as exc:
+        menu.show(f'Error: Invalid viewer setting: {exc}')
+        return
+    except (KitError, OSError) as exc:
+        menu.show(f'Error: {exc}')
+        return
+    _open_in_viewer(menu, lambda: view_vibration_scene(scene))
+
+
+def vibration_analysis(menu, loaded_path=None):
     from .io import json_text
     from .vibration_results import AmbiguousVibration, export_vibration, parse_threshold, parse_vibration
 
@@ -285,7 +354,7 @@ def vibration_analysis(menu):
         menu.show('Additional warnings are available in full details.')
     menu.show('Text observations do not establish convergence, a clean process exit or a stationary point.')
     while True:
-        raw = menu.ask('Enter returns; d details; j JSON; c CSV; s Shermo; cancel/q: ').lower()
+        raw = menu.ask('Enter returns; d details; j JSON; c CSV; v viewer; s Shermo; cancel/q: ').lower()
         if raw in {'', '0', 'back'}:
             return
         if raw == 'd':
@@ -294,10 +363,12 @@ def vibration_analysis(menu):
             output = required_path(menu, 'New vibration report path')
             export_vibration(output, report, 'json' if raw == 'j' else 'csv')
             menu.show(f'Generated path: {Path(output).resolve()}')
+        elif raw == 'v':
+            _view_vibration_tui(menu, report, loaded_path=loaded_path)
         elif raw == 's':
             shermo_analysis(menu, report)
         else:
-            menu.show('Error: Select d, j, c, s or Enter.')
+            menu.show('Error: Select d, j, c, v, s or Enter.')
 
 
 def shermo_analysis(menu, report):
@@ -407,6 +478,7 @@ def analysis(menu, action):
         plot_analysis(menu)
         menu.ask('Enter/0/back returns; cancel/q: ')
         return
+    view_action = None
     if action == 'cube_planar':
         report = planar_analysis(menu)
     elif action == 'quality':
@@ -464,9 +536,14 @@ def analysis(menu, action):
             menu.show(f"{key}: {quantity['value']} {quantity['unit']} ({quantity['quantity']})")
         for warning in report['warnings']:
             menu.show(f'Warning: {warning}')
+        if output is not None:
+            view_action = lambda: _open_in_viewer(
+                menu, lambda: view_checked_cube(output, metadata['length_unit'], iso_sign='both'))
+        else:
+            view_action = lambda: _view_cube_tui(menu, first, metadata['length_unit'])
     else:
         raise KitError(f'Unknown analysis action: {action}')
-    optional_details(menu, report)
+    optional_details(menu, report, view_action=view_action)
 
 
 def export_structure(menu, path):
@@ -479,7 +556,14 @@ def export_structure(menu, path):
         menu.show(f'Generated path: {Path(target).resolve()}')
     for warning in warnings:
         menu.show('Warning: '+warning)
-    menu.ask('Enter to return to the main menu; q exits: ')
+    while True:
+        raw = menu.ask('Enter to return to the main menu; v opens viewer; q exits: ').lower()
+        if raw in {'', '0', 'back'}:
+            return
+        if raw == 'v':
+            _open_in_viewer(menu, lambda: view_structure(output))
+        else:
+            menu.show('Error: Select v or Enter.')
 
 
 def run_main_menu(path=None, stdin=None, stdout=None, plain=False):
@@ -532,7 +616,8 @@ def run_main_menu(path=None, stdin=None, stdout=None, plain=False):
                 if action.id == 'details':
                     menu.presenter.rows(structure_summary(loaded, loaded_path))
                     menu.show(f'Full path: {Path(loaded_path).resolve()}')
-                    optional_details(menu, loaded.to_dict())
+                    optional_details(menu, loaded.to_dict(),
+                                     view_action=lambda: _open_in_viewer(menu, lambda: view_structure(loaded_path)))
                 elif action.id == 'generate':
                     run_interactive(loaded_path, -1, None, InputSettings(),
                                     stdin=stdin, stdout=stdout, plain=plain, parent_session=True)
@@ -541,7 +626,7 @@ def run_main_menu(path=None, stdin=None, stdout=None, plain=False):
                 elif action.id in ANALYSIS_GROUPS:
                     analysis_group(menu, action.id)
                 elif action.id == 'vibration':
-                    vibration_analysis(menu)
+                    vibration_analysis(menu, loaded_path=loaded_path)
             except (Cancelled, KeyboardInterrupt):
                 menu.show('Cancelled; returning to the main menu. Completed files, if any, are retained.')
             except (KitError, OSError) as exc:

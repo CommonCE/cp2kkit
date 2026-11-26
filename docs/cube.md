@@ -186,6 +186,13 @@ recognized opposing density types/units. Requests are recorded in
 A CP2K identity/title does not prove GPW or inclusion of every core electron.
 Unknown integrals use `raw_numerical_integral`, not electron counts.
 
+The optional `cube-check --view` / `cube-diff --view` and corresponding TUI
+viewer actions pass the same resolved spatial length unit (`--cube-length-unit`)
+to the companion `cp2kkit-viewer` executable. If `cube-check` cannot resolve the
+unit, the report is still produced but no viewer is opened (`--view` exits 2);
+explicitly select a length unit or dialect. Viewer checks do not certify source
+alignment, method, or scientific validity.
+
 ### Integration convention
 
 ```text

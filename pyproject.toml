@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cp2kkit"
-version = "0.4.7"
+version = "0.4.8"
 description = "CP2K analysis and non-destructive input generation with explicit units and provenance"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -19,6 +19,7 @@ license-files = [
 [project.optional-dependencies]
 plot = ["matplotlib>=3.7"]
 ui = ["rich>=13.7"]
+viewer = ["cp2kkit-viewer>=0.1.0"]
 
 [project.scripts]
 cp2kkit = "cp2kkit.cli:main"

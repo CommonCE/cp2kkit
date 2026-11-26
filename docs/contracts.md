@@ -12,8 +12,9 @@ scheduler or credentials are required to use or test cp2kkit.
 | Exchange conventions and field meanings | [Schema](schema.md) | Feature tests; not a complete JSON Schema validator |
 | GEO_OPT observations | [Observation contract](geo-opt-contract.md) | [Synthetic observation example](../examples/geo-opt-contract/README.md) |
 | Molecular and periodic partial-Hessian vibrational input generation, software 0.4.3–0.4.7 | [Generation contract](vibration-contract.md) | [Synthetic generation example](../examples/vibration-contract/README.md) |
-| Vibrational result observations (molecular and periodic partial Hessian), software 0.4.4–0.4.7 | [Result contract](vibration-results-contract.md) | [Synthetic frequency example](../examples/vibration-results/README.md) |
+| Vibrational result observations (molecular and periodic partial Hessian), software 0.4.4–0.4.8 | [Result contract](vibration-results-contract.md) | [Synthetic frequency example](../examples/vibration-results/README.md) |
 | External Shermo thermochemistry (`imode=0` and `imode=1`), software 0.4.5–0.4.7 | [Result and invocation contract](shermo-thermochemistry.md) | [Synthetic and mocked tests](../tests/test_thermochemistry.py) |
+| Optional companion viewer CLI bridge and CUBE unit forwarding | [CUBE analysis](cube.md#supported-formats-and-unit-policy) and [Vibrational results](vibration-results-contract.md#export-and-errors) | [Viewer bridge tests](../tests/test_viewer_integration.py) |
 | Other generated-input behavior | [Input generation](input-generation.md) and its feature sections | Existing feature tests; no blanket claim of complete consumer-contract coverage |
 
 Use a documented contract plus its referenced feature rules, not an example alone.

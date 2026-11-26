@@ -173,6 +173,26 @@ diagnostics. CLI diagnostics go to stderr; stdout is JSON by default, CSV with
 file is written, stdout is empty, and there is no sidecar. Existing files,
 including source aliases, `.inp` and symlinks, are not replaced.
 
+For 3D inspection of complete tables without a Molden `.mol` file,
+`build_viewer_scene(report, geometry_path, *, frame=-1, fixed_atoms='off')` /
+`export_viewer_scene(...)` and CLI
+`cp2kkit vibration <out> --format viewer-scene --geometry <structure> [--frame N] [--fixed-atoms SPEC] [-o scene.json]`
+pair the observed Cartesian normal-mode displacements with an explicit reference
+structure (checking every printed 1-based displacement atom index and element).
+For observed `NONE`, all reference atoms must be covered and the structure must
+not declare periodic axes. For observed `XYZ`, the structure must supply a valid
+cell with all three periodic axes; sparse partial-Hessian displacements remain
+valid. Missing periodicity in the vibration report is not inferred, and matching
+indices and elements cannot establish that two geometries came from the same run.
+The exporter emits a deterministic `cp2kkit-viewer-scene-v1` JSON document without modifying
+the standard `vibration_observation` JSON/CSV contract or schema `0.1.0`.
+Adding `--view` (with `--geometry`, and optional `--viewer PATH`) or selecting
+`v` in main menu **7** launches the optional standalone `cp2kkit-viewer` binary
+in the foreground on the exported scene (or a temporary scene cleaned up on
+close) and exits with code **6** if the viewer executable is unavailable.
+Incomplete vibration tables, missing/mismatched geometries, and target collisions
+are rejected (`KitError` / `OutputExists`).
+
 CLI exit codes: **0** report produced (including an ordinary incomplete report),
 **2** invalid requests/selectors or I/O, **3** ambiguous selection, **4** outside
 the recognized format or supported scope, **5** output collision, **7** report

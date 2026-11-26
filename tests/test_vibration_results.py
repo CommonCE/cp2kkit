@@ -16,7 +16,14 @@ from unittest.mock import patch
 from cp2kkit.errors import KitError, OutputExists, ParseError
 from cp2kkit.io import json_text
 from cp2kkit.main_tui import run_main_menu
-from cp2kkit.vibration_results import AmbiguousVibration, export_vibration, parse_vibration, write_vibration
+from cp2kkit.vibration_results import (
+    AmbiguousVibration,
+    build_viewer_scene,
+    export_vibration,
+    export_viewer_scene,
+    parse_vibration,
+    write_vibration,
+)
 from tests.test_input_tui import FIXTURES, TTY
 
 EXAMPLE = Path(__file__).resolve().parents[1] / 'examples' / 'vibration-results'
@@ -199,6 +206,18 @@ class VibrationResultTests(unittest.TestCase):
         result = self.cli(path, '--strict')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout)['periodicity'], 'XYZ')
+
+        rows = 'H 0 0 0\n' * 180 + 'O 2 2 2\n'
+        geom = self.root / 'slab.extxyz'
+        geom.write_text('181\nLattice="10 0 0 0 10 0 0 0 15" pbc="T T T"\n' + rows, encoding='utf-8')
+        scene = build_viewer_scene(report, geom, fixed_atoms='1-180')
+        self.assertEqual(scene['pbc'], [True] * 3)
+        self.assertEqual([d['atom_index'] for d in scene['modes'][0]['displacements']], [181])
+        self.assertTrue(scene['atoms'][179]['fixed'])
+        plain = self.root / 'slab.xyz'
+        plain.write_text('181\nno lattice\n' + rows, encoding='utf-8')
+        with self.assertRaisesRegex(KitError, 'reference structure with a cell and XYZ periodicity'):
+            build_viewer_scene(report, plain)
 
     def test_reference_energy_is_only_from_selected_native_footer(self):
         heading = ' VIB| NORMAL MODES - THERMOCHEMICAL DATA\n'
@@ -460,3 +479,63 @@ class VibrationResultTests(unittest.TestCase):
                     os.close(master)
                     if slave is not None:
                         os.close(slave)
+
+    def test_viewer_scene_export_alignment_fixed_atoms_and_protections(self):
+        # Reference geometry matching examples/vibration-results/molecular.txt (O1, C2, O3)
+        geom = self.root / 'co2.xyz'
+        geom.write_text('3\nco2\nO -1.16 0.0 0.0\nC 0.0 0.0 0.0\nO 1.16 0.0 0.0\n', encoding='utf-8')
+        report = parse_vibration(SOURCE)
+        scene = build_viewer_scene(report, geom, fixed_atoms='1')
+        self.assertEqual(scene['schema'], 'cp2kkit-viewer-scene-v1')
+        self.assertEqual(len(scene['atoms']), 3)
+        self.assertTrue(scene['atoms'][0]['fixed'])
+        self.assertFalse(scene['atoms'][1]['fixed'])
+        self.assertEqual(len(scene['modes']), 4)
+        self.assertEqual([m['mode_id'] for m in scene['modes']], [1, 2, 3, 4])
+        self.assertAlmostEqual(scene['modes'][0]['frequency_cm_1'], -123.45678901)
+        self.assertEqual(len(scene['modes'][0]['displacements']), 3)
+        self.assertEqual(scene['modes'][0]['displacements'][0]['atom_index'], 1)
+        self.assertEqual(scene['provenance']['fixed_atoms'], '1')
+        # Standard to_dict() remains unchanged (no private displacement vectors leaked)
+        self.assertNotIn('_mode_displacements', report.to_dict())
+
+        # CLI export to exclusive new file + overwrite protection (exit 5)
+        out_json = self.root / 'co2-scene.json'
+        res = self.cli(SOURCE, '--format', 'viewer-scene', '--geometry', geom, '-o', out_json)
+        self.assertEqual(res.returncode, 0, res.stderr)
+        loaded = json.loads(out_json.read_text(encoding='utf-8'))
+        self.assertEqual(loaded['schema'], 'cp2kkit-viewer-scene-v1')
+        self.assertEqual(len(loaded['modes']), 4)
+        res_dup = self.cli(SOURCE, '--format', 'viewer-scene', '--geometry', geom, '-o', out_json)
+        self.assertEqual(res_dup.returncode, 5)
+
+        # Missing --geometry for viewer-scene or stray --geometry for json fails with exit 2
+        self.assertEqual(self.cli(SOURCE, '--format', 'viewer-scene').returncode, 2)
+        self.assertEqual(self.cli(SOURCE, '--format', 'json', '--geometry', geom).returncode, 2)
+
+        # Element mismatch and out-of-bounds indices are rejected
+        bad_geom = self.root / 'bad.xyz'
+        bad_geom.write_text('3\nbad\nN -1.16 0 0\nC 0 0 0\nO 1.16 0 0\n', encoding='utf-8')
+        with self.assertRaises(KitError):
+            build_viewer_scene(report, bad_geom)
+        short_geom = self.root / 'short.xyz'
+        short_geom.write_text('2\nshort\nO 0 0 0\nC 1 0 0\n', encoding='utf-8')
+        with self.assertRaises(KitError):
+            build_viewer_scene(report, short_geom)
+
+        # Reject matching prefixes of larger molecular structures and known PBC conflicts.
+        large_geom = self.root / 'larger.xyz'
+        large_geom.write_text('4\nlarger molecule\nO -1.16 0 0\nC 0 0 0\nO 1.16 0 0\nH 1 2 3\n', encoding='utf-8')
+        with self.assertRaisesRegex(KitError, 'cover every atom'):
+            build_viewer_scene(report, large_geom)
+        periodic_geom = self.root / 'periodic.extxyz'
+        periodic_geom.write_text('3\nLattice="8 0 0 0 8 0 0 0 8" pbc="T T T"\n'
+                                 'O -1.16 0 0\nC 0 0 0\nO 1.16 0 0\n', encoding='utf-8')
+        self.assertEqual(self.cli(SOURCE, '--format', 'viewer-scene', '--geometry', periodic_geom).returncode, 2)
+        with self.assertRaisesRegex(KitError, 'cannot be paired with a periodic reference'):
+            build_viewer_scene(report, periodic_geom)
+
+        # Incomplete vibration report cannot be exported to viewer-scene
+        broken = parse_vibration(self.source(TEXT.replace('-5.0000000000E-01', 'NaN')))
+        with self.assertRaises(KitError):
+            export_viewer_scene(self.root / 'broken.json', broken, geom)

@@ -12,6 +12,7 @@ dist/
 # Expensive simulation outputs must not be committed.
 *.wfn
 *.cube
+!/tests/fixtures/cp2kkit-diff-angstrom.cube
 *.chk
 WAVECAR
 CHGCAR

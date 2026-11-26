@@ -72,13 +72,20 @@ Implemented local operations:
 - **5 / 3 Plot energy / SCF convergence:** same source selection, energy by
   default or SCF, and an explicit new `.png` path. Uses optional Matplotlib and
   writes the PNG, same-stem CSV and JSON together.
-- **6 / 1 Check scalar CUBE; 6 / 2 Subtract density CUBEs:** unchanged.
+- **6 / 1 Check scalar CUBE; 6 / 2 Subtract density CUBEs:** unchanged
+  core processing, with an optional read-only `v` action on completion to open
+  the CUBE (or new difference CUBE, and optional `--color-cube` in 6/1) in the
+  standalone `cp2kkit-viewer` binary.
 - **6 / 3 Planar averages and cumulative integrals:** use native grid index
   `x`, `y` or `z` (default), not necessarily a Cartesian cut. Reuses the CUBE
   interpretation assertions and writes an exclusive CSV and `<output>.json`
   sidecar; `d` shows full details. Integrals are not charge partitioning.
 - **7 Vibrational analysis:** directly opens the [bounded frequency workflow](vibration-results-contract.md),
-  with semantic ID `vibration` and no structure requirement.
+  with semantic ID `vibration` and no structure requirement. Selecting `v`
+  prompts for an explicit reference geometry and opens the modes in
+  `cp2kkit-viewer`.
+- Main **2 Structure details**, **3 Export structure**, and generator **v**
+  also offer optional read-only `v` inspection in `cp2kkit-viewer`.
 - Local **0 Back** returns without writing. Merely opening a group or inspecting
   observations does not publish files. Scrolling, cancel/q behavior,
   positive-width fallback, narrow-terminal and non-TTY handling are retained.

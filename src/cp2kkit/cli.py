@@ -25,6 +25,8 @@ from .method_profiles import parse_basis_overrides
 from .constraints import parse_fixed_atoms
 from .functional_registry import parse_functional
 from .auxiliary_basis import DEFAULT_AUXILIARY_BASIS, parse_auxiliary_basis
+from .viewer import (COLORMAPS, CUBE_LENGTH_UNITS, DISPLAY_MODES, ISO_SIGNS,
+                     launch_viewer, view_checked_cube, view_structure, view_vibration_scene)
 
 
 def build_parser():
@@ -53,7 +55,13 @@ def build_parser():
     vibration.add_argument('--segment', type=int, help='1-based program segment')
     vibration.add_argument('--block', type=int, help='1-based normal-mode block within a segment')
     vibration.add_argument('--zero-threshold-cm-1', default='0', help='Nonnegative reporting threshold (default 0)')
-    vibration.add_argument('--format', choices=('json', 'csv'), default='json')
+    vibration.add_argument('--format', choices=('json', 'csv', 'viewer-scene'), default='json')
+    vibration.add_argument('--geometry', help='Reference structure (XYZ/extXYZ/restart/POSCAR/GJF/CIF); required for --format viewer-scene or --view')
+    vibration.add_argument('--frame', type=int, default=-1, help='XYZ frame index for --geometry (default -1, last frame)')
+    vibration.add_argument('--fixed-atoms', type=parse_fixed_atoms, default='off',
+                           help='Optional 1-based fixed-atom indices/ranges for --format viewer-scene or --view (e.g. 1-180)')
+    vibration.add_argument('--view', action='store_true', help='Open parsed modes in the cp2kkit X11 viewer after reporting/exporting (requires --geometry)')
+    vibration.add_argument('--viewer', help='Explicit cp2kkit-viewer executable path (used with --view)')
     vibration.add_argument('-o', '--output', help='Exclusive new file; default writes to stdout')
     vibration.add_argument('--strict', action='store_true', help='Exit 7 if textual checks do not pass')
     thermo = sub.add_parser('thermochemistry', help='Explicitly run local Shermo 2.6.2 on CP2K molecular or surface-selected modes')
@@ -92,12 +100,16 @@ def build_parser():
     structure.add_argument("--format", choices=["extxyz", "xyz"], default="extxyz")
     structure.add_argument("--frame", type=int, default=-1, help="XYZ frame index, default last; negative indices allowed")
     structure.add_argument("--allow-cell-loss", action="store_true", help="Explicitly allow plain XYZ to omit a known cell")
+    structure.add_argument("--view", action="store_true", help="Open the exported structure in the cp2kkit X11 viewer")
+    structure.add_argument("--viewer", help="Explicit cp2kkit-viewer executable path (used with --view)")
     gen = sub.add_parser("generate-input", help="Generate a conservative GPW/GAPW/GFN-xTB CP2K input (optional provenance JSON)")
     gen.add_argument("path", nargs="?", help="XYZ/extXYZ/restart/GJF/CIF/POSCAR structure; prompted in TUI mode")
     gen.add_argument("-o", "--output", help="Input path; existing regular .inp may be replaced; required unless using TUI")
     gen.add_argument("--interactive", "--tui", action="store_true", help="Edit all CLI-seeded settings in one scrolling numbered menu")
     gen.add_argument("--plain", action="store_true", default=argparse.SUPPRESS, help="Disable interactive styling")
     gen.add_argument("--frame", type=int, default=-1)
+    gen.add_argument("--view", action="store_true", help="Open the generated CP2K input in the cp2kkit X11 viewer after writing")
+    gen.add_argument("--viewer", help="Explicit cp2kkit-viewer executable path (used with --view)")
     gen.add_argument("--write-json", action="store_true", help="Also write exclusive provenance JSON; default writes only input. Existing .inp may be replaced, JSON may not.")
     gen.add_argument("--project", help="Default: structure filename without its suffix")
     gen.add_argument("--run-type", type=str.upper, choices=RUN_TYPES, default="ENERGY")
@@ -228,6 +240,41 @@ def build_parser():
             cmd.add_argument("--grid-atol", type=float, default=1e-6, help="Componentwise absolute grid tolerance (bohr)")
             cmd.add_argument("--grid-rtol", type=float, default=0.0, help="Dimensionless relative grid tolerance")
             cmd.add_argument("--integral-atol", type=float, default=1e-3, help="Nonzero integral warning threshold (electrons); no correction")
+        if name in ("cube-check", "cube-diff"):
+            cmd.add_argument("--view", action="store_true", help="Open the CUBE result in the cp2kkit X11 viewer")
+            cmd.add_argument("--viewer", help="Explicit cp2kkit-viewer executable path (used with --view)")
+        if name == "cube-check":
+            cmd.add_argument("--color-cube", help="Optional second CUBE to color-map onto the isosurface (requires --view)")
+            cmd.add_argument("--flip-color-sign", action="store_true", help="Negate --color-cube values, e.g. CP2K V_HARTREE_CUBE -> ESP (requires --view)")
+            cmd.add_argument("--colormap", choices=COLORMAPS, help="Viewer color-map palette (requires --view)")
+    view_cmd = sub.add_parser("view", help="Open a structure, CUBE, Molden, or viewer-scene JSON in the cp2kkit X11 viewer")
+    view_cmd.add_argument("path", nargs="?", help="Optional file (.inp/.restart/POSCAR/.gjf/.cif/.pdb/.xyz/.extxyz/.mol/.cube/.json); omitted opens synthetic demo")
+    view_cmd.add_argument("--viewer", help="Explicit cp2kkit-viewer executable path")
+    view_cmd.add_argument("--cell", help="Attach periodic cell and &FIXED_ATOMS from a matching .inp/.restart/.extxyz")
+    view_cmd.add_argument("--cube", help="Attach a matching .cube volumetric field")
+    view_cmd.add_argument("--cube-length-unit", choices=CUBE_LENGTH_UNITS, help="Explicit length unit of the primary CUBE")
+    view_cmd.add_argument("--color-cube", help="Color-map a second .cube scalar field (e.g. v_hartree) onto the isosurface")
+    view_cmd.add_argument("--colormap", choices=COLORMAPS, help="Color-map palette for --color-cube")
+    view_cmd.add_argument("--flip-color-sign", action="store_true", help="Explicitly negate --color-cube values (CP2K V_HARTREE_CUBE has opposite sign to ESP)")
+    view_cmd.add_argument("--iso", type=float, help="Initial positive isosurface level")
+    view_cmd.add_argument("--iso-sign", choices=ISO_SIGNS, help="Initial isosurface lobe sign mode")
+    view_cmd.add_argument("--no-iso", action="store_true", help="Hide the isosurface on startup")
+    view_cmd.add_argument("--no-spins", action="store_true", help="Hide collinear magnetic-moment arrows")
+    view_cmd.add_argument("--boundary", help="Fractional display box X0:X1,Y0:Y1,Z0:Z1")
+    view_cmd.add_argument("--no-cell", action="store_true", help="Hide the periodic unit-cell wireframe box")
+    view_cmd.add_argument("--bond-scale", type=float, help="Covalent-radius sum multiplier (0.2..2.5)")
+    view_cmd.add_argument("--bond-pair", action="append", default=[], help="Explicit bond range EL1-EL2=MIN:MAX in angstrom (repeatable)")
+    view_cmd.add_argument("--no-bond", action="append", default=[], help="Suppress bonds between EL1-EL2 (repeatable)")
+    view_cmd.add_argument("--fixed", help="1-based inclusive fixed-atom indices/ranges (e.g. 1-180)")
+    view_cmd.add_argument("--hide-fixed", action="store_true", help="Hide fixed atoms on startup")
+    view_cmd.add_argument("--mode", choices=DISPLAY_MODES, help="Initial display style")
+    view_theme = view_cmd.add_mutually_exclusive_group()
+    view_theme.add_argument("--light", action="store_true", help="Use light theme")
+    view_theme.add_argument("--dark", action="store_true", help="Use dark theme")
+    view_arrows = view_cmd.add_mutually_exclusive_group()
+    view_arrows.add_argument("--arrows", action="store_true", help="Show displacement arrows on startup")
+    view_arrows.add_argument("--no-arrows", action="store_true", help="Hide displacement arrows on startup")
+    view_cmd.add_argument("--smoke-test", action="store_true", help="Open window, submit three frames, and exit")
     # Snapshot actual registrations, not a separately maintained command-name list.
     parser.command_names = frozenset(sub.choices)
     return parser
@@ -262,7 +309,47 @@ def emit(data, output):
         sys.stdout.write(json_text(data))
 
 
+def _build_view_args(args):
+    viewer_args = []
+    for flag, value in (
+        ('--cell', args.cell),
+        ('--cube', args.cube),
+        ('--cube-length-unit', args.cube_length_unit),
+        ('--color-cube', args.color_cube),
+        ('--colormap', args.colormap),
+        ('--iso', args.iso),
+        ('--iso-sign', args.iso_sign),
+        ('--boundary', args.boundary),
+        ('--bond-scale', args.bond_scale),
+        ('--fixed', args.fixed),
+        ('--mode', args.mode),
+    ):
+        if value is not None:
+            viewer_args.extend([flag, str(value)])
+    for spec in args.bond_pair:
+        viewer_args.extend(['--bond-pair', spec])
+    for spec in args.no_bond:
+        viewer_args.extend(['--no-bond', spec])
+    for flag, enabled in (
+        ('--flip-color-sign', args.flip_color_sign),
+        ('--no-iso', args.no_iso),
+        ('--no-spins', args.no_spins),
+        ('--no-cell', args.no_cell),
+        ('--hide-fixed', args.hide_fixed),
+        ('--light', args.light),
+        ('--dark', args.dark),
+        ('--arrows', args.arrows),
+        ('--no-arrows', args.no_arrows),
+        ('--smoke-test', args.smoke_test),
+    ):
+        if enabled:
+            viewer_args.append(flag)
+    return viewer_args
+
+
 def execute(args):
+    if args.command == 'view':
+        return launch_viewer(args.path, viewer_args=_build_view_args(args), executable=args.viewer)
     if args.command in {'thermochemistry', 'shermo-read'}:
         from .thermochemistry import parse_element_masses, read_shermo, run_shermo
         if args.output and os.path.lexists(args.output):
@@ -284,17 +371,56 @@ def execute(args):
             print(f'WARNING: {warning}', file=sys.stderr)
         return 0
     if args.command == 'vibration':
-        from .vibration_results import export_vibration, parse_threshold, parse_vibration, write_vibration
+        from .vibration_results import (
+            build_viewer_scene,
+            export_vibration,
+            export_viewer_scene,
+            parse_threshold,
+            parse_vibration,
+            write_vibration,
+        )
+        if args.viewer is not None and not args.view:
+            raise KitError('--viewer requires --view')
+        needs_geometry = args.format == 'viewer-scene' or args.view
+        if needs_geometry:
+            if not args.geometry:
+                raise KitError('--format viewer-scene and --view require --geometry PATH')
+        else:
+            if args.geometry is not None or args.fixed_atoms != 'off' or args.frame != -1:
+                raise KitError('--geometry, --frame, and --fixed-atoms require --format viewer-scene or --view')
         report = parse_vibration(args.path, segment=args.segment, block=args.block,
                                  zero_threshold_cm_1=parse_threshold(args.zero_threshold_cm_1))
-        if args.output is not None:
+        scene = None
+        if args.format == 'viewer-scene':
+            if args.output is not None:
+                export_viewer_scene(args.output, report, args.geometry, frame=args.frame,
+                                    fixed_atoms=args.fixed_atoms)
+            else:
+                scene = build_viewer_scene(report, args.geometry, frame=args.frame,
+                                           fixed_atoms=args.fixed_atoms)
+                sys.stdout.write(json_text(scene))
+        elif args.output is not None:
             export_vibration(args.output, report, args.format)
         else:
             write_vibration(sys.stdout, report, args.format)
         for warning in report.warnings:
             print(f'WARNING: {warning}', file=sys.stderr)
+        if args.view:
+            if args.format == 'viewer-scene' and args.output is not None:
+                view_structure(args.output, executable=args.viewer)
+            else:
+                if scene is None:
+                    scene = build_viewer_scene(report, args.geometry, frame=args.frame,
+                                               fixed_atoms=args.fixed_atoms)
+                view_vibration_scene(scene, executable=args.viewer)
         return 7 if args.strict and not report.strict_passed else 0
     if args.command in {"cube-check", "cube-diff", "cube-planar"}:
+        if args.command in {"cube-check", "cube-diff"} and args.viewer is not None and not args.view:
+            raise KitError('--viewer requires --view')
+        if args.command == "cube-check" and not args.view and (
+            args.color_cube is not None or args.flip_color_sign or args.colormap is not None
+        ):
+            raise KitError('--color-cube, --flip-color-sign, and --colormap require --view')
         options = CubeOptions(args.dialect, args.length_unit, args.scalar_type, args.scalar_unit)
         if args.command == "cube-check":
             report = check_cube(args.path, options)
@@ -315,8 +441,23 @@ def execute(args):
             print(f"Wrote {output} and {Path(str(output) + '.json')}", file=sys.stderr)
         for warning in report["warnings"]:
             print(f"WARNING: {warning}", file=sys.stderr)
+        if args.command == "cube-diff" and args.view:
+            view_checked_cube(output, report['output']['length_unit'], iso_sign="both", executable=args.viewer)
+        elif args.command == "cube-check" and args.view:
+            view_checked_cube(
+                args.path,
+                report['length_unit'],
+                color_cube=args.color_cube,
+                flip_color_sign=args.flip_color_sign,
+                colormap=args.colormap,
+                executable=args.viewer,
+            )
         return 0
     if args.command == "generate-input":
+        if args.viewer is not None and not args.view:
+            raise KitError('--viewer requires --view')
+        if args.interactive and args.view:
+            raise KitError('--view is for batch generate-input; use v inside the TUI menu')
         values = {name: getattr(args, name) for name in InputSettings.__dataclass_fields__}
         values["cell"] = tuple(args.cell) if args.cell is not None else None
         values["kpoints"] = tuple(args.kpoints)
@@ -332,17 +473,23 @@ def execute(args):
             print(f"WARNING: {warning}", file=sys.stderr)
         from .density_workflow import bundle_paths
         print("Wrote "+", ".join(map(str, bundle_paths(InputSettings(**values), output))), file=sys.stderr)
+        if args.view:
+            view_structure(output, executable=args.viewer)
         return 0
     if args.command == "discover":
         emit({"schema_version": SCHEMA_VERSION, "projects": [p.to_dict() for p in discover(args.path)]}, args.output)
         return 0
     if args.command == "export-structure":
+        if args.viewer is not None and not args.view:
+            raise KitError('--viewer requires --view')
         structure = read_structure(args.path, args.frame)
         output, manifest_path, warnings = export_structure_files(
             structure, args.output, args.format, args.allow_cell_loss)
         for warning in warnings:
             print(f"WARNING: {warning}", file=sys.stderr)
         print(f"Wrote {output} and {manifest_path}", file=sys.stderr)
+        if args.view:
+            view_structure(output, executable=args.viewer)
         return 0
     run = parse_output(resolve_output(args.path, args.project))
     if args.command == "parse":
@@ -364,6 +511,26 @@ def execute(args):
     return 0
 
 
+def _normalize_view_boundary(argv):
+    command = next((i for i, arg in enumerate(argv) if arg != '--plain'), None)
+    if command is None or argv[command] != 'view':
+        return argv
+    result = argv[:command + 1]
+    tokens = iter(range(command + 1, len(argv)))
+    for i in tokens:
+        arg = argv[i]
+        if arg == '--':
+            result.extend(argv[i:])
+            break
+        if arg == '--boundary' and i + 1 < len(argv):
+            value = argv[i + 1]
+            if value.startswith('-') and not value.startswith('--') and ':' in value:
+                arg = f'--boundary={value}'  # argparse otherwise treats it as an option.
+                next(tokens)
+        result.append(arg)
+    return result
+
+
 def main(argv=None):
     parser = build_parser()
     argv = list(sys.argv[1:] if argv is None else argv)
@@ -379,7 +546,7 @@ def main(argv=None):
         except OSError as exc:
             print(f"cp2kkit: filesystem error: {exc}", file=sys.stderr)
             return 2
-    args = parser.parse_args(argv)
+    args = parser.parse_args(_normalize_view_boundary(argv))
     if args.command == "generate-input":
         if args.path is None and args.output is None and sys.stdin.isatty() and sys.stdout.isatty():
             args.interactive = True

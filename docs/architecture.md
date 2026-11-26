@@ -1,4 +1,4 @@
-# cp2kkit v0.4.6 architecture
+# cp2kkit v0.4.8 architecture
 
 ## Design principles
 
@@ -60,6 +60,19 @@ read-only import share one output parser; normal CP2K result observation invokes
 neither. Inputs, process metadata and derived values remain separate; no code is
 bundled from Shermo and no scheduler/general execution service is introduced.
 See the [thermochemistry contract](shermo-thermochemistry.md).
+
+## Standalone X11 viewer integration (0.4.8)
+
+`viewer.py` discovers and invokes the optional companion `cp2kkit-viewer` X11
+binary (maintained in a separate standalone repository; discovered via
+`--viewer`, `CP2KKIT_VIEWER`, active Python environment `bin/`, or `PATH`) in
+the foreground via `cp2kkit view`, explicit CLI `--view` flags, and interactive
+TUI `v` actions. Temporary `viewer-scene` JSON
+and CP2K input drafts are staged inside disposable temporary directories and
+cleaned up automatically on close. Batch CLI operations remain non-interactive
+by default; missing viewer binaries raise `MissingDependency` (exit code 6).
+The viewer opens all inputs read-only and never parses CP2K `.out` files or runs
+calculations.
 
 ## Producer and consumer responsibilities
 
@@ -129,7 +142,8 @@ cli.py
  |-- density_workflow.py -- inputgen.py / io.staged_files (whole/A/B bundle, shared generator, explicit mapping)
  |-- spin_settings.py (explicit Ueff/L parsing, collinear atom seeds, stable KIND splitting)
  |-- cube.py ------- models.py / io.py / structure.py (units; streaming checks/differences)
- `-- cube_profile.py -- cube.py / io.staged_files (native-grid plane means/integrals; no charge partition)
+ |-- cube_profile.py -- cube.py / io.staged_files (native-grid plane means/integrals; no charge partition)
+ `-- viewer.py ----- io.py / errors.py (optional foreground launcher for standalone cp2kkit-viewer X11 binary)
 
 models.py: data model/schema version
 io.py: strict reads, hashes, stable JSON, exclusive outputs

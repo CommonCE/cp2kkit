@@ -13,6 +13,7 @@ from .inputgen import InputSettings, generate_input, write_input
 from .menu_registry import ENTRIES, BY_TOKEN, CATEGORY_NAMES, MENU_LAYOUT_VERSION
 from .presentation import require_terminal
 from .structure import read_structure
+from .viewer import view_input_draft
 
 FIELDS = {field.name: field for _, fields in GROUPS for field in fields}
 FIELD_IDS = tuple((entry.number, entry.field) for entry in ENTRIES if entry.field)
@@ -68,6 +69,7 @@ def show_settings(menu, values, category=None):
             if number in categories:
                 menu.show(f' {number}. {label}')
         menu.show('  r. Review effective settings\n  p. Preview all inputs and replay command\n'
+                  '  v. View generated draft in 3D viewer\n'
                   '  w. Review & write files (with confirmation)')
     else:
         menu.heading(f'\n=== {category}. {CATEGORY_NAMES[category]} ===')
@@ -75,7 +77,7 @@ def show_settings(menu, values, category=None):
             if entry.category == category:
                 _show_entry(menu, entry, entry.number, values)
         menu.show('   0. Back to input-generator main menu (no files written)\n'
-                  '  r/p. Review / full preview; full IDs can access other categories')
+                  '  r/p/v. Review / full preview / 3D viewer; full IDs can access other categories')
     return entries, categories
 
 
@@ -371,7 +373,7 @@ def run_editor(path, frame, output, settings, stdin=None, stdout=None, plain=Fal
                   'Category/602 0 returns; -10/back returns; q exits.')
         while True:
             applicable, categories = show_settings(menu, values, category)
-            raw = menu.ask('Select shortcut/category/full ID, s/f, r/p/w; -10/back returns: ').lower()
+            raw = menu.ask('Select shortcut/category/full ID, s/f, r/p/v/w; -10/back returns: ').lower()
             if raw in {'-10', 'back'} or raw == '0' and category is not None:
                 if category is not None:
                     category = None
@@ -401,6 +403,17 @@ def run_editor(path, frame, output, settings, stdin=None, stdout=None, plain=Fal
                 if changed:
                     values['_edited'].update(changed)
                     compatibility(menu, values)
+                continue
+            if raw == 'v':
+                try:
+                    if not values['path']:
+                        raise KitError('Structure path is required; use s to load a structure')
+                    text, _manifest = generate_input(read_structure(values['path'], values['frame']),
+                                                     settings_from(values))
+                    menu.show('Opening viewer (close window to return)...')
+                    view_input_draft(text, stem=values['output'] or values['path'] or 'draft')
+                except (KitError, OSError) as exc:
+                    menu.show(f'Error: {exc}')
                 continue
             if raw in {'r', 'p', 'w', '0'}:
                 if category is not None and raw == 'w':

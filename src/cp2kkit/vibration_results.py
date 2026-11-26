@@ -7,11 +7,15 @@ from pathlib import Path
 from typing import Iterator, TextIO
 
 from . import __version__
+from .constraints import resolve_atom_indices
 from .errors import AmbiguousProject, KitError, ParseError
 from .io import json_text, new_file, read_text
 from .models import SCHEMA_VERSION, Evidence, Quantity
 from .output_settings import normalize_settings
 from .parser import NUMBER, RUN_TYPE, SCF_FAIL, SCF_OK, SETTING, VERSION, number
+from .structure import read_structure
+
+VIEWER_SCENE_SCHEMA = 'cp2kkit-viewer-scene-v1'
 
 UNIT = 'cm^-1'
 HEADING = re.compile(r'VIB\|\s+NORMAL MODES - CARTESIAN DISPLACEMENTS')
@@ -74,6 +78,10 @@ class VibrationReport:
     periodicity: str | None = None
     periodicity_sources: list[Evidence] = field(default_factory=list)
     rotovibrational_vectors: int | None = None
+
+    def __post_init__(self) -> None:
+        # Kept outside dataclass fields so VibrationReport.to_dict() / schema 0.1.0 stay unchanged.
+        self._mode_displacements: list[list[tuple[int, tuple[float, float, float]]]] = []
 
     @property
     def counts(self) -> dict[str, int]:
@@ -188,6 +196,7 @@ def _read_table(report: VibrationReport, lines: list[str], start: int, stop: int
     next_id, previous_width = 1, None
     ids, id_source = None, None
     stage, atoms = 'ids', []
+    group_vecs: list[list[tuple[int, tuple[float, float, float]]]] = []
     supported_rows = unsupported_rows = 0
     boundary = None
     for i in range(start + 1, stop):
@@ -198,6 +207,9 @@ def _read_table(report: VibrationReport, lines: list[str], start: int, stop: int
                     report.displacement_atoms = atoms
                 elif atoms != report.displacement_atoms:
                     _issue(report, evidence(i), 'Inconsistent displacement atom indices or elements between groups')
+                if group_vecs:
+                    report._mode_displacements.extend(group_vecs)
+                    group_vecs = []
                 report.closure = evidence(i)
                 stage = 'ids'
             continue
@@ -241,6 +253,7 @@ def _read_table(report: VibrationReport, lines: list[str], start: int, stop: int
                     _issue(report, src, 'A non-final mode group does not contain three values')
                 previous_width = width
                 next_id += width
+                group_vecs = [[] for _ in range(width)]
                 for column, token in enumerate(tokens):
                     try:
                         value = _numeric(token, src)
@@ -273,12 +286,17 @@ def _read_table(report: VibrationReport, lines: list[str], start: int, stop: int
             components = atom[3].split()
             if previous_width is not None and len(components) != 3 * previous_width:
                 _issue(report, src, 'Incomplete displacement row')
+            parsed_vals: list[float] = []
             for token in components:
                 try:
-                    _numeric(token, src)
+                    parsed_vals.append(_numeric(token, src))
                 except ParseError:
                     _issue(report, src, f'Invalid or out-of-range displacement token: {token!r}')
+                    parsed_vals = []
                     break  # One numeric diagnostic per damaged row is enough.
+            if previous_width is not None and len(parsed_vals) == 3 * previous_width and len(group_vecs) == previous_width:
+                for col in range(previous_width):
+                    group_vecs[col].append((index, (parsed_vals[3 * col], parsed_vals[3 * col + 1], parsed_vals[3 * col + 2])))
         else:
             _issue(report, evidence(i), 'Unexpected record in the normal-mode table')
     else:
@@ -456,3 +474,102 @@ def export_vibration(path: str | Path, report: VibrationReport, fmt: str = 'json
         raise KitError(f'Unsupported vibration export format: {fmt}')
     with new_file(path) as stream:
         write_vibration(stream, report, fmt)
+
+
+def build_viewer_scene(
+    report: VibrationReport,
+    geometry_path: str | Path,
+    *,
+    frame: int = -1,
+    fixed_atoms: str = 'off',
+) -> dict:
+    """Build a deterministic cp2kkit-viewer-scene-v1 dict from a complete vibration report and reference geometry."""
+    if not report.complete or not report.modes:
+        raise KitError('Viewer scene export requires a complete vibration table with observed modes')
+    if len(report._mode_displacements) != len(report.modes):
+        raise KitError('Vibration report lacks aligned Cartesian displacement vectors for viewer export')
+
+    structure = read_structure(geometry_path, frame=frame)
+    atom_count = len(structure.symbols)
+    for atom_index, symbol in report.displacement_atoms:
+        if atom_index < 1 or atom_index > atom_count:
+            raise KitError(
+                f'Displacement atom index {atom_index} ({symbol}) is out of bounds for '
+                f'{geometry_path} ({atom_count} atoms)'
+            )
+        ref_symbol = structure.symbols[atom_index - 1]
+        if ref_symbol != symbol:
+            raise KitError(
+                f'Element mismatch at atom #{atom_index}: vibration table has {symbol!r}, '
+                f'reference geometry has {ref_symbol!r}'
+            )
+
+    if report.periodicity == 'XYZ':
+        if structure.cell is None or structure.pbc != [True, True, True]:
+            raise KitError('Periodic XYZ vibration modes require a reference structure with a cell and XYZ periodicity')
+    elif report.periodicity == 'NONE':
+        if structure.pbc is not None and any(structure.pbc):
+            raise KitError('Nonperiodic vibration modes cannot be paired with a periodic reference structure')
+        if {index for index, _ in report.displacement_atoms} != set(range(1, atom_count + 1)):
+            raise KitError('Nonperiodic vibration modes must cover every atom in the reference structure')
+
+    fixed_spec, fixed_indices = resolve_atom_indices(fixed_atoms, atom_count)
+    fixed_set = set(fixed_indices)
+
+    atoms = [
+        {
+            'symbol': sym,
+            'position': [float(v) for v in pos],
+            'fixed': (idx in fixed_set),
+        }
+        for idx, (sym, pos) in enumerate(zip(structure.symbols, structure.positions), 1)
+    ]
+
+    modes = []
+    for mode, vecs in zip(report.modes, report._mode_displacements):
+        modes.append({
+            'mode_id': mode.mode_id if mode.mode_id is not None else mode.ordinal,
+            'frequency_cm_1': mode.frequency.value,
+            'displacements': [
+                {'atom_index': atom_idx, 'vector': [vec[0], vec[1], vec[2]]}
+                for atom_idx, vec in vecs
+            ],
+        })
+
+    return {
+        'schema': VIEWER_SCENE_SCHEMA,
+        'title': Path(report.source['path']).stem,
+        'atoms': atoms,
+        'cell': structure.cell,
+        'pbc': structure.pbc,
+        'modes': modes,
+        'provenance': {
+            'generator': {'name': 'cp2kkit', 'version': __version__},
+            'vibration_source': {
+                'path': report.source['path'],
+                'sha256': report.source['sha256'],
+                'segment': report.segment,
+                'block': report.block,
+            },
+            'geometry_source': structure.source,
+            'geometry_frame': structure.frame,
+            'periodicity': report.periodicity,
+            'fixed_atoms': fixed_spec,
+            'displacement_atoms_count': len(report.displacement_atoms),
+        },
+    }
+
+
+def export_viewer_scene(
+    path: str | Path,
+    report: VibrationReport,
+    geometry_path: str | Path,
+    *,
+    frame: int = -1,
+    fixed_atoms: str = 'off',
+) -> dict:
+    """Write a cp2kkit-viewer-scene-v1 JSON file exclusively (never overwrites)."""
+    scene = build_viewer_scene(report, geometry_path, frame=frame, fixed_atoms=fixed_atoms)
+    with new_file(path) as stream:
+        stream.write(json_text(scene))
+    return scene
