@@ -1,4 +1,4 @@
-# GEO_OPT observation contract (software 0.4.2)
+# GEO_OPT/CELL_OPT observation contract (software 0.4.9)
 
 This batch stabilizes observations and their provenance, not a final-state or
 scientific-validation API. New regressions use tiny hand-written strings in
@@ -188,7 +188,8 @@ split segments without inferred restart continuity. No segments are joined.
 No final_candidate_energy is implemented. Completion + the last number, even with
 positive text quality, does not establish a final energy. Truncation, a damaged tail,
 unknown step/evaluation ordering or ambiguous SCF must not be promoted downstream.
-Final-candidate criteria and optimizer-specific ordering support remain follow-up.
+Determining a scientific final energy and optimizer-specific evaluation ordering
+remain outside this contract.
 
 ## State axes
 
@@ -203,6 +204,127 @@ Quality `passed` means only the supported text rules passed; it does not certify
 final-state ordering, method choice, physical model, numerical convergence studies
 or chemical correctness. Process `exit_status` remains null. Neither PROGRAM ENDED
 nor absence of fatal diagnostics establishes a process exit or restart continuity.
+
+## Optimization criteria (0.4.9)
+
+Supported formats are the CP2K 2026.x `OPT|` layout (including the 2026.2
+`Step number`, `Optimization method` and `Total energy` labels) and the legacy
+`Max. step size =`, `Conv. limit for step size =` and analogous convergence
+records. Units are `bohr` for step sizes, `hartree/bohr` for gradients, `bar`
+for pressure deviation/tolerance and internal pressure, and `hartree` for
+optimization energy (`[hartree]` or `[a.u.]`). Flags are printed `YES`/`NO`;
+values are not compared to limits to infer flags or fill in missing values.
+
+`optimization_steps` is ordered within each segment, with a 1-based observation
+`index` distinct from the explicit or null `step`. A numbered `OPT|` record can
+confirm the immediately preceding optimization banner or supply a step without
+one (including step 0). It does not backfill step 0 into a FORCE_EVAL observation
+or replace the legacy banner-based association. Repeated or decreasing step
+markers split segments, except for the first `OPT|` confirmation of the same
+step; recognized records after program termination start an incomplete segment.
+`last_optimization_step` is the last recorded optimization observation, not a
+scientific final-state claim.
+
+`max_step`, `rms_step`, `max_gradient`, `rms_gradient` and `pressure` are nullable
+criterion objects. Each can carry `value`, `limit`, `unit`, `converged` and the
+corresponding evidence fields. `source` points to the value line, or to the first
+available limit/flag evidence if the value is absent. Missing is null; actual
+zero and `NO` become `0.0` and `false`. A recognized malformed record leaves the
+affected field null and is retained in `unparsed_optimization_records` with a
+line warning. Valid numeric tokens that overflow or underflow to zero raise
+`ParseError` (CLI exit 4).
+
+`all_cartesian_converged` is null until all four Cartesian flags are observed.
+`all_observed_converged` requires those four flags plus pressure for CELL_OPT
+or when a pressure criterion is present. With all required flags observed,
+either aggregate is true only if each required flag is true. Quality adds
+`optimization_step_count` and `last_optimization_criteria` (last step with any
+criterion, which can differ from `last_optimization_step`). Malformed records
+block `passed`; a false aggregate on that last criteria step contradicts a
+successful geometry marker and makes segment quality `failed`. All-YES flags
+alone do not establish completion, SCF convergence, geometry convergence or a
+supported total energy. Outputs without criteria keep prior quality judgments.
+
+```bash
+cp2kkit plot opt.out --kind convergence -o criteria.png
+```
+
+Plots are per-segment and include printed limits; Cartesian values use a log
+scale when positive measurements are present. Nonpositive values/limits omitted
+on log axes remain in the CSV; all-zero observations use a linear scale. Pressure
+uses a separate linear bar panel. New PNG, criteria CSV and JSON manifest are
+published exclusively with exception rollback. Matplotlib is optional (exit 6
+if unavailable); no criteria is a usage error (exit 2).
+
+## Explicit trajectory association (0.4.9)
+
+```bash
+cp2kkit match-trajectory opt.out opt-pos-1.xyz --strict
+cp2kkit match-trajectory opt.out positions.extxyz --segment 2 --step 3 \
+  --export-structure step-3.extxyz -o match.json
+```
+
+Python: `match_trajectory(output, trajectory_path, *, segment=None,
+energy_tol_hartree=1e-6, requested_step=None)` accepts an output path or parsed
+`Run`; use `select_matched_frame(report, step=None)` to retrieve a verified
+frame and its match entry. `--segment` is **1-based**: one segment is selected
+implicitly only if it is the sole segment; otherwise select one explicitly
+(exit 3 for ambiguity). `segment_id` is the original zero-based parser ID.
+The absolute energy tolerance in hartree must be finite and nonnegative.
+
+XYZ comments use `i = <int>, E = <float>` with optional `time = <float>`;
+extXYZ can use `Step` or `i` and `Energy`, `energy` or `E`. CP2K 2026.2
+EXTXYZ also uses capitalized `Time=`, recognized as the same optional metadata
+as `time=`. Keys embedded in quoted values are not metadata. Invalid or duplicate
+metadata do not supply a value; numeric overflow or nonzero underflow to zero
+raises `ParseError`. Frame indices are zero-based and source lines are one-based.
+No filename, modification time, offset or last-frame heuristic is used.
+
+Association requires a unique frame with the same explicit step. FORCE_EVAL
+energies for that step take precedence; if all agree pairwise within tolerance,
+the first is retained, along with the count (`output_energy_selection: force_eval`).
+For disagreeing line-search energies, an explicit `OPT| Total energy [hartree]`
+summary (also recognized with `[a.u.]`) is selected as `opt_summary_line_search`
+only if at least one preceding FORCE_EVAL for that step agrees within tolerance
+and every later FORCE_EVAL for that step also agrees. A post-summary discrepancy
+in this case leaves the energy `ambiguous`. With no FORCE_EVAL energy at the
+step, the explicit optimization energy is used if present (`opt_summary`),
+otherwise the selection is `unavailable`.
+
+When given an output path, the report checks native `- Atoms:` records in the
+selected segment and exposes `output_atom_count` and `output_atom_count_sources`.
+No records, malformed or conflicting counts, or a parsed `Run` input leave the
+count null; malformed or conflicting records generate warnings. For a unique
+pair, `atom_count_matches` is null if the count is unknown, otherwise true or
+false. A false value takes precedence over energy comparison and yields
+`atom_count_mismatch` with a warning. Otherwise `status` is
+`energy_unavailable_in_trajectory`, `energy_unavailable_in_output`, `matched`
+(absolute difference within tolerance), or `energy_mismatch`. The signed
+energy difference, when computed, is trajectory minus output in hartree.
+Duplicate frame steps are never matched; missing step metadata and unmatched
+output/trajectory steps are listed separately. Extra unique frames generate a
+warning.
+
+Without `--step`, export/view requires the last optimization observation's explicit
+step (or the last observed energy's step when the optimization step is absent)
+to have a `matched` entry, positive segment text quality, the successful
+geometry marker, and all required flags true if criteria were observed there.
+Otherwise `converged_final_step` is null and the report gives explicit reasons.
+With `--step`, a `matched` entry is required but geometry convergence is not.
+`--strict` returns 7 for duplicate frame steps, missing step metadata, any energy
+or atom-count mismatch, or an unverified requested/default selection. Unique
+extra frames do not alone fail strict mode. Request or selection errors are
+distinct from a successfully emitted report that does not pass strict mode.
+
+Reports go to stdout or an exclusive `-o` file. `--export-structure` writes a
+new extXYZ (default) or explicit plain XYZ and a new `.json` sidecar; `xyz` with
+a known cell requires `--allow-cell-loss`. The `-o` report is reserved before
+structure export and removed if export fails; this is not crash-atomic.
+`--view` optionally opens the export or stages only the verified frame for the
+foreground X11 viewer. `--viewer` requires `--view`. Neither matching (even
+with agreeing atom counts) nor viewing proves shared element order,
+coordinate or cell identity, unique calculation provenance, a stationary point,
+process success or scientific validity.
 
 ## Normalized settings
 

@@ -1,7 +1,20 @@
 """Completion != convergence != physical validity. Unknown is never success."""
 import re
 
-from .models import SCHEMA_VERSION
+from .models import OPTIMIZATION_CRITERIA, SCHEMA_VERSION
+
+
+def _last_criteria(segment):
+    for opt in reversed(segment.optimization_steps):
+        criteria = {}
+        for name in OPTIMIZATION_CRITERIA:
+            criterion = getattr(opt, name)
+            if criterion is not None:
+                criteria[name] = {key: getattr(criterion, key) for key in ("value", "limit", "unit", "converged")}
+        if criteria:
+            return {"step": opt.step, "all_cartesian_converged": opt.all_cartesian_converged,
+                    "all_observed_converged": opt.all_observed_converged, "criteria": criteria}
+    return None
 
 
 def quality_report(run):
@@ -29,12 +42,19 @@ def quality_report(run):
             reasons.append("No supported total-energy record")
         if segment.unparsed_energy_records:
             reasons.append("Unsupported/malformed total-energy record in segment")
+        last_criteria = _last_criteria(segment)
+        if segment.unparsed_optimization_records:
+            reasons.append("Unsupported or malformed optimization criteria record in segment")
+        contradicted = (needs_geometry and segment.geometry_converged is True and last_criteria is not None
+                        and last_criteria["all_observed_converged"] is False)
+        if contradicted:
+            reasons.append("Observed optimization criteria are not converged despite completion marker")
         if not supported:
             reasons.append("Run type is unknown or outside the v0.1 quality rules")
         if fatal:
             reasons.append("Error/abort diagnostics present")
         status = "passed" if not reasons else ("failed" if fatal or earlier_scf_failure or segment.scf_converged is False
-                    or segment.geometry_converged is False else "incomplete_or_unknown")
+                    or segment.geometry_converged is False or contradicted else "incomplete_or_unknown")
         reports.append({
             "segment": segment.id, "status": status, "completed": segment.completed,
             "electronic_converged": segment.scf_converged,
@@ -48,7 +68,10 @@ def quality_report(run):
             "final_energy": None if segment.final_energy is None else {
                 "value": segment.final_energy.value, "unit": segment.final_energy.unit,
                 "source": segment.final_energy.source.__dict__},
-            "evidence": [e.__dict__ for e in segment.evidence + segment.diagnostics + segment.unparsed_energy_records],
+            "evidence": [e.__dict__ for e in segment.evidence + segment.diagnostics
+                         + segment.unparsed_energy_records + segment.unparsed_optimization_records],
+            "optimization_step_count": len(segment.optimization_steps),
+            "last_optimization_criteria": last_criteria,
         })
     return {
         "schema_version": SCHEMA_VERSION, "source": run.source,

@@ -2,7 +2,7 @@
 
 A Python toolkit connecting CP2K output reading, traceable post-processing, and
 non-destructive input generation. The original MVP planning baseline is preserved in
-[the roadmap](docs/roadmap.md). **v0.4.8 preliminary implementation**, not a production
+[the roadmap](docs/roadmap.md). **v0.4.9 preliminary implementation**, not a production
 release certified with actual CP2K runs.
 
 cp2kkit is an independent CP2K toolkit, not an internal component of a workflow
@@ -17,7 +17,7 @@ and [public contract index](docs/contracts.md).
   or submit CP2K. The optional Shermo integration executes only on explicit request.
 - The six MVP features have entry points, with additional `generate-input`,
   `cube-check`, `cube-diff`, `cube-planar`, `vibration`, `thermochemistry`,
-  `shermo-read` and `view` commands.
+  `shermo-read`, `match-trajectory` and `view` commands.
 - The core uses Python's standard library; Rich styling and Matplotlib are optional.
 - Outputs include schema, units, SHA-256, line numbers, and original text.
   Missing values are not zero.
@@ -28,7 +28,7 @@ and [public contract index](docs/contracts.md).
 An optional companion Linux X11 viewer (`cp2kkit-viewer`, maintained in its own
 standalone repository) integrates with `cp2kkit` through `cp2kkit view`, CLI
 `--view` (`cube-diff`, `cube-check`, `vibration`, `export-structure`,
-`generate-input`), and `v` inside the interactive TUI menus. `cp2kkit` itself
+`generate-input`, `match-trajectory`), and `v` inside the interactive TUI menus. `cp2kkit` itself
 remains pure Python; install the companion `cp2kkit-viewer` package/binary into
 the same Python environment (`cp2kkit[viewer]`) or on `PATH` (or configure
 `CP2KKIT_VIEWER` / `--viewer`). Standalone CUBEs are not wrapped by default,
@@ -48,7 +48,18 @@ input generation; version 0.3.3 adds BHandHLYP, M06-2X and configurable PBEh.
 All 21 referenced DFT selections now have bounded generation support; this is
 not full Multiwfn feature/combination coverage.
 
-## Current version: 0.4.8
+## Current version: 0.4.9
+
+Read supported GEO_OPT/CELL_OPT convergence criteria from CP2K 2026.x `OPT|`
+blocks and legacy output. Inspect the observations in `report` and `parse`,
+plot them with `plot --kind convergence`, or verify explicit output steps
+against an XYZ/extXYZ trajectory with `match-trajectory`. The TUI keeps main
+entries 1-7; output analysis adds **5/4** for matching and single-frame export
+or viewer inspection. Matching checks printed step and energy metadata, not
+physical validity or atom/coordinate identity. See the
+[optimization observation contract](docs/geo-opt-contract.md).
+
+## Retained viewer integration (0.4.8)
 
 Version **0.4.8** integrates the optional companion Linux X11 viewer
 (`cp2kkit-viewer`, maintained as a separate standalone Rust project) into the
@@ -713,6 +724,8 @@ cp2kkit export-structure water.restart --format xyz --allow-cell-loss -o water.x
 # Write curve.png, curve.csv, and curve.json; reject the operation if any target exists.
 cp2kkit plot /path/to/run/water.out -o curve.png
 cp2kkit plot /path/to/run/water.out --kind scf -o scf.png
+cp2kkit plot /path/to/run/opt.out --kind convergence -o convergence.png
+cp2kkit match-trajectory /path/to/run/opt.out /path/to/run/positions.xyz --strict
 ```
 
 Without `--output`, discover/parse/report/cube-check write machine-readable stdout;
@@ -876,7 +889,8 @@ no PBE dispersion parameters are substituted. See [the full guide](docs/input-ge
 | Structure/cell export | Strict XYZ/extXYZ/restart subset, triclinic cells, bohr conversion, scaled coordinates |
 | Quality reports | Completion/electronic/geometry evidence; unknown/truncated jobs cannot pass |
 | CSV/JSON/provenance | Schema 0.1.0, units, null/empty values, original text/lines/hashes, quality flags |
-| Energy/convergence plots | Energy and SCF iteration counts per cycle; disconnected segments; CSV/JSON sidecars |
+| Analysis plots | Energy, SCF iteration counts, or printed optimization criteria; disconnected segments; CSV/JSON sidecars |
+| Trajectory matching | Explicit step and energy verification before selected-frame export or viewing |
 
 ### Compatibility statement
 

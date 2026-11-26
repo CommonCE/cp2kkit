@@ -4,6 +4,7 @@
 import argparse
 import os
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 
 from . import __version__
@@ -25,8 +26,10 @@ from .method_profiles import parse_basis_overrides
 from .constraints import parse_fixed_atoms
 from .functional_registry import parse_functional
 from .auxiliary_basis import DEFAULT_AUXILIARY_BASIS, parse_auxiliary_basis
+from .trajectory import DEFAULT_ENERGY_TOL_HARTREE, match_trajectory, select_matched_frame
 from .viewer import (COLORMAPS, CUBE_LENGTH_UNITS, DISPLAY_MODES, ISO_SIGNS,
-                     launch_viewer, view_checked_cube, view_structure, view_vibration_scene)
+                     launch_viewer, view_checked_cube, view_matched_structure, view_structure,
+                     view_vibration_scene)
 
 
 def build_parser():
@@ -49,7 +52,27 @@ def build_parser():
         elif name == "report":
             cmd.add_argument("--strict", action="store_true", help="Exit 7 if quality is not passed")
         else:
-            cmd.add_argument("--kind", choices=["energy", "scf"], default="energy")
+            cmd.add_argument("--kind", choices=["energy", "scf", "convergence"], default="energy")
+    match = sub.add_parser('match-trajectory',
+                           help='Associate explicit CP2K optimization steps with XYZ/extXYZ trajectory frames')
+    match.add_argument('output_path', help='Explicit CP2K .out file')
+    match.add_argument('trajectory_path', help='Explicit .xyz or .extxyz trajectory file')
+    match.add_argument('--segment', type=int,
+                       help='1-based CP2K output segment (required when output has multiple segments)')
+    match.add_argument('--step', type=int, help='Explicit optimization step to verify, export, or view')
+    match.add_argument('--energy-tol', type=float, default=DEFAULT_ENERGY_TOL_HARTREE,
+                       help='Energy agreement tolerance [hartree] (default 1e-6)')
+    match.add_argument('-o', '--output', help='Exclusive new JSON report file; default stdout')
+    match.add_argument('--export-structure',
+                       help='Optional exclusive output path for the verified matched single-frame structure (+ .json sidecar)')
+    match.add_argument('--structure-format', choices=('extxyz', 'xyz'), default='extxyz')
+    match.add_argument('--allow-cell-loss', action='store_true',
+                       help='Explicitly allow plain XYZ to omit a known cell when using --export-structure')
+    match.add_argument('--view', action='store_true',
+                       help='Open ONLY the verified matched frame in cp2kkit-viewer; refuses ambiguous/mismatched frames')
+    match.add_argument('--viewer', help='Explicit cp2kkit-viewer executable path (used with --view)')
+    match.add_argument('--strict', action='store_true',
+                       help='Exit 7 if trajectory match or target step verification does not pass')
     vibration = sub.add_parser('vibration', help='Observe a CP2K 2026.2 Cartesian normal-mode table')
     vibration.add_argument('path', help='Explicit CP2K output file')
     vibration.add_argument('--segment', type=int, help='1-based program segment')
@@ -347,7 +370,46 @@ def _build_view_args(args):
     return viewer_args
 
 
+def _match_trajectory_command(args):
+    if args.viewer is not None and not args.view:
+        raise KitError('--viewer requires --view')
+    if args.export_structure is None and (args.allow_cell_loss or args.structure_format != 'extxyz'):
+        raise KitError('--allow-cell-loss and non-default --structure-format require --export-structure')
+    if args.output is not None:
+        if os.path.lexists(args.output):
+            raise OutputExists(f'Refusing to overwrite: {args.output}')
+        if args.export_structure is not None and Path(args.output).resolve() in {
+            Path(args.export_structure).resolve(), Path(args.export_structure + '.json').resolve(),
+        }:
+            raise OutputExists(f'Refusing to overwrite overlapping structure export: {args.output}')
+
+    report = match_trajectory(args.output_path, args.trajectory_path, segment=args.segment,
+                              energy_tol_hartree=args.energy_tol, requested_step=args.step)
+    exported_path = None
+    if args.export_structure is not None or args.view:
+        frame, matched = select_matched_frame(report, step=args.step)
+    with (new_file(args.output) if args.output is not None else nullcontext(sys.stdout)) as stream:
+        if args.export_structure is not None:
+            exported_path, sidecar_path, export_warnings = export_structure_files(
+                frame.structure, args.export_structure, args.structure_format, args.allow_cell_loss)
+        stream.write(json_text(report.to_dict()))
+    if exported_path is not None:
+        for warning in export_warnings:
+            print(f'WARNING: {warning}', file=sys.stderr)
+        print(f'Wrote {exported_path} and {sidecar_path}', file=sys.stderr)
+    for warning in report.warnings:
+        print(f'WARNING: {warning}', file=sys.stderr)
+    if args.view:
+        if exported_path is not None:
+            view_structure(exported_path, executable=args.viewer)
+        else:
+            view_matched_structure(frame.structure, stem=f"step-{matched['step']}", executable=args.viewer)
+    return 7 if args.strict and not report.strict_passed else 0
+
+
 def execute(args):
+    if args.command == 'match-trajectory':
+        return _match_trajectory_command(args)
     if args.command == 'view':
         return launch_viewer(args.path, viewer_args=_build_view_args(args), executable=args.viewer)
     if args.command in {'thermochemistry', 'shermo-read'}:

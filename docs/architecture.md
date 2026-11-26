@@ -1,4 +1,4 @@
-# cp2kkit v0.4.8 architecture
+# cp2kkit v0.4.9 architecture
 
 ## Design principles
 
@@ -19,6 +19,17 @@ No submission system or deferred Bader/PDOS/NEB post-processing is introduced.
    ordinary single-input generation alone may atomically replace regular .inp,
    never sources/data/symlinks. Density bundles require all requested targets to be new.
 7. **Minimal dependencies:** standard-library core, isolated optional plotting/Rich presentation, no ASE requirement.
+
+## Optimization criteria and explicit trajectory association (0.4.9)
+
+`parser.py` observes criteria separately from legacy FORCE_EVAL indexing;
+`quality.py` treats malformed records and incompatible success evidence
+conservatively. `trajectory.py` reuses the XYZ frame reader in `structure.py`,
+classifies evidence on one selected output segment, and is shared by CLI and
+TUI. Export and viewer code receive only the selected structure, not an entire
+trajectory. `plot.py` exports a separate criteria CSV schema and retains the
+existing exclusive PNG/CSV/JSON publication path. See the
+[optimization observation contract](geo-opt-contract.md).
 
 ## Vibrational input task (0.4.3, extended in 0.4.6–0.4.7)
 
@@ -111,6 +122,7 @@ cli.py
  |-- export.py ----- structure.py / io.py / models.py / quality.py (shared structure export/CSV)
  |-- structure.py -- models.py / io.py (independent geometry)
  |-- plot.py ------- export.py / quality.py / optional matplotlib
+ |-- trajectory.py - parser.py / quality.py / structure.py (explicit frame association)
  |-- main_tui.py --- input_tui.py / structure.py / export.py (menu/load/grouped analysis adapters)
  |-- vibration_results.py -- parser.py (helpers) / models.py / io.py (frequency observations)
  |-- thermochemistry.py -- vibration_results.py / constraints.py / parser.py / quality.py / structure.py / models.py / io.py / errors.py

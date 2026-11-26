@@ -5,7 +5,8 @@ import re
 from .discovery import CP2K_MARKER
 from .errors import ParseError
 from .io import read_text
-from .models import Energy, Evidence, Quantity, Run, SCHEMA_VERSION, Segment
+from .models import (OPTIMIZATION_CRITERIA, ConvergenceCriterion, Energy, Evidence,
+                     OptimizationStep, Quantity, Run, SCHEMA_VERSION, Segment)
 from .output_settings import normalize_settings
 
 NUMBER = r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[EeDd][+-]?\d+)?"
@@ -33,6 +34,107 @@ def number(token, source):
     return value
 
 
+# (criterion, member, unit), or (None, step member, None) for block metadata.
+_OPT_LABELS = {
+    "Step number": (None, "step", None),
+    "Optimization method": (None, "method", None),
+    "Total energy [hartree]": (None, "energy_hartree", None),
+    "Total energy [a.u.]": (None, "energy_hartree", None),
+    "Internal pressure [bar]": (None, "internal_pressure_bar", None),
+    "Pressure deviation [bar]": ("pressure", "value", "bar"),
+    "Pressure tolerance [bar]": ("pressure", "limit", "bar"),
+    "Pressure is converged": ("pressure", "converged", "bar"),
+    "Conv. for PRESSURE": ("pressure", "converged", "bar"),
+}
+_LEGACY_LABELS = {
+    label: _OPT_LABELS[label] for label in ("Internal pressure [bar]", "Pressure deviation [bar]",
+                                           "Pressure tolerance [bar]", "Conv. for PRESSURE")
+}
+for _name, _unit, _label, _legacy in (
+    ("max_step", "bohr", "Maximum step size", ("Max. step size", "Conv. limit for step size", "Convergence in step size")),
+    ("rms_step", "bohr", "RMS step size", ("RMS step size", "Conv. limit for RMS step", "Convergence in RMS step")),
+    ("max_gradient", "hartree/bohr", "Maximum gradient", ("Max. gradient", "Conv. limit for gradients", "Conv. for gradients")),
+    ("rms_gradient", "hartree/bohr", "RMS gradient", ("RMS gradient", "Conv. limit for RMS grad.", "Conv. for RMS grad.")),
+):
+    for _member, _modern, _old in zip(
+        ("value", "limit", "converged"), (_label, "Convergence limit for " + _label, _label + " is converged"), _legacy
+    ):
+        _OPT_LABELS[_modern] = _LEGACY_LABELS[_old] = (_name, _member, _unit)
+
+
+def _optimization_pattern(labels, prefix, separator):
+    alternatives = "|".join(re.escape(label).replace(r"\ ", r"\s+")
+                            for label in sorted(labels, key=len, reverse=True))
+    return re.compile(r"^\s*" + prefix + "(" + alternatives + ")" + separator + r"(.*)$", re.I)
+
+
+_OPT_LABELS = {key.lower(): value for key, value in _OPT_LABELS.items()}
+_LEGACY_LABELS = {key.lower(): value for key, value in _LEGACY_LABELS.items()}
+_OPT_RECORDS = (
+    (_optimization_pattern(_OPT_LABELS, r"OPT\|\s*", r"(?=\s|$)"), _OPT_LABELS),
+    (_optimization_pattern(_LEGACY_LABELS, r"(?:Convergence\s+check\s*:\s*)?", r"\s*="), _LEGACY_LABELS),
+)
+
+
+def _optimization_record(line):
+    for pattern, labels in _OPT_RECORDS:
+        match = pattern.match(line)
+        if match:
+            return (*labels[" ".join(match[1].lower().split())], match[2].strip())
+    return None
+
+
+def _optimization_value(member, token, evidence):
+    if member == "step":
+        if re.fullmatch(r"[+-]?[0-9]+", token):
+            try:
+                return int(token)
+            except ValueError:
+                pass
+        return None
+    if member == "method":
+        return token if re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", token) else None
+    if member == "converged":
+        return token.upper() == "YES" if token.upper() in {"YES", "NO"} else None
+    return number(token, evidence) if re.fullmatch(NUMBER, token) else None
+
+
+def _record_optimization_value(opt, name, member, unit, value, evidence):
+    if name is None:
+        setattr(opt, member, value)
+        if member in {"energy_hartree", "internal_pressure_bar"}:
+            source_field = "energy_source" if member == "energy_hartree" else "internal_pressure_source"
+            setattr(opt, source_field, evidence if value is not None else None)
+        return
+    criterion = getattr(opt, name)
+    if criterion is None:
+        criterion = ConvergenceCriterion(unit=unit)
+        setattr(opt, name, criterion)
+    setattr(criterion, member, value)
+    if member != "value":
+        setattr(criterion, member + "_source", evidence if value is not None else None)
+    if member == "value" and value is not None:
+        criterion.source = evidence
+    elif criterion.value is None:
+        sources = (criterion.limit_source, criterion.converged_source)
+        criterion.source = min((s for s in sources if s is not None), key=lambda s: s.line, default=None)
+
+
+def _finalize_optimization(segment):
+    def flags(criteria):
+        if all(c is not None and c.converged is not None for c in criteria):
+            return all(c.converged is True for c in criteria)
+        return None
+
+    for opt in segment.optimization_steps:
+        four = tuple(getattr(opt, name) for name in OPTIMIZATION_CRITERIA[:-1])
+        required = (*four, opt.pressure) if segment.run_type == "CELL_OPT" or opt.pressure is not None else four
+        opt.all_cartesian_converged = flags(four)
+        opt.all_observed_converged = flags(required)
+    if segment.optimization_steps:
+        segment.last_optimization_step = segment.optimization_steps[-1]
+
+
 def _parse_output_with_ranges(path):
     text, provenance = read_text(path)
     if not CP2K_MARKER.search(text):
@@ -48,8 +150,12 @@ def _parse_output_with_ranges(path):
     version = project = None
     warnings = []
 
+    opt = None
+    last_opt_step = None
+    opt_number_seen = False
+
     def begin(line_no, started=False):
-        nonlocal current, step, pending_scf, scf_evidence, step_source
+        nonlocal current, step, pending_scf, scf_evidence, step_source, opt, last_opt_step, opt_number_seen
         current = Segment(id=len(segments), started=started)
         segments.append(current)
         ranges.append([line_no, line_no])
@@ -57,11 +163,29 @@ def _parse_output_with_ranges(path):
         step_source = None
         pending_scf = None
         scf_evidence = []
+        opt = None
+        last_opt_step = None
+        opt_number_seen = False
+
+    def begin_opt(number, source):
+        nonlocal opt, last_opt_step, opt_number_seen
+        opt = OptimizationStep(current.id, len(current.optimization_steps) + 1, number, source)
+        current.optimization_steps.append(opt)
+        if number is not None:
+            last_opt_step = number
+        opt_number_seen = False
+
+    def reset(line_no):
+        old_run_type = current.run_type
+        begin(line_no)
+        current.run_type = old_run_type
+        warnings.append(f"Step reset at line {line_no}: new segment, no inferred restart continuity")
 
     for line_no, line in enumerate(lines, 1):
         evidence = Evidence(provenance["path"], line_no, line)
         was_completed = current is not None and current.completed
-        if was_completed and (VERSION.search(line) or RUN_TYPE.search(line)
+        opt_record = _optimization_record(line)
+        if was_completed and (opt_record or VERSION.search(line) or RUN_TYPE.search(line)
                 or STEP.search(line) or SCF_OK.search(line) or SCF_FAIL.search(line)
                 or SETTING.match(line) or re.search(r"ENERGY\|\s+Total FORCE_EVAL", line, re.I)):
             begin(line_no)
@@ -70,7 +194,7 @@ def _parse_output_with_ranges(path):
             if current is None:
                 begin(line_no, True)
                 was_completed = False
-            elif current.started or current.energies or current.completed:
+            elif current.started or current.energies or current.optimization_steps or current.completed:
                 begin(line_no, True)
                 was_completed = False
             else:
@@ -108,17 +232,42 @@ def _parse_output_with_ranges(path):
         match = STEP.search(line)
         if match:
             new_step = int(match[1])
-            if current.completed or (step is not None and new_step <= step):
-                old_run_type = current.run_type
-                begin(line_no)
+            is_opt_banner = match[0].upper().startswith("OPTIMIZATION")
+            if (current.completed or (step is not None and new_step <= step)
+                    or (is_opt_banner and last_opt_step is not None and new_step <= last_opt_step)):
+                reset(line_no)
                 was_completed = False
-                current.run_type = old_run_type
-                warnings.append(f"Step reset at line {line_no}: new segment, no inferred restart continuity")
+            if is_opt_banner:
+                begin_opt(new_step, evidence)
             step = new_step
             step_source = evidence
             pending_scf = None
             scf_evidence = []
             current.scf_converged = None
+        if opt_record:
+            name, member, unit, token = opt_record
+            value = _optimization_value(member, token, evidence)
+            if value is None:
+                current.unparsed_optimization_records.append(evidence)
+                warnings.append(f"Unsupported or malformed optimization record at {evidence.path}:line {line_no}")
+            if member == "step":
+                if value is None:
+                    # Do not attach records from an unidentifiable block to a
+                    # previous explicit optimization step.
+                    begin_opt(None, None)
+                else:
+                    confirms_banner = opt is not None and opt.step == value and not opt_number_seen
+                    if last_opt_step is not None and value <= last_opt_step and not confirms_banner:
+                        reset(line_no)
+                    if opt is None or opt.step != value:
+                        begin_opt(value, evidence)
+                    # A banner and its first OPT| step label describe one step.
+                    # Do not change the legacy FORCE_EVAL step / SCF association.
+                    opt_number_seen = True
+            else:
+                if opt is None:
+                    begin_opt(None, None)
+                _record_optimization_value(opt, name, member, unit, value, evidence)
         match = SCF_OK.search(line)
         if match:
             current.scf_converged = pending_scf = True
@@ -183,6 +332,7 @@ def _parse_output_with_ranges(path):
         if not was_completed:
             ranges[-1][1] = line_no
     for segment in segments:
+        _finalize_optimization(segment)
         segment.normalized_settings = normalize_settings(segment.settings_records)
         for field, setting in segment.normalized_settings.items():
             if field != "uks" and setting["status"] in {"unsupported", "conflicting"}:

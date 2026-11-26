@@ -1,5 +1,10 @@
 # Synthetic GEO_OPT observation baseline
 
+Software 0.4.9 adds optional convergence criteria observations and explicit
+trajectory matching; see the [current contract](../../docs/geo-opt-contract.md).
+The original `observation.txt` and `expected-fields.json` still exercise the
+legacy observation baseline and do not attempt to match a trajectory.
+
 `observation.txt` is a hand-written public format fixture, not a CP2K output or a
 calculation. Its zero energy is deliberate: zero must survive parsing and must not
 be treated as missing. The printed version is explicitly synthetic. No coordinates,

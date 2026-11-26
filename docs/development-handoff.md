@@ -1,4 +1,4 @@
-# Development handoff: 0.4.7 and follow-up priorities
+# Development handoff: 0.4.9 and follow-up priorities
 
 Task keyword: **CP2KKIT-NEXT**. This is a reference label for this document.
 
@@ -22,9 +22,52 @@ the full generation/parsing/Shermo chain to periodic surface partial-Hessian
 adsorbate vibrations and external Shermo `imode=1`.
 A future internal engine remains a separate task.
 
-## Current handoff: 0.4.7
+## Current handoff: 0.4.9
 
-The working-tree software version is **0.4.7** with exchange schema **0.1.0**.
+The working-tree software version is **0.4.9** with exchange schema **0.1.0**.
+This stage completes bounded read-only GEO_OPT/CELL_OPT convergence criteria
+observation and explicit trajectory-step association:
+
+- **Convergence criteria observation (`models.py`, `parser.py`, `quality.py`,
+  `export.py`, `plot.py`):** parses CP2K 2026.x `OPT|` and legacy
+  `Convergence check` records for the four Cartesian criteria (`bohr`,
+  `hartree/bohr`) and `CELL_OPT` signed pressure deviation/tolerance (`bar`),
+  retaining Step 0, exact `0.0`, and per-line provenance while keeping legacy
+  `Energy` indexing and long-form CSV columns unchanged. Malformed records and
+  completion-marker contradictions block `passed`. `plot --kind convergence`
+  writes exclusive PNG/CSV/JSON with a linear signed pressure subplot when
+  present.
+- **Explicit trajectory-step association (`structure.py`, `trajectory.py`,
+  `cli.py`, `viewer.py`, `main_tui.py`):** adds `cp2kkit match-trajectory`
+  and TUI **5/4** with explicit `.out` + `.xyz`/`.extxyz` paths, 1-based
+  `--segment` selection, `1e-6` hartree default tolerance, CP2K 2026.2 EXTXYZ
+  `Step=`/`Time=`/`Energy=` parsing, conservative preceding line-search
+  disambiguation via `OPT| Total energy [hartree]`, and segment-scoped
+  `- Atoms:` count cross-checking (`atom_count_mismatch`). Export (`-o`
+  reserved before `--export-structure`) and single-frame `--view` staging
+  require verified step matches and never fall back to `frames[-1]`.
+- **Source-tree closeout checks (Linux):**
+  - Python 3.12.16 full environment (with optional Matplotlib/Rich): all **770**
+    tests passed with **0** skips (including 27 tests in
+    `tests/test_opt_criteria_trajectory.py`, `tests/test_project_text.py`, and
+    `tests/test_version.py`); `compileall`, `cp2kkit --version` (`0.4.9`), and
+    `git diff --check` passed.
+  - Core-only verification (with Matplotlib and Rich blocked): 25 of 27 tests
+    in `tests/test_opt_criteria_trajectory.py` passed with 2 optional
+    Matplotlib skips.
+  - Bounded read-only format checks exercised CP2K 2026.2 `BFGS` `GEO_OPT`
+    (`XYZ`) and `CELL_OPT` (`EXTXYZ`) outputs (confirming signed pressure
+    deviations, `Step=`/`Time=`/`Energy=` EXTXYZ headers, Step 0/extra-frame
+    separation, and cross-system `- Atoms:` mismatch rejection); these checks
+    do not certify general CP2K execution, real X11 viewer rendering, `CG`/
+    `LBFGS` native line-search outputs, or scientific validity.
+- **Deferred (next stages):** `0.5.0` packaging/CI/PyPI/MCP (`AGENT-1`) and
+  documentation restructuring (`DOC-1`) remain separate work. See the
+  [optimization observation contract](geo-opt-contract.md).
+
+## Historical handoff: 0.4.7
+
+The software version at this stage was **0.4.7** with exchange schema **0.1.0**.
 This stage implements the end-to-end bounded periodic surface adsorbate workflow:
 
 - **Generation (`vibration.py`, `inputgen.py`, `input_tui.py`, `cli.py`):**

@@ -65,13 +65,16 @@ the workflow; the loaded geometry is not automatically associated with a result.
 
 Implemented local operations:
 
-- **5 / 1 Quality report:** unchanged text-quality view.
+- **5 / 1 Quality report:** text quality and the last observed optimization criteria.
 - **5 / 2 Parse & export output:** read-only summary from an explicit output
   file or an unambiguous directory. `d` shows full JSON; `j` and `c` explicitly
   export the batch-equivalent JSON and long-form CSV to new files.
-- **5 / 3 Plot energy / SCF convergence:** same source selection, energy by
-  default or SCF, and an explicit new `.png` path. Uses optional Matplotlib and
-  writes the PNG, same-stem CSV and JSON together.
+- **5 / 3 Plot energy / SCF / convergence:** same source selection, energy by
+  default or SCF/optimization criteria, and an explicit new `.png` path.
+  Uses optional Matplotlib and writes the PNG, same-stem CSV and JSON together.
+- **5 / 4 Match trajectory to output:** explicit `.out` and `.xyz`/`.extxyz`
+  paths, with 1-based segment choice if needed. Inspect details (`d`), write a
+  new JSON report (`j`), export (`e`) or view (`v`) a verified matched frame.
 - **6 / 1 Check scalar CUBE; 6 / 2 Subtract density CUBEs:** unchanged
   core processing, with an optional read-only `v` action on completion to open
   the CUBE (or new difference CUBE, and optional `--color-cube` in 6/1) in the

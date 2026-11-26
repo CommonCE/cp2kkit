@@ -8,6 +8,34 @@ Versions use **A.B.C**: A is decided manually by the user; features increment B
 and reset C; fixes increment C with A/B unchanged. A mixed feature/fix round
 increments B once. Explicit user version requests take priority.
 
+## 0.4.9
+
+- Observe GEO_OPT/CELL_OPT convergence criteria from CP2K 2026.x `OPT|` blocks
+  and legacy `Convergence check` records, retaining units (`bohr`,
+  `hartree/bohr`, `bar`), signed pressure deviations, YES/NO flags, and source
+  lines without changing legacy energy indexing. Malformed observations and
+  completion-marker contradictions block positive text quality.
+- Add `cp2kkit match-trajectory` (`src/cp2kkit/trajectory.py`) with explicit
+  output/trajectory paths, unified 1-based `--segment` selection, default
+  absolute energy tolerance of `1e-6` hartree, CP2K 2026.2 EXTXYZ `Step=` /
+  `Time=` / `Energy=` recognition, conservative `OPT| Total energy [hartree]`
+  disambiguation for preceding line-search evaluations (retaining ambiguity on
+  post-summary disagreements), and segment-scoped `- Atoms:` count cross-checks
+  (`atom_count_mismatch` blocks strict mode, final selection, export, and
+  viewer launch). Never infer a final frame from filenames, timestamps, or
+  `frames[-1]`; reserve `-o` before exporting matched geometry with rollback on
+  error.
+- Add `cp2kkit plot --kind convergence` (Cartesian log panel, linear signed
+  pressure subplot when present, dedicated criteria CSV, and exclusive
+  PNG/CSV/JSON publication), single-frame `view_matched_structure()`, and
+  output-analysis TUI enhancements (`5/1`, `5/2`, `5/3`, and new `5/4`).
+  Preserve schema `0.1.0`, existing CSV columns, exit codes (`0/2/3/4/5/6/7`),
+  and main-menu numbering (`1–7`).
+- Add synthetic parser, trajectory-matching, CLI, plot, viewer, and TUI
+  regression coverage in `tests/test_opt_criteria_trajectory.py`. Source-tree
+  tests and bounded read-only format checks do not certify general CP2K
+  execution or scientific validity.
+
 ## 0.4.8
 
 - Add `build_viewer_scene()` / `export_viewer_scene()` in

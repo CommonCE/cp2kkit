@@ -7,7 +7,7 @@ from pathlib import Path
 from .errors import KitError
 from .io import json_text, new_file
 from .structure import xyz_text
-from .models import SCHEMA_VERSION
+from .models import OPTIMIZATION_CRITERIA, SCHEMA_VERSION
 from .quality import quality_report
 
 FIELDS = ["schema_version", "software", "software_version", "project", "source_path", "source_sha256",
@@ -68,3 +68,38 @@ def write_csv(stream, run):
     writer = csv.DictWriter(stream, FIELDS, lineterminator="\n")
     writer.writeheader()
     writer.writerows(data_rows(run))
+
+
+CONVERGENCE_FIELDS = ["schema_version", "software", "software_version", "project", "source_path", "source_sha256",
+                      "segment", "run_type", "segment_status", "index", "step", "criterion", "value", "limit",
+                      "unit", "converged", "source_line", "source_text"]
+
+
+def convergence_rows(run):
+    reports = {r["segment"]: r for r in quality_report(run)["segments"]}
+    for segment in run.segments:
+        for opt in segment.optimization_steps:
+            for name in OPTIMIZATION_CRITERIA:
+                criterion = getattr(opt, name)
+                if criterion is None:
+                    continue
+                source = criterion.source
+                row = {
+                    "schema_version": SCHEMA_VERSION, "software": run.software,
+                    "software_version": segment.settings.get("software_version", {}).get("value"),
+                    "project": run.project, "source_path": run.source["path"],
+                    "source_sha256": run.source["sha256"], "segment": segment.id,
+                    "run_type": segment.run_type, "segment_status": reports[segment.id]["status"],
+                    "index": opt.index, "step": opt.step, "criterion": name,
+                    "value": criterion.value, "limit": criterion.limit, "unit": criterion.unit,
+                    "converged": criterion.converged,
+                    "source_line": source.line if source is not None else None,
+                    "source_text": source.text if source is not None else None,
+                }
+                yield {key: "" if value is None else value for key, value in row.items()}
+
+
+def write_convergence_csv(stream, run):
+    writer = csv.DictWriter(stream, CONVERGENCE_FIELDS, lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(convergence_rows(run))

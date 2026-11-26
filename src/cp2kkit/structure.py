@@ -50,7 +50,8 @@ def check_cell(cell):
         raise ParseError("Singular or invalid cell")
 
 
-def read_xyz(path, frame=-1):
+def read_xyz_frames(path) -> list[tuple[Structure, str]]:
+    """Read validated structures with their original comment lines and frame provenance."""
     text, source = read_text(path)
     lines = text.splitlines()
     frames = []
@@ -102,13 +103,18 @@ def read_xyz(path, frame=-1):
             symbols.append(fields[0])
             positions.append(floats(fields[1:]))
         frame_source = {**source, "line_start": start+1, "line_end": start+count+2}
-        frames.append(Structure(symbols, positions, cell, pbc, frame_source, len(frames)))
+        frames.append((Structure(symbols, positions, cell, pbc, frame_source, len(frames)), comment))
         i += count + 2
     if not frames:
         raise ParseError("No XYZ frames found")
+    return frames
+
+
+def read_xyz(path, frame=-1):
+    frames = read_xyz_frames(path)
     if not -len(frames) <= frame < len(frames):
         raise ParseError(f"Frame {frame} out of range ({len(frames)} frames)")
-    return frames[frame]
+    return frames[frame][0]
 
 
 def length_values(tokens, default="angstrom"):

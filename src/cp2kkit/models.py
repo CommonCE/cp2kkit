@@ -32,6 +32,40 @@ class Energy:
     scf_association: str = "unknown"
 
 
+OPTIMIZATION_CRITERIA = ("max_step", "rms_step", "max_gradient", "rms_gradient", "pressure")
+
+
+@dataclass
+class ConvergenceCriterion:
+    value: float | None = None
+    limit: float | None = None
+    unit: str | None = None
+    converged: bool | None = None
+    source: Evidence | None = None
+    limit_source: Evidence | None = None
+    converged_source: Evidence | None = None
+
+
+@dataclass
+class OptimizationStep:
+    segment: int
+    index: int
+    step: int | None
+    step_source: Evidence | None = None
+    method: str | None = None
+    energy_hartree: float | None = None
+    energy_source: Evidence | None = None
+    internal_pressure_bar: float | None = None
+    internal_pressure_source: Evidence | None = None
+    max_step: ConvergenceCriterion | None = None
+    rms_step: ConvergenceCriterion | None = None
+    max_gradient: ConvergenceCriterion | None = None
+    rms_gradient: ConvergenceCriterion | None = None
+    pressure: ConvergenceCriterion | None = None
+    all_cartesian_converged: bool | None = None
+    all_observed_converged: bool | None = None
+
+
 @dataclass
 class Segment:
     id: int
@@ -53,6 +87,9 @@ class Segment:
     unparsed_energy_context: list[dict[str, Any]] = field(default_factory=list)
     settings_records: list[dict[str, Any]] = field(default_factory=list)
     normalized_settings: dict[str, Any] = field(default_factory=dict)
+    optimization_steps: list[OptimizationStep] = field(default_factory=list)
+    last_optimization_step: OptimizationStep | None = None
+    unparsed_optimization_records: list[Evidence] = field(default_factory=list)
 
 
 @dataclass

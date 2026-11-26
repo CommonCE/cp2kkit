@@ -137,7 +137,17 @@ Software 0.4.2 adds nullable step_source/scf_source, scf_evidence (list), and
 scf_association (preceding_summary/ambiguous/unknown). Segment additions are
 last_observed_energy (full Energy or null) and unparsed_energy_context (list).
 See [GEO_OPT contract](geo-opt-contract.md) for exact semantics, null/absence,
-compatibility policy, limitations and consumer migration. No final candidate is exported.
+compatibility policy, limitations and consumer migration. No final candidate
+energy is exported in parse JSON.
+
+Software 0.4.9 adds optional `optimization_steps` (ordered array with 1-based
+`index`, nullable explicit `step`, metadata and criteria), `last_optimization_step`
+(last such observation or null), and `unparsed_optimization_records` (line
+evidence array). Each optional criterion object retains nullable `value`,
+`limit`, `unit`, `converged`, `source`, `limit_source` and `converged_source`.
+`all_cartesian_converged` and `all_observed_converged` are nullable booleans; they
+summarize only printed flags. Step sizes use bohr, gradients hartree/bohr, and
+pressure bar. Older exports may omit all additions.
 Total FORCE_EVAL records accept `[a.u.]` and `[hartree]` unit labels
 (case-insensitive); both serialize as `hartree` without numerical conversion.
 Original evidence retains the printed label. Unsupported units and malformed
@@ -189,7 +199,43 @@ Electronic and geometry convergence are independent. ENERGY may have
 geometry_converged=null with geometry_required=false.
 
 Reports include reasons, energy_usable, evidence arrays, original provenance, and
-limitations. Command success and calculation quality are separate.
+limitations. Optional segment additions in software 0.4.9 are
+`optimization_step_count` and `last_optimization_criteria` (null or a step,
+aggregate flags and named criteria with nullable value, limit, unit and flag).
+The last criteria observation need not be the last optimization record. Command
+success and calculation quality are separate.
+
+## Trajectory step match JSON (0.4.9)
+
+`operation: "trajectory_step_match"` uses schema 0.1.0, with `parser`, output
+`source`, `trajectory_source`, `segment` (1-based), `segment_id` (zero-based),
+`requested_step` and `energy_tol_hartree`. Frame metadata retains zero-based
+`frame_index`, one-based `line_start`/`line_end`, raw `comment`, nullable
+`trajectory_step`/`trajectory_energy_hartree`, `atom_count`, `has_cell` and
+`has_pbc` as resolved by the existing XYZ reader; coordinates are not embedded.
+CP2K 2026.2 EXTXYZ `Time=` is recognized for metadata validation, not used to
+pair frames. `matches` holds same-step unique pairs, their status, signed energy
+difference, output evidence, number of FORCE_EVAL energies, ambiguity flag and
+nullable aggregate convergence flags. The additive `output_energy_selection`
+is `force_eval`, `opt_summary`, `opt_summary_line_search`, `ambiguous` or
+`unavailable`. Disagreeing FORCE_EVAL energies can use the explicit
+`OPT| Total energy [hartree]` summary only with preceding same-step agreement
+and no disagreeing post-summary reevaluation for that step.
+
+Optional `output_atom_count` is the agreed native `- Atoms:` count from the
+selected output-file segment, or null if unavailable, malformed, conflicting,
+or supplied only as a parsed `Run`. `output_atom_count_sources` lists evidence
+for all valid records, including conflicting ones, and is empty if none were
+observed. Each pair's `atom_count_matches` is null for an unknown output count,
+true for agreement, or false for `status: atom_count_mismatch`. That status
+skips the energy comparison (`energy_diff_hartree` is null) and fails strict
+matching. A count match does not verify element order or coordinates.
+
+`frames_missing_step`, `duplicate_trajectory_steps`, `unmatched_output_steps`
+and `unmatched_trajectory_frames` distinguish absent and ambiguous evidence.
+`converged_final_step` is a matched entry or null, with `converged_final_status`,
+`converged_final_reasons`, `strict_passed` and `warnings`. See the
+[matching contract](geo-opt-contract.md#explicit-trajectory-association-049).
 
 ## Structure JSON
 
@@ -207,9 +253,13 @@ inventing PBC flags.
 
 source, kind, x_label, y_label, segments_connected=false, data/path/sha256,
 image/path/sha256, run, quality.
-CSV contains both record types; kind chooses the plotted subset. The Python
-plot writer rejects kinds other than `energy` and `scf` before creating files.
-Plot segments independently without cross-segment connections.
+For `energy` and `scf`, CSV retains both legacy record types and kind chooses
+the plotted subset. Since 0.4.9, `plot --kind convergence` produces a separate
+criteria CSV with one row per observed step/criterion, retaining the nullable
+explicit step, observation index, values, units, flags and line/text evidence.
+The CSV preserves zero observations even when omitted from the log plot. The
+Python writer rejects unsupported kinds before creating files. Plot segments
+independently without cross-segment connections.
 
 ## Generated input JSON: menu/workflow additions (software 0.2.9)
 

@@ -5,13 +5,13 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
-from .errors import KitError
+from .errors import AmbiguousProject, KitError
 from .export import export_structure_files
 from .input_tui import Cancelled, SessionExit, Field, Menu, run_interactive
 from .inputgen import InputSettings
 from .presentation import require_terminal
 from .structure import is_structure_path, read_structure
-from .viewer import view_checked_cube, view_structure, view_vibration_scene
+from .viewer import view_checked_cube, view_matched_structure, view_structure, view_vibration_scene
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,8 @@ ACTIONS = (
 ANALYSIS_GROUPS = {
     'output_analysis': ('Output analysis', (('quality', 'Quality report'),
                                             ('parse', 'Parse & export output'),
-                                            ('plot', 'Plot energy / SCF convergence'))),
+                                            ('plot', 'Plot energy / SCF / convergence'),
+                                            ('match_trajectory', 'Match trajectory to output'))),
     'cube_analysis': ('CUBE analysis', (('cube_check', 'Check scalar CUBE'),
                                         ('cube_diff', 'Subtract density CUBEs'),
                                         ('cube_planar', 'Planar averages and cumulative integrals'))),
@@ -182,7 +183,10 @@ def parse_analysis(menu):
               f'project: {run.project or "Unknown"}')
     energies = sum(len(segment.energies) for segment in run.segments)
     scf = sum(len(segment.scf_iterations) for segment in run.segments)
+    opt_steps = sum(len(segment.optimization_steps) for segment in run.segments)
     menu.show(f'Segments: {len(run.segments)}; observed records: energy={energies}, SCF={scf}')
+    if opt_steps:
+        menu.show(f'Optimization criteria steps: {opt_steps}')
     menu.show(f'Parser warnings: {len(run.parser_warnings)}')
     for warning in run.parser_warnings[:8]:
         menu.show(f'Warning: {warning}')
@@ -216,7 +220,7 @@ def plot_analysis(menu):
     from .quality import quality_report
 
     run = read_analysis_output(menu)
-    kind = analysis_choice(menu, 'Plot kind', ('energy', 'scf'), 'energy')
+    kind = analysis_choice(menu, 'Plot kind', ('energy', 'scf', 'convergence'), 'energy')
     output = required_path(menu, 'New plot .png output path')
     for target in plot_run(run, output, kind):
         menu.show(f'Generated path: {target.resolve()}')
@@ -225,6 +229,85 @@ def plot_analysis(menu):
         menu.show(f'Warning: {warning}')
     if len(run.parser_warnings) > 8:
         menu.show('Additional warnings are available in the plot JSON sidecar.')
+
+
+def match_trajectory_analysis(menu):
+    from .io import json_text, write_json
+    from .parser import parse_output
+    from .trajectory import match_trajectory, select_matched_frame
+
+    out_path = required_path(menu, 'CP2K .out path')
+    traj_path = required_path(menu, 'Trajectory .xyz/.extxyz path')
+    try:
+        report = match_trajectory(out_path, traj_path)
+    except AmbiguousProject:
+        run = parse_output(out_path)
+        for index, segment in enumerate(run.segments, 1):
+            status = 'completed' if segment.completed else 'incomplete'
+            menu.show(f'  {index}. {segment.run_type or "Unknown run type"}; {status}')
+        choices = {str(i): i for i in range(1, len(run.segments) + 1)}
+        while True:
+            raw = menu.ask(f'Select 1-based segment [1-{len(choices)}]; Enter/0/back returns; cancel/q: ')
+            if raw.lower() in {'', '0', 'back'}:
+                return
+            if raw in choices:
+                report = match_trajectory(out_path, traj_path, segment=choices[raw])
+                if report.source != run.source:
+                    raise KitError('Output changed while selecting a segment; reopen the report')
+                break
+            menu.show('Error: Select a listed segment.')
+    matched = sum(entry['status'] == 'matched' for entry in report.matches)
+    mismatches = sum(entry['status'] == 'energy_mismatch' for entry in report.matches)
+    menu.show(f"Source: {report.source['path']}")
+    menu.show(f"Trajectory: {report.trajectory_source['path']}")
+    menu.show(f'Segment {report.segment} (1-based): frames={len(report.frames)}; matched={matched}; '
+              f'energy mismatches={mismatches}; unverified pairs={len(report.matches) - matched}')
+    menu.show(f'Unmatched output steps={len(report.unmatched_output_steps)}; '
+              f'unmatched trajectory frames={len(report.unmatched_trajectory_frames)}; '
+              f'duplicates={len(report.duplicate_trajectory_steps)}; missing-step={len(report.frames_missing_step)}')
+    final = report.converged_final_step
+    menu.show(f'converged_final_status: {report.converged_final_status}')
+    menu.show(f"converged_final_step: {final['step'] if final is not None else 'unavailable'}")
+    for reason in report.converged_final_reasons:
+        menu.show(f'  Reason: {reason}')
+    for warning in report.warnings[:8]:
+        menu.show(f'Warning: {warning}')
+    if len(report.warnings) > 8:
+        menu.show('Additional warnings are available in full details.')
+    while True:
+        raw = menu.ask('Enter/0/back returns; d details; j JSON; e export matched frame; v viewer; cancel/q: ').lower()
+        if raw in {'', '0', 'back'}:
+            return
+        try:
+            if raw == 'd':
+                menu.show(json_text(report.to_dict()))
+            elif raw == 'j':
+                path = required_path(menu, 'New trajectory match JSON path')
+                write_json(path, report.to_dict())
+                menu.show(f'Generated path: {Path(path).resolve()}')
+            elif raw in {'e', 'v'}:
+                action = 'export' if raw == 'e' else 'view'
+                step = menu.ask(f'Optimization step to {action}; Enter uses verified converged final step; back returns: ')
+                if step.lower() == 'back':
+                    continue
+                try:
+                    step = int(step) if step else None
+                except ValueError:
+                    raise KitError('Enter an integer optimization step or leave blank') from None
+                frame, matched = select_matched_frame(report, step=step)
+                if raw == 'e':
+                    path = required_path(menu, 'New matched extXYZ path')
+                    target, sidecar, warnings = export_structure_files(frame.structure, path)
+                    for item in (target, sidecar):
+                        menu.show(f'Generated path: {item.resolve()}')
+                    for warning in warnings:
+                        menu.show(f'Warning: {warning}')
+                else:
+                    _open_in_viewer(menu, lambda: view_matched_structure(frame.structure, stem=f"step-{matched['step']}"))
+            else:
+                menu.show('Error: Select d, j, e, v or Enter.')
+        except (KitError, OSError) as exc:
+            menu.show(f'Error: {exc}')
 
 
 def planar_analysis(menu):
@@ -474,6 +557,8 @@ def shermo_analysis(menu, report):
 def analysis(menu, action):
     if action == 'parse':
         return parse_analysis(menu)
+    if action == 'match_trajectory':
+        return match_trajectory_analysis(menu)
     if action == 'plot':
         plot_analysis(menu)
         menu.ask('Enter/0/back returns; cancel/q: ')
@@ -494,6 +579,17 @@ def analysis(menu, action):
             for key in ('final_energy', 'wall_time'):
                 value = segment[key]
                 menu.show(f"{key}: {value['value']} {value['unit']}" if value else f'{key}: Unknown')
+            count = segment['optimization_step_count']
+            if count > 0:
+                menu.show(f'Optimization steps: {count}')
+            criteria = segment['last_optimization_criteria']
+            if criteria is not None:
+                menu.show(f"Observed optimization steps: {segment['optimization_step_count']}; "
+                          f"last criteria step={criteria['step']}; Cartesian={criteria['all_cartesian_converged']}; "
+                          f"all observed={criteria['all_observed_converged']}")
+                for name, item in criteria['criteria'].items():
+                    menu.show(f"  {name}: value={item['value']}, limit={item['limit']} {item['unit']}; "
+                              f"converged={item['converged']}")
             for reason in segment['reasons']:
                 menu.show(f'Warning: {reason}')
         for warning in report['parser_warnings']:

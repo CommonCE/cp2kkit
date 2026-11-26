@@ -1,6 +1,25 @@
 # Development status and next steps
 
-Current software: **0.4.8**; schema: **0.1.0**.
+Current software: **0.4.9**; schema: **0.1.0**.
+
+## 0.4.9 optimization criteria and trajectory matching
+
+- Observe supported GEO_OPT/CELL_OPT convergence criteria (`OPT|` and legacy
+  formats, including signed `CELL_OPT` pressure deviations), retain per-line
+  evidence, block positive quality on malformed records or contradictions, and
+  keep legacy energy/CSV/structure interfaces compatible.
+- Associate explicit output steps with unique XYZ/extXYZ frames (`cp2kkit
+  match-trajectory` and TUI **5/4**) using 1-based `--segment`, explicit
+  energy tolerance (`1e-6` hartree default), CP2K 2026.2 EXTXYZ
+  `Step=`/`Time=`/`Energy=` metadata, conservative preceding line-search
+  disambiguation, and segment-scoped `- Atoms:` count checks; never infer a
+  final frame from filenames, timestamps, or `frames[-1]`.
+- Add `plot --kind convergence` (Cartesian log + signed pressure linear panels)
+  and verified single-frame viewer staging while preserving schema **0.1.0**,
+  exit codes (`0/2/3/4/5/6/7`), and main-menu numbering (`1–7`).
+- See the [observation contract](geo-opt-contract.md) and
+  [development handoff](development-handoff.md) for closeout checks and limits.
+  `0.5.0` packaging/CI/MCP and broad native certification remain separate work.
 
 ## 0.4.8 optional companion viewer CLI/TUI integration
 

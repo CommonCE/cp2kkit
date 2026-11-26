@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .errors import KitError, MissingDependency
 from .io import json_text
+from .structure import Structure, xyz_text
 
 VIEWER_ENV_VAR = 'CP2KKIT_VIEWER'
 VIEWER_BINARY_NAMES = ('cp2kkit-viewer', 'cp2kkit-viewer-prototype')
@@ -106,6 +107,20 @@ def launch_viewer(path=None, *, viewer_args=(), executable=None, on_launch=None)
 def view_structure(path, *, executable=None, viewer_args=(), on_launch=None) -> int:
     """Open an existing structure, CP2K input/restart, Molden, or scene file in the viewer."""
     return launch_viewer(path, viewer_args=viewer_args, executable=executable, on_launch=on_launch)
+
+
+def view_matched_structure(structure: Structure, *, stem='matched-step', executable=None,
+                           viewer_args=(), on_launch=None) -> int:
+    """Stage just the selected frame for the lifetime of the foreground viewer."""
+    safe_stem = ''.join(ch if ch.isalnum() or ch in '._-' else '_'
+                        for ch in Path(stem).stem).strip('._') or 'matched-step'
+    extended = structure.cell is not None
+    suffix = '.extxyz' if extended else '.xyz'
+    frame_text = xyz_text(structure, extended=extended)
+    with tempfile.TemporaryDirectory(prefix='cp2kkit-viewer-') as tmpdir:
+        frame_path = Path(tmpdir) / (safe_stem + suffix)
+        frame_path.write_text(frame_text, encoding='utf-8')
+        return launch_viewer(frame_path, viewer_args=viewer_args, executable=executable, on_launch=on_launch)
 
 
 def view_cube(
